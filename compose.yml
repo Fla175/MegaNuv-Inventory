@@ -1,0 +1,58 @@
+networks:
+  interno:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.20.0/24
+
+
+volumes:
+  banco:
+
+services:
+  app:
+    image: front
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      interno:
+        ipv4_address: 192.168.20.2
+    environment:
+      # As variáveis existentes estão aqui
+      DB_HOST: banco
+      DB_PORT: ${DB_PORT}
+      DB_ROOT: ${DB_ROOT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DATABASE_URL: ${DATABASE_URL} 
+    ports: # Adicione esta linha se você quiser acessar a aplicação do host
+      - "3000:3000"
+    volumes: # Adicione estas linhas se você quiser hot-reload ou manter node_modules separado
+      - .:/app
+      - /app/node_modules
+    command: yarn dev # Ou yarn start para produção
+    depends_on:
+      banco:
+        condition: service_healthy # Garante que o DB esteja pronto antes de iniciar o Next.js
+
+  banco:
+    image: mariadb
+    networks:
+      interno:
+        ipv4_address: 192.168.20.3
+    volumes:
+      - banco:/var/lib/mysql
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+    # Adicione a seção healthcheck para o banco (já tinha sugerido antes)
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u$$MARIADB_USER", "-p$$MARIADB_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always # Garante que o container reinicie se cair
