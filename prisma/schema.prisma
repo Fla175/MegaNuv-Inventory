@@ -6,11 +6,25 @@ generator client {
 
 datasource db {
   provider = "mysql" // Você está usando MySQL
-  url      = env("DATABASE_URL") 
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN     // Acesso total ao sistema
+  MANAGER   // Gerente de estoque, pode adicionar/remover, ver relatórios
+  STAFF     // Operador de estoque, registra entradas/saídas
+  VIEWER    // Somente visualização de relatórios
 }
 
 model User {
-  id       String   @id @default(uuid())
-  email    String   @unique
-  password String
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String    // Campo para armazenar a senha hashada
+  name      String?   // Adicionei 'name' novamente, já que é útil
+  role      UserRole  @default(STAFF) // Papel do usuário, padrão 'STAFF'
+  status    String    @default("ACTIVE") // Status da conta do usuário
+  lastLogin DateTime? // Data e hora do último login do usuário
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt // Este campo é atualizado automaticamente
 }
