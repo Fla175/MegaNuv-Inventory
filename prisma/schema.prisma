@@ -6,14 +6,14 @@ generator client {
 
 datasource db {
   provider = "mysql" // Você está usando MySQL
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
 }
 
 enum UserRole {
-  ADMIN     // Acesso total ao sistema
-  MANAGER   // Gerente de estoque, pode adicionar/remover, ver relatórios
-  STAFF     // Operador de estoque, registra entradas/saídas
-  VIEWER    // Somente visualização de relatórios
+  ADMIN       // Acesso total ao sistema
+  MANAGER     // Gerente de estoque, pode adicionar/remover, ver relatórios
+  STAFF       // Operador de estoque, registra entradas/saídas
+  VIEWER      // Somente visualização de relatórios
 }
 
 model User {
@@ -27,4 +27,40 @@ model User {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt // Este campo é atualizado automaticamente
+
+  // Adicionando a relação com ContaAzulIntegration
+  contaAzulIntegration ContaAzulIntegration? // Um usuário pode ter UMA integração com a Conta Azul
 }
+
+model Item {
+  id              String    @id @default(uuid()) // ID interno do seu sistema
+  contaAzulId     String?   @unique // ID do produto na Conta Azul (UUID), opcional para itens criados localmente antes da sync
+  name            String
+  sku             String?   @unique // SKU do produto, opcional, pode vir da Conta Azul
+  description     String?
+  stockQuantity   Int       @default(0) // Quantidade em estoque, gerida pelo seu sistema
+  price           Decimal   @default(0.00) @db.Decimal(10, 2) // Preço de venda
+  cost            Decimal?  @db.Decimal(10, 2) // Custo do produto
+  type            String    @default("PRODUCT") // Tipo: "PRODUCT" ou "SERVICE" (da Conta Azul)
+  status          String    @default("ACTIVE") // Status: "ACTIVE", "INACTIVE" (da Conta Azul)
+
+  // Campo de controle da sincronização (para a abordagem hibrida)
+  lastContaAzulSync DateTime? // Data da ultima sincronizacao com a Conta Azul
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Novo modelo para armazenar as credenciais de integração da Conta Azul
+model ContaAzulIntegration {
+      id               String    @id @default(uuid())
+      userId           String    @unique
+      user             User      @relation(fields: [userId], references: [id])
+      accessToken      String    @db.Text // Alterado de VarChar(1000) para TEXT
+      refreshToken     String    @db.Text // Alterado de VarChar(1000) para TEXT
+      expiresAt        DateTime
+      scope            String?   @db.VarChar(500) // O scope também pode ser longo, mas 500 geralmente basta
+
+      createdAt        DateTime  @default(now())
+      updatedAt        DateTime  @updatedAt
+    }
