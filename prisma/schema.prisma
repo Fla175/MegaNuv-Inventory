@@ -5,62 +5,98 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql" // Você está usando MySQL
+  provider = "mysql"
   url       = env("DATABASE_URL")
 }
 
 enum UserRole {
-  ADMIN       // Acesso total ao sistema
-  MANAGER     // Gerente de estoque, pode adicionar/remover, ver relatórios
-  STAFF       // Operador de estoque, registra entradas/saídas
-  VIEWER      // Somente visualização de relatórios
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String    // Campo para armazenar a senha hashada
-  name      String?   // Adicionei 'name' novamente, já que é útil
-  role      UserRole  @default(STAFF) // Papel do usuário, padrão 'STAFF'
-  status    String    @default("ACTIVE") // Status da conta do usuário
-  lastLogin DateTime? // Data e hora do último login do usuário
+  id         String                @id @default(uuid())
+  email      String                @unique
+  password   String
+  name       String?
+  role       UserRole              @default(STAFF)
+  status     String                @default("ACTIVE")
+  lastLogin  DateTime?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt // Este campo é atualizado automaticamente
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
 
-  // Adicionando a relação com ContaAzulIntegration
-  contaAzulIntegration ContaAzulIntegration? // Um usuário pode ter UMA integração com a Conta Azul
+  contaAzulIntegration ContaAzulIntegration?
 }
 
 model Item {
-  id              String    @id @default(uuid()) // ID interno do seu sistema
-  contaAzulId     String?   @unique // ID do produto na Conta Azul (UUID), opcional para itens criados localmente antes da sync
-  name            String
-  sku             String?   @unique // SKU do produto, opcional, pode vir da Conta Azul
-  description     String?
-  stockQuantity   Int       @default(0) // Quantidade em estoque, gerida pelo seu sistema
-  price           Decimal   @default(0.00) @db.Decimal(10, 2) // Preço de venda
-  cost            Decimal?  @db.Decimal(10, 2) // Custo do produto
-  type            String    @default("PRODUCT") // Tipo: "PRODUCT" ou "SERVICE" (da Conta Azul)
-  status          String    @default("ACTIVE") // Status: "ACTIVE", "INACTIVE" (da Conta Azul)
+  id                      String    @id @default(uuid()) // ID interno do seu sistema
+  contaAzulId             String?   @unique // ID do produto na Conta Azul (UUID), opcional para itens criados localmente antes da sync
+  idLegado                Int?      // Novo: ID Legado do produto da Conta Azul
+  name                    String
+  sku                     String?   @unique // SKU do produto, pode vir da Conta Azul
+  ean                     String?   // Novo: Código EAN da Conta Azul
+  description             String?
+  stockQuantity           Int       @default(0) // Quantidade em estoque, gerida pelo seu sistema
+  price                   Decimal   @default(0.00) @db.Decimal(10, 2) // Preço de venda
+  cost                    Decimal?  @db.Decimal(10, 2) // Custo do produto
+  type                    String    @default("PRODUCT") // Tipo: "PRODUTO" ou "SERVICO" (da Conta Azul)
+  status                  String    @default("ACTIVE") // Status: "ATIVO", "INATIVO" (da Conta Azul)
+  
+  variacao                Int?      // Quantidade de filhos/variações da Conta Azul (se for tipo VARIACAO/KIT)
+  stockLevel              String?   // Nível do estoque da Conta Azul (MINIMO, MAXIMO, PADRAO)
+  minStockQuantity        Int?      // Estoque mínimo da Conta Azul
+  maxStockQuantity        Int?      // Estoque máximo da Conta Azul
+  isMoved                 Boolean?  // Indica se o produto foi movimentado na Conta Azul
+  idParent                String?   // ID do produto pai (se for uma variação/filho)
+  isEcommerceIntegrated   Boolean?  // Indica se a integração com o e-commerce está ativa na Conta Azul
 
-  // Campo de controle da sincronização (para a abordagem hibrida)
-  lastContaAzulSync DateTime? // Data da ultima sincronizacao com a Conta Azul
+  tags                    Json?     // Para armazenar um array de tags personalizadas
+  
+  lastContaAzulSync       DateTime? // Data da ultima sincronizacao com a Conta Azul
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relação com instâncias individuais deste item
+  instances               ItemInstance[]
 }
 
-// Novo modelo para armazenar as credenciais de integração da Conta Azul
-model ContaAzulIntegration {
-      id               String    @id @default(uuid())
-      userId           String    @unique
-      user             User      @relation(fields: [userId], references: [id])
-      accessToken      String    @db.Text // Alterado de VarChar(1000) para TEXT
-      refreshToken     String    @db.Text // Alterado de VarChar(1000) para TEXT
-      expiresAt        DateTime
-      scope            String?   @db.VarChar(500) // O scope também pode ser longo, mas 500 geralmente basta
+model ItemInstance {
+  id                      String    @id @default(uuid())
+  itemId                  String    // Foreign key para o Item (o tipo/definicao de produto)
+  item                    Item      @relation(fields: [itemId], references: [id])
 
-      createdAt        DateTime  @default(now())
-      updatedAt        DateTime  @updatedAt
-    }
+  serialNumber            String    @unique // CRUCIAL: Numero de serie individual da unidade (exclusivo para seu sistema)
+  location                String?   // Localização física (ex: "Rack 1 / Slot 3", "Armario B2")
+  qrCodePath              String?   // Caminho/URL para pasta de documentos ou URL gerada do QR Code
+  isInUse                 Boolean   @default(false) // Indica se esta instancia especifica esta em uso (true/false)
+
+  purchaseDate            DateTime? // Opcional: Data de compra desta unidade
+  warrantyEndDate         DateTime? // Opcional: Data de fim da garantia
+  lastMaintenanceDate     DateTime? // Opcional: Ultima manutencao
+  notes                   String?   @db.Text // Opcional: Notas especificas sobre esta unidade
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // NOVO: Relação de auto-referência para hierarquia (Pai-Filho)
+  parentId                String?       // ID da instância pai (ex: um servidor que contém esta RAM)
+  parent                  ItemInstance? @relation("ItemInstanceHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children                ItemInstance[] @relation("ItemInstanceHierarchy")
+}
+
+model ContaAzulIntegration {
+      id                 String    @id @default(uuid())
+      userId             String    @unique
+      user               User      @relation(fields: [userId], references: [id])
+      accessToken        String    @db.Text
+      refreshToken       String    @db.Text
+      expiresAt          DateTime
+      scope              String?   @db.VarChar(500)
+
+      createdAt          DateTime  @default(now())
+      updatedAt          DateTime  @updatedAt
+}
