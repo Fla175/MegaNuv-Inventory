@@ -1,9 +1,10 @@
-// pages/api/item-instances/create.ts (Com parentId)
+// pages/api/item-instances/create.ts (Leitura de JWT de Cookie)
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
-import { Prisma } from '@prisma/client'; // Importe 'Prisma' para usar suas tipagens de erro
+import { Prisma } from '@prisma/client';
+import * as cookie from 'cookie'; // Importar a biblioteca 'cookie'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -11,26 +12,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   let authenticatedUserId: string | undefined;
+
+  // --- INÍCIO: AUTENTICAÇÃO ATRAVÉS DO CABEÇALHO OU COOKIE ---
   const authHeader = req.headers.authorization;
+  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
+  const tokenFromCookie = cookies.auth_token; // O nome do seu cookie é 'auth_token'
 
+  let tokenToVerify: string | null = null;
+
+  // Prioriza o cabeçalho Authorization, depois o cookie
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const decodedPayload: AuthTokenPayload | null = verifyAuthToken(token);
+    tokenToVerify = authHeader.split(' ')[1];
+  } else if (tokenFromCookie) {
+    tokenToVerify = tokenFromCookie;
+  }
 
-    if (decodedPayload && decodedPayload.userId) {
-      authenticatedUserId = decodedPayload.userId;
-    } else {
-      console.warn('Token JWT decodificado inválido ou sem ID do usuário.');
-      return res.status(401).json({ message: 'Não autorizado: Token JWT inválido ou ausente.' });
-    }
-  } else {
-    console.warn('Cabeçalho de autenticação Bearer não encontrado.');
+  if (!tokenToVerify) {
+    console.warn('Token de autenticação ausente no cabeçalho ou cookie.');
     return res.status(401).json({ message: 'Não autorizado: É necessário um token de autenticação JWT válido.' });
   }
 
-  if (!authenticatedUserId) {
-    return res.status(500).json({ message: 'Erro interno do servidor: Usuário não identificado.' });
+  const decodedPayload: AuthTokenPayload | null = verifyAuthToken(tokenToVerify);
+
+  if (decodedPayload && decodedPayload.userId) {
+    authenticatedUserId = decodedPayload.userId;
+  } else {
+    console.warn('Token JWT inválido ou sem ID do usuário.');
+    return res.status(401).json({ message: 'Não autorizado: Token JWT inválido.' });
   }
+
+  if (!authenticatedUserId) {
+    return res.status(500).json({ message: 'Erro interno do servidor: Usuário não identificado após decodificação.' });
+  }
+  // --- FIM: AUTENTICAÇÃO ATRAVÉS DO CABEÇALHO OU COOKIE ---
 
   try {
     const { 
@@ -42,15 +56,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       warrantyEndDate, 
       lastMaintenanceDate, 
       notes,
-      parentId // NOVO: parentId recebido no body
+      parentId
     } = req.body;
 
-    // --- Validação básica dos dados recebidos ---
     if (!itemId || !serialNumber) {
       return res.status(400).json({ message: 'ID do Item e Número de Série são obrigatórios.' });
     }
 
-    // Verificar se o Item principal ao qual a instância pertence existe
     const existingItem = await prisma.item.findUnique({
       where: { id: itemId },
     });
@@ -59,7 +71,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'Item principal não encontrado. A instância deve pertencer a um Item existente.' });
     }
 
-    // Opcional: Verificar se o parentId existe e é uma ItemInstance válida
     if (parentId) {
       const existingParent = await prisma.itemInstance.findUnique({
         where: { id: parentId },
@@ -69,7 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Criar a nova instância do item
     const newItemInstance = await prisma.itemInstance.create({
       data: {
         itemId: itemId,
@@ -80,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         warrantyEndDate: warrantyEndDate ? new Date(warrantyEndDate) : null,
         lastMaintenanceDate: lastMaintenanceDate ? new Date(lastMaintenanceDate) : null,
         notes: notes || null,
-        parentId: parentId || null, // NOVO: Salvar o parentId
+        parentId: parentId || null,
       },
     });
 

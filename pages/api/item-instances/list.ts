@@ -1,8 +1,9 @@
-// pages/api/item-instances/list.ts (Com Log de Depuração)
+// pages/api/item-instances/list.ts (Remoção de mode: 'insensitive')
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth'; // Verifique o caminho se necessário
+import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
+import * as cookie from 'cookie';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -10,25 +11,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   let authenticatedUserId: string | undefined;
+
   const authHeader = req.headers.authorization;
+  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
+  const tokenFromCookie = cookies.auth_token;
+
+  let tokenToVerify: string | null = null;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const decodedPayload: AuthTokenPayload | null = verifyAuthToken(token);
+    tokenToVerify = authHeader.split(' ')[1];
+  } else if (tokenFromCookie) {
+    tokenToVerify = tokenFromCookie;
+  }
 
-    if (decodedPayload && decodedPayload.userId) {
-      authenticatedUserId = decodedPayload.userId;
-    } else {
-      console.warn('Token JWT decodificado inválido ou sem ID do usuário.');
-      return res.status(401).json({ message: 'Não autorizado: Token JWT inválido ou ausente.' });
-    }
-  } else {
-    console.warn('Cabeçalho de autenticação Bearer não encontrado.');
+  if (!tokenToVerify) {
+    console.warn('Token de autenticação ausente no cabeçalho ou cookie.');
     return res.status(401).json({ message: 'Não autorizado: É necessário um token de autenticação JWT válido.' });
   }
 
+  const decodedPayload: AuthTokenPayload | null = verifyAuthToken(tokenToVerify);
+
+  if (decodedPayload && decodedPayload.userId) {
+    authenticatedUserId = decodedPayload.userId;
+  } else {
+    console.warn('Token JWT inválido ou sem ID do usuário.');
+    return res.status(401).json({ message: 'Não autorizado: Token JWT inválido.' });
+  }
+
   if (!authenticatedUserId) {
-    return res.status(500).json({ message: 'Erro interno do servidor: Usuário não identificado.' });
+    return res.status(500).json({ message: 'Erro interno do servidor: Usuário não identificado após decodificação.' });
   }
 
   try {
@@ -45,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (location) {
       whereClause.location = {
         contains: String(location),
-        mode: 'insensitive'
+        // CORREÇÃO: Removido 'mode: "insensitive"'
       };
     }
     if (isInUse !== undefined) {
@@ -62,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const itemInstances = await prisma.itemInstance.findMany({
       where: whereClause,
       include: {
-        item: { // Inclui o Item para a instância principal
+        item: {
           select: {
             name: true,
             sku: true,
@@ -72,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             cost: true,
           },
         },
-        parent: { // Inclui o ItemInstance pai
+        parent: {
           select: {
             id: true,
             serialNumber: true,
@@ -80,11 +91,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         },
         children: fetchChildren === 'true' ? {
-          // CORREÇÃO: Removido o bloco 'select' direto aqui.
-          // O Prisma irá incluir todos os campos escalares do filho por padrão
-          // quando uma relação (como 'item') é incluída via 'include'.
-          include: { // Este 'include' é para as RELAÇÕES DO MODELO FILHO
-            item: { // Inclui o Item para CADA filho
+          include: {
+            item: {
                 select: {
                     name: true,
                     sku: true,
@@ -97,25 +105,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // --- CRUCIAL: Log do resultado BRUTO do Prisma. Isso nos dirá se 'item' está vindo para os filhos. ---
-    console.log("Raw itemInstances from Prisma:", JSON.stringify(itemInstances, null, 2));
-
-
-    // Mapear as instâncias para garantir que price e cost são Numbers
-    // e para fazer a conversão dos Decimal para Number.
     const formattedItemInstances = itemInstances.map(instance => {
-      // Cria uma cópia da instância para manipulação
       const formattedInstance: any = { ...instance };
 
-      // Formata o item da instância principal
       if (formattedInstance.item) {
         formattedInstance.item.price = formattedInstance.item.price ? parseFloat(formattedInstance.item.price.toString()) : 0.00;
         formattedInstance.item.cost = formattedInstance.item.cost ? parseFloat(formattedInstance.item.cost.toString()) : null;
       }
 
-      // Formata os itens dos filhos
       if (formattedInstance.children && Array.isArray(formattedInstance.children)) {
-        formattedInstance.children = formattedInstance.children.map((child: any) => { // Tipagem 'any' temporariamente para depuração
+        formattedInstance.children = formattedInstance.children.map((child: any) => {
           const formattedChild: any = { ...child };
           if (formattedChild.item) {
             formattedChild.item.price = formattedChild.item.price ? parseFloat(formattedChild.item.price.toString()) : 0.00;
@@ -127,10 +126,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return formattedInstance;
     });
 
-
-    return res.status(200).json({ 
-      message: 'Instâncias de itens listadas com sucesso!', 
-      itemInstances: formattedItemInstances 
+    return res.status(200).json({
+      message: 'Instâncias de itens listadas com sucesso!',
+      itemInstances: formattedItemInstances
     });
 
   } catch (error) {

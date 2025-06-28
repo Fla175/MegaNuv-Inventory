@@ -1,70 +1,77 @@
-// pages/api/auth/login.ts
+// pages/api/auth/login.ts (SameSite=None e Secure=true)
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import bcrypt from 'bcryptjs'; // Para comparar a senha
-import jwt from 'jsonwebtoken'; // Para gerar o JWT
-import prisma from '../../../lib/prisma'; // Instância do Prisma Client
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { serialize } from 'cookie';
+import prisma from '../../../lib/prisma';
 
-// Chave secreta para assinar o JWT.
-// MUITO IMPORTANTE: Em produção, NUNCA deixe isso hardcoded ou em um .env publicamente acessível.
-// Use uma variável de ambiente FORTEMENTE segura (ex: process.env.JWT_SECRET)
-// e gere uma string aleatória e complexa para isso.
-const JWT_SECRET = process.env.JWT_SECRET || 'sua_super_secreta_chave_jwt'; // Mude esta chave!
+const JWT_SECRET = process.env.JWT_SECRET || 'sua_super_secreta_chave_jwt';
+// MUITO IMPORTANTE: Esta variável DEVE ser a URL completa do seu aplicativo,
+// INCLUINDO o protocolo (http ou https) e o domínio/IP.
+// Para Ngrok, DEVE SER A URL HTTPS DO NGROK. Ex: https://fde4-179-124-29-242.ngrok-free.app
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // A rota de login deve aceitar apenas requisições POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
   const { email, password } = req.body;
 
-  // 1. Validação básica de entrada
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
 
   try {
-    // 2. Encontrar o usuário pelo e-mail
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
-    // Se o usuário não for encontrado, ou se a senha estiver incorreta,
-    // retorne uma mensagem genérica para não dar dicas sobre a existência do e-mail.
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // 3. Comparar a senha fornecida com a senha hashada no banco de dados
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!passwordMatch) {
+    if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // 4. Se as senhas combinarem, gerar um JWT
-    // Incluímos informações relevantes do usuário no payload do token,
-    // mas evite informações sensíveis como a senha.
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
-        role: user.role, // Adiciona o papel do usuário ao token para autorização
+        role: user.role,
+        name: user.name,
       },
       JWT_SECRET,
       {
-        expiresIn: '1h', // O token expira em 1 hora (ajuste conforme a necessidade)
+        expiresIn: '1h',
       }
     );
 
-    // Opcional: Atualizar a data do último login
+    // --- CORREÇÃO FINAL PARA COOKIE: SameSite=None e Secure=true ---
+    const url = new URL(NEXT_PUBLIC_BASE_URL);
+    const isHttps = url.protocol === 'https:';
+
+    res.setHeader('Set-Cookie', serialize('auth_token', token, {
+      httpOnly: true,
+      // 'secure' DEVE ser true se 'SameSite' for 'None'.
+      // Será true se 'NEXT_PUBLIC_BASE_URL' for HTTPS ou em produção.
+      secure: isHttps || process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60, // 1 hora
+      path: '/', // Acessível em todas as rotas
+      sameSite: 'none' as const, // Permite envio cross-site, MAS EXIGE 'secure: true'
+      // 'domain' é omitido para que o navegador defina para o host da requisição (IP ou domínio Ngrok)
+    }));
+    // --- FIM DA CORREÇÃO ---
+
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
 
-    // 5. Retornar o token JWT e algumas informações básicas do usuário
     return res.status(200).json({
       message: 'Login successful!',
       token,

@@ -1,115 +1,204 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+// pages/index.tsx (Antigo locations.tsx, agora a página principal)
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import Layout from '../components/Layout';
+import { useState, useEffect } from 'react';
+import AddLocationModal from '../components/AddLocationModal';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Reusando interfaces para consistência (pode ser movido para um types.ts central)
+interface Item {
+    name: string;
+    sku: string;
+    contaAzulId?: string;
+    status: string;
+    price: number;
+    cost: number | null;
+}
 
-export default function Home() {
+interface ItemInstance {
+    id: string;
+    itemId: string;
+    serialNumber: string; // Usado como o identificador único para o local (ex: RACK-01)
+    location: string | null; // Nome amigável do local (ex: "Rack 01")
+    qrCodePath: string | null;
+    isInUse: boolean;
+    notes: string | null;
+    parentId: string | null;
+    item: Item;
+    children?: ItemInstance[]; // Itens dentro deste local (servidores, peças, etc.)
+}
+
+export default function LocationsPage() { // Mantenha o nome da função, o nome do arquivo define a rota
+  const router = useRouter();
+  const [locations, setLocations] = useState<ItemInstance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [addingLocation, setAddingLocation] = useState(false);
+  const [addLocationError, setAddLocationError] = useState<string | null>(null);
+
+  const fetchLocations = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Adicionado credentials: 'include' para garantir que os cookies HttpOnly sejam enviados
+      const response = await fetch('/api/item-instances/list?parentId=null&fetchChildren=true', {
+        credentials: 'include', // <--- NOVO: Essencial para enviar cookies com a requisição
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Falha ao buscar espaços físicos.');
+      }
+
+      const data = await response.json();
+      setLocations(data.itemInstances);
+    } catch (err: any) {
+      console.error('Erro ao buscar espaços físicos:', err);
+      setError(err.message || 'Ocorreu um erro ao carregar os espaços físicos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  const handleAddLocation = async (name: string, serialNumber: string, notes: string) => {
+    setAddingLocation(true);
+    setAddLocationError(null);
+    try {
+      // 1. Chamar a API interna para garantir que o "Item" de tipo "Espaço Físico" existe
+      const itemResponse = await fetch('/api/internal/ensure-location-item', {
+        credentials: 'include', // <--- NOVO: Essencial para enviar cookies
+      });
+      if (!itemResponse.ok) {
+        const errData = await itemResponse.json();
+        throw new Error(errData.message || 'Falha ao obter item de localização interno.');
+      }
+      const itemData = await itemResponse.json();
+      const locationItemId = itemData.locationItemId;
+
+      // 2. Criar a nova ItemInstance para este espaço físico
+      const response = await fetch('/api/item-instances/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // <--- NOVO: Essencial para enviar cookies
+        body: JSON.stringify({
+          itemId: locationItemId,
+          serialNumber: serialNumber,
+          location: name,
+          isInUse: true,
+          notes: notes,
+          parentId: null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Falha ao adicionar espaço físico.');
+      }
+
+      await fetchLocations();
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error('Erro ao adicionar espaço físico:', err);
+      setAddLocationError(err.message || 'Ocorreu um erro ao adicionar o espaço.');
+    } finally {
+      setAddingLocation(false);
+    }
+  };
+
+  const handleViewContents = (locationValue: string) => {
+    router.push(`/inventory-view?location=${encodeURIComponent(locationValue)}`);
+  };
+
+  const handleGenerateQrCode = async (locationValue: string) => {
+    try {
+      // O fetch do QR Code também espera o JWT via cookie
+      const response = await fetch(`/api/generate-qrcode?type=location&value=${encodeURIComponent(locationValue)}`, {
+        credentials: 'include', // <--- NOVO: Essencial para enviar cookies
+      });
+      
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Falha ao gerar QR Code.');
+      }
+
+      const data = await response.json();
+      console.log('URL do QR Code gerado (para impressão física - COPIE ESTA URL):', data.qrCodeUrl);
+      alert(`QR Code URL gerado. Copie do console do navegador para imprimir: ${data.qrCodeUrl}`);
+    } catch (err: any) {
+      console.error('Erro ao gerar QR Code:', err);
+      setError(err.message || 'Ocorreu um erro ao gerar QR Code.');
+    }
+  };
+
+  if (loading) return <Layout><div className="flex items-center justify-center py-10 text-gray-700">Carregando espaços físicos...</div></Layout>;
+  if (error) return <Layout><div className="text-red-600 py-10 text-center">Erro: {error}</div></Layout>;
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+    <Layout title="Espaços Físicos - MegaNuv Inventory">
+      <Head>
+        <title>Espaços Físicos - MegaNuv Inventory</title>
+      </Head>
+      <div className="bg-white p-6 rounded-lg shadow-lg">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Seus Espaços Físicos</h1>
+        
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="mb-6 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline transition duration-200 ease-in-out transform hover:scale-105"
+        >
+          + Adicionar Novo Espaço
+        </button>
+
+        <AddLocationModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setAddLocationError(null);
+          }}
+          onLocationAdded={handleAddLocation}
+          isLoading={addingLocation}
+          error={addLocationError}
         />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              pages/index.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {locations.length === 0 ? (
+            <p className="col-span-full text-center text-gray-600">Nenhum espaço físico cadastrado ainda. Adicione um!</p>
+          ) : (
+            locations.map((loc) => (
+              <div key={loc.id} className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 flex flex-col justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">{loc.location || loc.serialNumber}</h2>
+                  <p className="text-gray-600 text-sm mb-3">ID: {loc.id}</p>
+                  <p className="text-gray-600 text-sm mb-3">Identificador Único: {loc.serialNumber}</p>
+                  {loc.notes && <p className="text-gray-700 text-base mb-3">Notas: {loc.notes}</p>}
+                  <p className="text-gray-600 text-sm">Itens Diretos Contidos: <span className="font-bold">{loc.children?.length ?? 0}</span></p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleViewContents(loc.location || loc.serialNumber || loc.id)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2 px-3 rounded-md transition duration-200"
+                  >
+                    Ver Conteúdo
+                  </button>
+                  <button
+                    onClick={() => handleGenerateQrCode(loc.location || loc.serialNumber || loc.id)}
+                    className="bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold py-2 px-3 rounded-md transition duration-200"
+                  >
+                    Gerar QR
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 }
