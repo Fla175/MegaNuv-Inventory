@@ -1,13 +1,14 @@
-// pages/sync-contaazul.tsx (SSP e JWT no Header)
+// pages/sync-contaazul.tsx (Com melhorias UI/UX)
 
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import axios from 'axios';
+import axios from 'axios'; // Mantemos o axios padrão, pois está funcionando
 import { GetServerSideProps } from 'next';
-import * as cookie from 'cookie'; // Importar 'cookie' para o getServerSideProps
-import { verifyAuthToken } from '../lib/auth'; // Importar verifyAuthToken
-import Layout from '../components/Layout';
+import * as cookie from 'cookie';
+import { verifyAuthToken } from '../lib/auth';
+
+import Layout from '../components/Layout'; // Importa o componente Layout
 
 interface SyncContaAzulPageProps {
   initialAuthToken?: string; // Token inicial carregado do servidor
@@ -26,17 +27,16 @@ const SyncContaAzulPage: React.FC<SyncContaAzulPageProps> = ({ initialAuthToken 
       setAuthToken(token);
     }
 
-    const { status, message } = router.query;
+    const { status, message, details } = router.query; // Pega 'details' para erros mais específicos
     if (status === 'success' && message) {
       setSyncStatus(`Autorização Conta Azul: ${message}`);
     } else if (status === 'error' && message) {
-      setSyncStatus(`Erro na Autorização Conta Azul: ${message}`);
+      setSyncStatus(`Erro na Autorização Conta Azul: ${message}${details ? `: ${details}` : ''}`); // Exibe detalhes
     }
-  }, [router.query, authToken]); // Adicionado authToken como dependência para reavaliação
+  }, [router.query, authToken]);
 
   const getAuthHeaders = () => {
     if (!authToken) {
-      // Se ainda não há token, redireciona para o login
       router.push('/login?message=Por favor, faça login para sincronizar a Conta Azul.');
       throw new Error('Não autenticado: Token JWT ausente.');
     }
@@ -51,13 +51,9 @@ const SyncContaAzulPage: React.FC<SyncContaAzulPageProps> = ({ initialAuthToken 
     setLoading(true);
     setSyncStatus('Iniciando processo de autorização da Conta Azul...');
     try {
-      // Chama a API de autorização com axios.post e passa o JWT no header
       const response = await axios.post('/api/contaazul/authorize', {}, getAuthHeaders());
-      // O backend /api/contaazul/authorize.ts fará o res.redirect.
-      // Esta linha abaixo só seria executada se houvesse algum erro antes do redirect.
       setSyncStatus('Redirecionando para a Conta Azul...');
-      // Você pode adicionar um pequeno delay ou window.location.href para garantir o redirect
-      window.location.href = response.data.redirectUrl; // O backend vai retornar a URL de redirecionamento
+      window.location.href = response.data.redirectUrl;
     } catch (error: any) {
       console.error('Erro ao iniciar autorização da Conta Azul:', error.response?.data || error.message);
       setSyncStatus(`Erro ao iniciar autorização: ${error.response?.data?.message || error.message}`);
@@ -70,7 +66,6 @@ const SyncContaAzulPage: React.FC<SyncContaAzulPageProps> = ({ initialAuthToken 
     setLoading(true);
     setSyncStatus('Iniciando sincronização de produtos...');
     try {
-      // Chama a sua API de sincronização (pages/api/contaazul/products.ts - POST)
       const response = await axios.post('/api/contaazul/products', {}, getAuthHeaders()); 
       setSyncStatus(`Sincronização concluída: ${response.data.message}`);
     } catch (error: any) {
@@ -82,66 +77,105 @@ const SyncContaAzulPage: React.FC<SyncContaAzulPageProps> = ({ initialAuthToken 
   };
 
   return (
-    <Layout title="Sincronizar Conta Azul"> {/* NOVO: Envolve o conteúdo com Layout */}
-      {/* O Head está dentro do Layout, mas também pode ficar aqui se precisar de algo específico */}
-      {/* <Head>
-        <title>Sincronizar Conta Azul</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head> */}
+    <Layout title="Sincronizar Conta Azul">
+      <div className="flex flex-col items-center justify-center min-h-full py-10 px-4 sm:px-6 lg:px-8"> {/* min-h-full para preencher o Layout */}
+        <Head>
+          <title>Sincronizar Conta Azul</title>
+          <link rel="icon" href="/favicon.ico" />
+          {/* Font Inter para uma tipografia moderna */}
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        </Head>
 
-      <div className="flex flex-col items-center justify-center py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Sincronização Conta Azul</h1>
-
-          <p className="text-gray-700 mb-6">
-            Para sincronizar seus produtos com a Conta Azul, primeiro você precisa autorizar a integração.
+        {/* Card principal com sombra e bordas arredondadas */}
+        <div className="max-w-xl w-full bg-white p-8 sm:p-10 rounded-xl shadow-lg transform transition duration-300 hover:scale-[1.01] text-center border border-gray-200">
+          <h1 className="text-4xl font-extrabold text-gray-800 mb-6 tracking-tight">
+            Integração Conta Azul
+          </h1>
+          <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+            Sincronize os produtos do seu inventário com a sua conta da Conta Azul de forma rápida e eficiente.
           </p>
 
-          <button
-            onClick={handleAuthorizeContaAzul}
-            disabled={loading || !authToken} // Desabilita se não tiver token do MegaNuv
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mb-4"
-          >
-            {loading ? 'Preparando Autorização...' : (authToken ? 'Autorizar Conta Azul' : 'Faça Login Primeiro')}
-          </button>
+          <div className="space-y-6">
+            {/* Seção de Autorização */}
+            <div className="bg-blue-50 bg-opacity-70 p-6 rounded-lg border border-blue-200 shadow-sm">
+              <h2 className="text-2xl font-semibold text-blue-700 mb-4">Autorização</h2>
+              <p className="text-md text-gray-700 mb-5">
+                Conecte seu sistema ao Conta Azul para iniciar o processo de sincronização. Isso requer um redirecionamento seguro para a plataforma Conta Azul.
+              </p>
+              <button
+                onClick={handleAuthorizeContaAzul}
+                disabled={loading || !authToken}
+                className={`w-full py-3 px-6 rounded-lg text-lg font-semibold text-white transition-all duration-300 transform shadow-md
+                  ${loading || !authToken
+                    ? 'bg-blue-300 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 active:scale-95'
+                  }`}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Preparando Autorização...
+                  </span>
+                ) : (authToken ? 'Autorizar Conta Azul' : 'Faça Login Primeiro')}
+              </button>
+            </div>
 
-          <p className="text-gray-700 mb-6 mt-6">
-            Após autorizar, clique no botão abaixo para iniciar a sincronização dos produtos.
-          </p>
-
-          <button
-            onClick={handleSyncProducts}
-            disabled={loading || !authToken} // Desabilita se não tiver token do MegaNuv
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white ${
-              loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
-            }`}
-          >
-            {loading ? 'Sincronizando...' : (authToken ? 'Iniciar Sincronização Agora' : 'Faça Login Primeiro')}
-          </button>
+            {/* Seção de Sincronização */}
+            <div className="bg-green-50 bg-opacity-70 p-6 rounded-lg border border-green-200 shadow-sm">
+              <h2 className="text-2xl font-semibold text-green-700 mb-4">Sincronização de Produtos</h2>
+              <p className="text-md text-gray-700 mb-5">
+                Após a autorização, clique abaixo para sincronizar seus produtos. O processo pode levar alguns instantes, dependendo do volume de dados.
+              </p>
+              <button
+                onClick={handleSyncProducts}
+                disabled={loading || !authToken}
+                className={`w-full py-3 px-6 rounded-lg text-lg font-semibold text-white transition-all duration-300 transform shadow-md
+                  ${loading || !authToken
+                    ? 'bg-green-300 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50 active:scale-95'
+                  }`}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sincronizando...
+                  </span>
+                ) : (authToken ? 'Iniciar Sincronização Agora' : 'Faça Login Primeiro')}
+              </button>
+            </div>
+          </div>
 
           {syncStatus && (
-            <p className={`mt-4 text-md ${syncStatus.includes('Erro') ? 'text-red-600' : 'text-green-600'}`}>
+            <p className={`mt-6 text-md font-medium px-4 py-2 rounded-md ${syncStatus.includes('Erro') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
               {syncStatus}
             </p>
           )}
 
           <div className="mt-8 text-gray-500 text-sm">
-            <p>Certifique-se de estar logado no MegaNuv Inventário antes de iniciar a autorização.</p>
-            <p>Em caso de problemas, reautorize a integração com a Conta Azul.</p>
+            <p>
+              <span className="font-semibold">Importante:</span> Certifique-se de estar logado no MegaNuv inventário antes de iniciar a autorização e sincronização.
+            </p>
+            <p className="mt-2">
+              Em caso de problemas ou tokens expirados, reautorize a integração com a Conta Azul para obter novos tokens.
+            </p>
           </div>
         </div>
       </div>
-    </Layout> // NOVO: Fecha o componente Layout
+    </Layout>
   );
 };
 
-// NOVO: getServerSideProps para ler o cookie no servidor
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const cookies = cookie.parse(context.req.headers.cookie || '');
   const authToken = cookies.auth_token;
 
   if (!authToken) {
-    // Se não há token, redireciona o usuário para a página de login
     return {
       redirect: {
         destination: '/login?message=Por favor, faça login para sincronizar a Conta Azul.',
