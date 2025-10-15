@@ -2,7 +2,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs'; // Importa a biblioteca bcryptjs para hash de senhas
-import prisma from '../../../lib/prisma'; // Importa a instância do Prisma Client
+import prisma from '@/lib/prisma'; // Importa a instância do Prisma Client
 
 // Número de "salt rounds" para o bcrypt. Quanto maior, mais seguro (e mais lento).
 // 10-12 é um bom ponto de partida para a maioria das aplicações.

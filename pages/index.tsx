@@ -73,9 +73,14 @@ export default function LocationsPage() {
     }
   };
 
-  useEffect(() => {
-    fetchLocations();
-  }, []);
+  // useEffect(() => {
+  //   const checkSeed = async () => {
+  //     const res = await fetch("/api/auth/seed", { credentials: 'include' });
+  //     const data = await res.json();
+  //     window.location.href = data.redirectTo;
+  //   };
+  //   checkSeed();
+  // }, []);  
 
   const handleAddLocation = async (name: string, serialNumber: string, notes: string) => {
     setAddingLocation(true);

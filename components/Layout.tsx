@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import {
-  Home,
+  LineChart,
   Warehouse,
   Box,
   ShoppingCart,
@@ -85,8 +85,8 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
           <nav className="flex-grow">
             <ul>
               {[
-                { href: '/dashboard', label: 'Dashboard', icon: Home },
-                { href: '/', label: 'Espaços Físicos', icon: Warehouse },
+                { href: '/dashboard', label: 'Dashboard', icon: LineChart },
+                { href: '/', label: 'Ordenação de Itens', icon: Warehouse },
                 { href: '/instances', label: 'Gerenciar Ativos', icon: Box },
                 { href: '/products', label: 'Definição de Produtos (CA)', icon: ShoppingCart },
                 { href: '/sync-contaazul', label: 'Sincronizar Conta Azul', icon: RefreshCw },
