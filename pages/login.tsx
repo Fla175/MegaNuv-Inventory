@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// pages/login.tsx
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -11,6 +12,32 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // 🧩 Checa seed e redireciona para registro inicial se necessário
+  useEffect(() => {
+    const checkSeed = async () => {
+      try {
+        // Só faz a requisição se ainda não tivermos verificado
+        const alreadyChecked = sessionStorage.getItem("seedChecked");
+        if (alreadyChecked) return;
+  
+        const res = await fetch("/api/auth/seed", { credentials: 'include' });
+        if (!res.ok) return;
+  
+        const data = await res.json();
+        sessionStorage.setItem("seedChecked", "true"); // marca que já foi verificado
+  
+        // redireciona só se necessário
+        if (data.redirectTo) {
+          window.location.href = data.redirectTo;
+        }
+      } catch (err) {
+        console.error("Erro ao verificar seed:", err);
+      }
+    };
+  
+    checkSeed();
+  }, []);  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
@@ -21,16 +48,14 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        credentials: 'include', // importante para cookies httpOnly
+        credentials: 'include',
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // sucesso → redireciona
-        router.replace('/'); // use replace para evitar histórico /login → /
+        router.replace('/'); // redireciona após login
       } else {
-        // erro → mostra vermelho
         setMessage(data.message || 'Credenciais inválidas');
       }
     } catch (err) {
@@ -39,6 +64,12 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🚪 Logout manual (pode ser usado em qualquer página protegida)
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    router.replace('/login');
   };
 
   return (

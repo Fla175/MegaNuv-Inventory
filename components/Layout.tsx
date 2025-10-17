@@ -109,10 +109,21 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
               <UserCircle size={22} className="mr-2" />
               <span>{userName}</span>
             </div>
-            <Link href="/logout" className="w-full flex items-center justify-center py-2 px-4 rounded-md text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm">
+            <button
+              onClick={async () => {
+                try {
+                  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                  router.push('/login'); // redireciona para login
+                } catch (err) {
+                  console.error('Erro ao fazer logout', err);
+                }
+              }}
+              className="w-full flex items-center justify-center py-2 px-4 rounded-md text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
+            >
               <LogOut size={18} className="mr-2" />
               Sair
-            </Link>
+            </button>
+
           </div>
         </aside>
 
