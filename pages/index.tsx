@@ -1,13 +1,15 @@
-// pages/index.tsx (Header Responsivo)
+// pages/index.tsx
 
 import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
 import AddLocationModal from '../components/AddLocationModal';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { PlusCircle, Eye, Box, MapPin } from 'lucide-react'; // Ícones Lucide
+import { PlusCircle, Eye, Box, MapPin } from 'lucide-react';
+import jwt from 'jsonwebtoken';
+import { GetServerSideProps } from 'next';
 
-// Reusando interfaces para consistência (pode ser movido para um types.ts central)
+// Tipagens
 interface Item {
   name: string;
   sku: string;
@@ -20,22 +22,26 @@ interface Item {
 interface ItemInstance {
   id: string;
   itemId: string;
-  serialNumber: string; // Usado como o identificador único para o local (ex: RACK-01)
-  location: string | null; // Nome amigável do local (ex: "Rack 01")
+  serialNumber: string;
+  location: string | null;
   qrCodePath: string | null;
   isInUse: boolean;
-  notes: string | null; // Agora "Descrição"
+  notes: string | null;
   parentId: string | null;
   item: Item;
-  children?: ItemInstance[]; // Itens dentro deste local (servidores, peças, etc.)
+  children?: ItemInstance[];
 }
 
-export default function LocationsPage() {
+interface LocationsPageProps {
+  userName: string;
+}
+
+export default function LocationsPage({ userName }: LocationsPageProps) {
   const router = useRouter();
   const [locations, setLocations] = useState<ItemInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false); // Estado para abrir/fechar o modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [addingLocation, setAddingLocation] = useState(false);
   const [addLocationError, setAddLocationError] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -58,6 +64,11 @@ export default function LocationsPage() {
         credentials: 'include',
       });
 
+      if (response.status === 401) {
+        router.push('/login');
+        return;
+      }
+
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.message || 'Falha ao buscar espaços físicos.');
@@ -73,14 +84,9 @@ export default function LocationsPage() {
     }
   };
 
-  // useEffect(() => {
-  //   const checkSeed = async () => {
-  //     const res = await fetch("/api/auth/seed", { credentials: 'include' });
-  //     const data = await res.json();
-  //     window.location.href = data.redirectTo;
-  //   };
-  //   checkSeed();
-  // }, []);  
+  useEffect(() => {
+    fetchLocations();
+  }, []);
 
   const handleAddLocation = async (name: string, serialNumber: string, notes: string) => {
     setAddingLocation(true);
@@ -98,16 +104,14 @@ export default function LocationsPage() {
 
       const response = await fetch('/api/item-instances/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           itemId: locationItemId,
-          serialNumber: serialNumber,
+          serialNumber,
           location: name,
           isInUse: true,
-          notes: notes,
+          notes,
           parentId: null,
         }),
       });
@@ -118,12 +122,12 @@ export default function LocationsPage() {
       }
 
       await fetchLocations();
-      setIsModalOpen(false); // Fecha o modal
+      setIsModalOpen(false);
       showFeedback('Espaço físico adicionado com sucesso!', 'success');
     } catch (err: any) {
       console.error('Erro ao adicionar espaço físico:', err);
-      setAddLocationError(err.message || 'Ocorreu um erro ao adicionar o espaço.');
-      showFeedback(`Erro: ${err.message || 'Falha ao adicionar espaço.'}`, 'error');
+      setAddLocationError(err.message);
+      showFeedback(`Erro: ${err.message}`, 'error');
     } finally {
       setAddingLocation(false);
     }
@@ -135,11 +139,29 @@ export default function LocationsPage() {
 
   if (loading) {
     return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory">
+      <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
         <div className="flex items-center justify-center h-full text-gray-700">
-          <svg className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <svg
+            className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2
+               5.291A7.962 7.962 0 014 12H0c0 3.042 1.135
+               5.824 3 7.938l3-2.647z"
+            ></path>
           </svg>
           Carregando espaços físicos...
         </div>
@@ -149,7 +171,7 @@ export default function LocationsPage() {
 
   if (error) {
     return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory">
+      <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
         <div className="text-red-600 text-center h-full flex items-center justify-center">
           Erro: {error}
         </div>
@@ -158,63 +180,76 @@ export default function LocationsPage() {
   }
 
   return (
-    <Layout title="Espaços Físicos - MegaNuv Inventory">
-      {/* Wrapper principal para o conteúdo da página, com max-w para centralização */}
-      <div className={`max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 transition-filter duration-300 ${isModalOpen ? 'blur-sm pointer-events-none' : ''}`}>
+    <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
+      <div
+        className={`max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 transition-filter duration-300 ${
+          isModalOpen ? 'blur-sm pointer-events-none' : ''
+        }`}
+      >
         <Head>
           <title>Espaços Físicos - MegaNuv Inventory</title>
         </Head>
 
-        {/* Cabeçalho da Página - CORREÇÃO: Ajuste de responsividade para título e botão */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0"> {/* Adicionado flex-col e gap para mobile */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left w-full sm:w-auto"> {/* Ajuste de tamanho e alinhamento */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4 sm:gap-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left w-full sm:w-auto">
             Seus Espaços Físicos
           </h1>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center" // Ajuste de tamanho e largura
+            className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center"
           >
-            <PlusCircle size={18} className="mr-2 sm:mr-2" /> {/* Ajuste de tamanho do ícone */}
+            <PlusCircle size={18} className="mr-2 sm:mr-2" />
             Adicionar Novo Espaço
           </button>
         </div>
 
-        {/* Mensagem de Feedback */}
         {feedbackMessage && (
-          <div className={`mb-6 px-4 py-3 rounded-lg text-lg font-medium ${feedbackType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <div
+            className={`mb-6 px-4 py-3 rounded-lg text-lg font-medium ${
+              feedbackType === 'success'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
             {feedbackMessage}
           </div>
         )}
 
-        {/* Grid de Cards de Espaços Físicos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {locations.length === 0 ? (
             <p className="col-span-full text-center text-gray-600 py-10">
-              Nenhum espaço físico cadastrado ainda. Clique em "Adicionar Novo Espaço" para começar!
+              Nenhum espaço físico cadastrado ainda.
             </p>
           ) : (
             locations.map((loc) => (
               <div
                 key={loc.id}
-                className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col justify-between 
-                           transform transition duration-300 hover:shadow-lg hover:scale-[1.01] cursor-pointer"
-                onClick={() => handleViewContents(loc.location || loc.serialNumber || loc.id)}
+                className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col justify-between transform transition duration-300 hover:shadow-lg hover:scale-[1.01] cursor-pointer"
+                onClick={() =>
+                  handleViewContents(
+                    loc.location || loc.serialNumber || loc.id
+                  )
+                }
               >
                 <div>
                   <div className="flex items-center mb-3">
                     <MapPin size={24} className="text-blue-500 mr-3" />
-                    <h2 className="text-xl font-semibold text-gray-800">{loc.location || loc.serialNumber}</h2>
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      {loc.location || loc.serialNumber}
+                    </h2>
                   </div>
-
                   {loc.notes && (
                     <p className="text-gray-700 text-sm mb-3">
-                      <span className="font-medium">Descrição:</span> {loc.notes}
+                      <span className="font-medium">Descrição:</span>{' '}
+                      {loc.notes}
                     </p>
                   )}
-
                   <p className="text-gray-600 text-sm flex items-center">
                     <Box size={16} className="text-gray-500 mr-2" />
-                    Itens Contidos: <span className="font-bold ml-1">{loc.children?.length ?? 0}</span>
+                    Itens Contidos:{' '}
+                    <span className="font-bold ml-1">
+                      {loc.children?.length ?? 0}
+                    </span>
                   </p>
                 </div>
 
@@ -222,7 +257,9 @@ export default function LocationsPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleViewContents(loc.location || loc.serialNumber || loc.id);
+                      handleViewContents(
+                        loc.location || loc.serialNumber || loc.id
+                      );
                     }}
                     className="flex items-center bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-sm"
                   >
@@ -236,7 +273,6 @@ export default function LocationsPage() {
         </div>
       </div>
 
-      {/* Modal para Adicionar Espaço - Renderizado condicionalmente */}
       <AddLocationModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -250,3 +286,20 @@ export default function LocationsPage() {
     </Layout>
   );
 }
+
+// ✅ Server-side: decodifica o JWT e passa o nome do usuário
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const token = context.req.cookies['auth_token'];
+  let userName = 'Usuário';
+
+  if (token && process.env.JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET) as { name?: string };
+      if (decoded?.name) userName = decoded.name;
+    } catch (err) {
+      console.error('Erro ao decodificar token:', err);
+    }
+  }
+
+  return { props: { userName } };
+};

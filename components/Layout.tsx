@@ -1,5 +1,4 @@
-// components/Layout.tsx (Main com Largura Total)
-
+// components/Layout.tsx
 import React, { ReactNode, useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -15,29 +14,27 @@ import {
   LogOut,
   Menu,
   X,
-  UserCircle
+  UserCircle,
 } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
   title?: string;
+  userName: string; // Recebido via props
 }
 
-export default function Layout({ children, title = 'MegaNuv Inventory' }: LayoutProps) {
+export default function Layout({ children, title = 'MegaNuv Inventory', userName }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
-  const [userName, setUserName] = useState('Admin Teste'); // Placeholder para nome do usuário
 
+  // Fecha a sidebar ao navegar
   useEffect(() => {
-    if (isSidebarOpen) {
-      setIsSidebarOpen(false);
-    }
+    if (isSidebarOpen) setIsSidebarOpen(false);
   }, [router.asPath]);
 
+  // Função para marcar item ativo
   const isActive = (pathname: string) => {
-    if (pathname === '/') {
-      return router.pathname === pathname;
-    }
+    if (pathname === '/') return router.pathname === pathname;
     return router.pathname.startsWith(pathname);
   };
 
@@ -48,20 +45,25 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
       </Head>
 
-      {/* O layout base agora preenche a tela. */}
       <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100 font-inter">
-        {/* Mobile Header (para mostrar o botão do hambúrguer e nome do app) */}
+        {/* Mobile Header */}
         <header className="lg:hidden fixed top-0 left-0 right-0 bg-gray-800 text-white p-4 flex items-center justify-between z-20 shadow-md">
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-white focus:outline-none">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="text-white focus:outline-none"
+          >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="text-2xl font-bold text-blue-400">MegaNuv</div>
           <div className="flex items-center space-x-2 text-sm">
             <UserCircle size={20} />
-            <span>{userName}</span>
+            <span>{userName || 'Usuário'}</span>
           </div>
         </header>
 
@@ -82,6 +84,7 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
             />
           </div>
 
+          {/* Navegação */}
           <nav className="flex-grow">
             <ul>
               {[
@@ -93,8 +96,14 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
                 { href: '/settings', label: 'Configurações', icon: Settings },
               ].map((item) => (
                 <li key={item.href} className="mb-2">
-                  <Link href={item.href} className={`flex items-center py-2 px-4 rounded-md transition duration-200
-                    ${isActive(item.href) ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-gray-700 text-gray-300'}`}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center py-2 px-4 rounded-md transition duration-200 ${
+                      isActive(item.href)
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'hover:bg-gray-700 text-gray-300'
+                    }`}
+                  >
                     <item.icon size={20} className="mr-3" />
                     <span className="font-medium">{item.label}</span>
                   </Link>
@@ -103,17 +112,17 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
             </ul>
           </nav>
 
-          {/* User & Logout Section */}
+          {/* Usuário + Logout */}
           <div className="mt-auto pt-4 border-t border-gray-700 flex flex-col items-center">
             <div className="flex items-center text-gray-300 text-base mb-3">
               <UserCircle size={22} className="mr-2" />
-              <span>{userName}</span>
+              <span>{userName || 'Usuário'}</span>
             </div>
             <button
               onClick={async () => {
                 try {
                   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-                  router.push('/login'); // redireciona para login
+                  router.push('/login');
                 } catch (err) {
                   console.error('Erro ao fazer logout', err);
                 }
@@ -123,11 +132,10 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
               <LogOut size={18} className="mr-2" />
               Sair
             </button>
-
           </div>
         </aside>
 
-        {/* Overlay para mobile quando sidebar está aberto - ADICIONADO: backdrop-blur-sm */}
+        {/* Overlay mobile */}
         {isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden backdrop-blur-sm"
@@ -135,7 +143,7 @@ export default function Layout({ children, title = 'MegaNuv Inventory' }: Layout
           ></div>
         )}
 
-        {/* Main Content Area - CORREÇÃO: Removido max-w-full lg:max-w-7xl lg:mx-auto */}
+        {/* Conteúdo principal */}
         <main className="flex-grow p-8 pt-20 lg:pt-8 h-screen overflow-y-auto bg-white lg:rounded-r-lg">
           {children}
         </main>

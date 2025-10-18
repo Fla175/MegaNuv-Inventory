@@ -3,9 +3,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { serialize } from 'cookie';
-import prisma from '../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sua_super_secreta_chave_jwt';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
