@@ -1,13 +1,11 @@
 // pages/index.tsx
-
-import Layout from '../components/Layout';
-import { useState, useEffect } from 'react';
-import AddLocationModal from '../components/AddLocationModal';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
-import { PlusCircle, Eye, Box, MapPin } from 'lucide-react';
-import jwt from 'jsonwebtoken';
-import { GetServerSideProps } from 'next';
+import Layout from "../components/Layout";
+import { useState, useEffect } from "react";
+import AddLocationModal from "../components/AddLocationModal";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { PlusCircle, Eye, Box, MapPin } from "lucide-react";
+import { useUser } from "../lib/context/UserContext";
 
 // Tipagens
 interface Item {
@@ -32,12 +30,10 @@ interface ItemInstance {
   children?: ItemInstance[];
 }
 
-interface LocationsPageProps {
-  userName: string;
-}
-
-export default function LocationsPage({ userName }: LocationsPageProps) {
+export default function LocationsPage() {
   const router = useRouter();
+  const { user, setUser } = useUser();
+
   const [locations, setLocations] = useState<ItemInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,9 +41,9 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
   const [addingLocation, setAddingLocation] = useState(false);
   const [addLocationError, setAddLocationError] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [feedbackType, setFeedbackType] = useState<'success' | 'error' | null>(null);
+  const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
 
-  const showFeedback = (message: string, type: 'success' | 'error') => {
+  const showFeedback = (message: string, type: "success" | "error") => {
     setFeedbackMessage(message);
     setFeedbackType(type);
     setTimeout(() => {
@@ -60,25 +56,25 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/item-instances/list?parentId=null&fetchChildren=true', {
-        credentials: 'include',
+      const response = await fetch("/api/item-instances/list?parentId=null&fetchChildren=true", {
+        credentials: "include",
       });
 
       if (response.status === 401) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.message || 'Falha ao buscar espaços físicos.');
+        throw new Error(errData.message || "Falha ao buscar espaços físicos.");
       }
 
       const data = await response.json();
       setLocations(data.itemInstances);
     } catch (err: any) {
-      console.error('Erro ao buscar espaços físicos:', err);
-      setError(err.message || 'Ocorreu um erro ao carregar os espaços físicos.');
+      console.error("Erro ao buscar espaços físicos:", err);
+      setError(err.message || "Ocorreu um erro ao carregar os espaços físicos.");
     } finally {
       setLoading(false);
     }
@@ -92,20 +88,20 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
     setAddingLocation(true);
     setAddLocationError(null);
     try {
-      const itemResponse = await fetch('/api/internal/ensure-location-item', {
-        credentials: 'include',
+      const itemResponse = await fetch("/api/internal/ensure-location-item", {
+        credentials: "include",
       });
       if (!itemResponse.ok) {
         const errData = await itemResponse.json();
-        throw new Error(errData.message || 'Falha ao obter item de localização interno.');
+        throw new Error(errData.message || "Falha ao obter item de localização interno.");
       }
       const itemData = await itemResponse.json();
       const locationItemId = itemData.locationItemId;
 
-      const response = await fetch('/api/item-instances/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const response = await fetch("/api/item-instances/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           itemId: locationItemId,
           serialNumber,
@@ -118,16 +114,16 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.message || 'Falha ao adicionar espaço físico.');
+        throw new Error(errData.message || "Falha ao adicionar espaço físico.");
       }
 
       await fetchLocations();
       setIsModalOpen(false);
-      showFeedback('Espaço físico adicionado com sucesso!', 'success');
+      showFeedback("Espaço físico adicionado com sucesso!", "success");
     } catch (err: any) {
-      console.error('Erro ao adicionar espaço físico:', err);
+      console.error("Erro ao adicionar espaço físico:", err);
       setAddLocationError(err.message);
-      showFeedback(`Erro: ${err.message}`, 'error');
+      showFeedback(`Erro: ${err.message}`, "error");
     } finally {
       setAddingLocation(false);
     }
@@ -139,7 +135,7 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
 
   if (loading) {
     return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
+      <Layout title="Espaços Físicos - MegaNuv Inventory">
         <div className="flex items-center justify-center h-full text-gray-700">
           <svg
             className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500"
@@ -171,7 +167,7 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
 
   if (error) {
     return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
+      <Layout title="Espaços Físicos - MegaNuv Inventory">
         <div className="text-red-600 text-center h-full flex items-center justify-center">
           Erro: {error}
         </div>
@@ -180,10 +176,10 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
   }
 
   return (
-    <Layout title="Espaços Físicos - MegaNuv Inventory" userName={userName}>
+    <Layout title="Espaços Físicos - MegaNuv Inventory">
       <div
         className={`max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 transition-filter duration-300 ${
-          isModalOpen ? 'blur-sm pointer-events-none' : ''
+          isModalOpen ? "blur-sm pointer-events-none" : ""
         }`}
       >
         <Head>
@@ -206,9 +202,9 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
         {feedbackMessage && (
           <div
             className={`mb-6 px-4 py-3 rounded-lg text-lg font-medium ${
-              feedbackType === 'success'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+              feedbackType === "success"
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
             }`}
           >
             {feedbackMessage}
@@ -226,9 +222,7 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
                 key={loc.id}
                 className="bg-white border border-gray-200 rounded-xl shadow-md p-6 flex flex-col justify-between transform transition duration-300 hover:shadow-lg hover:scale-[1.01] cursor-pointer"
                 onClick={() =>
-                  handleViewContents(
-                    loc.location || loc.serialNumber || loc.id
-                  )
+                  handleViewContents(loc.location || loc.serialNumber || loc.id)
                 }
               >
                 <div>
@@ -240,13 +234,13 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
                   </div>
                   {loc.notes && (
                     <p className="text-gray-700 text-sm mb-3">
-                      <span className="font-medium">Descrição:</span>{' '}
+                      <span className="font-medium">Descrição:</span>{" "}
                       {loc.notes}
                     </p>
                   )}
                   <p className="text-gray-600 text-sm flex items-center">
                     <Box size={16} className="text-gray-500 mr-2" />
-                    Itens Contidos:{' '}
+                    Itens Contidos:{" "}
                     <span className="font-bold ml-1">
                       {loc.children?.length ?? 0}
                     </span>
@@ -257,9 +251,7 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleViewContents(
-                        loc.location || loc.serialNumber || loc.id
-                      );
+                      handleViewContents(loc.location || loc.serialNumber || loc.id);
                     }}
                     className="flex items-center bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-sm"
                   >
@@ -286,20 +278,3 @@ export default function LocationsPage({ userName }: LocationsPageProps) {
     </Layout>
   );
 }
-
-// ✅ Server-side: decodifica o JWT e passa o nome do usuário
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const token = context.req.cookies['auth_token'];
-  let userName = 'Usuário';
-
-  if (token && process.env.JWT_SECRET) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET) as { name?: string };
-      if (decoded?.name) userName = decoded.name;
-    } catch (err) {
-      console.error('Erro ao decodificar token:', err);
-    }
-  }
-
-  return { props: { userName } };
-};

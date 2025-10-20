@@ -1,9 +1,9 @@
 // components/Layout.tsx
-import React, { ReactNode, useState, useEffect } from 'react';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import Image from 'next/image';
+import React, { ReactNode, useState, useEffect } from "react";
+import Head from "next/head";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import Image from "next/image";
 import {
   LineChart,
   Warehouse,
@@ -15,17 +15,18 @@ import {
   Menu,
   X,
   UserCircle,
-} from 'lucide-react';
+} from "lucide-react";
+import { useUser } from "../lib/context/UserContext";
 
 interface LayoutProps {
   children: ReactNode;
   title?: string;
-  userName: string; // Recebido via props
 }
 
-export default function Layout({ children, title = 'MegaNuv Inventory', userName }: LayoutProps) {
+export default function Layout({ children, title = "MegaNuv Inventory" }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
+  const { user } = useUser();
 
   // Fecha a sidebar ao navegar
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function Layout({ children, title = 'MegaNuv Inventory', userName
 
   // Função para marcar item ativo
   const isActive = (pathname: string) => {
-    if (pathname === '/') return router.pathname === pathname;
+    if (pathname === "/") return router.pathname === pathname;
     return router.pathname.startsWith(pathname);
   };
 
@@ -63,14 +64,14 @@ export default function Layout({ children, title = 'MegaNuv Inventory', userName
           <div className="text-2xl font-bold text-blue-400">MegaNuv</div>
           <div className="flex items-center space-x-2 text-sm">
             <UserCircle size={20} />
-            <span>{userName || 'Usuário'}</span>
+            <span>{user?.name || "Usuário"}</span>
           </div>
         </header>
 
         {/* Sidebar */}
         <aside
           className={`fixed inset-y-0 left-0 w-64 bg-gray-800 text-white p-4 flex flex-col z-30 transform ${
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out lg:shadow-xl lg:rounded-r-lg`}
         >
           {/* Logo */}
@@ -88,20 +89,20 @@ export default function Layout({ children, title = 'MegaNuv Inventory', userName
           <nav className="flex-grow">
             <ul>
               {[
-                { href: '/dashboard', label: 'Dashboard', icon: LineChart },
-                { href: '/', label: 'Ordenação de Itens', icon: Warehouse },
-                { href: '/instances', label: 'Gerenciar Ativos', icon: Box },
-                { href: '/products', label: 'Definição de Produtos (CA)', icon: ShoppingCart },
-                { href: '/sync-contaazul', label: 'Sincronizar Conta Azul', icon: RefreshCw },
-                { href: '/settings', label: 'Configurações', icon: Settings },
+                { href: "/dashboard", label: "Dashboard", icon: LineChart },
+                { href: "/", label: "Espaços Físicos", icon: Warehouse },
+                { href: "/instances", label: "Gerenciar Ativos", icon: Box },
+                { href: "/products", label: "Definição de Produtos (CA)", icon: ShoppingCart },
+                { href: "/sync-contaazul", label: "Sincronizar Conta Azul", icon: RefreshCw },
+                { href: "/settings", label: "Configurações", icon: Settings },
               ].map((item) => (
                 <li key={item.href} className="mb-2">
                   <Link
                     href={item.href}
                     className={`flex items-center py-2 px-4 rounded-md transition duration-200 ${
                       isActive(item.href)
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'hover:bg-gray-700 text-gray-300'
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "hover:bg-gray-700 text-gray-300"
                     }`}
                   >
                     <item.icon size={20} className="mr-3" />
@@ -116,15 +117,16 @@ export default function Layout({ children, title = 'MegaNuv Inventory', userName
           <div className="mt-auto pt-4 border-t border-gray-700 flex flex-col items-center">
             <div className="flex items-center text-gray-300 text-base mb-3">
               <UserCircle size={22} className="mr-2" />
-              <span>{userName || 'Usuário'}</span>
+              <span>{user?.name || "Usuário"}</span>
             </div>
             <button
               onClick={async () => {
                 try {
-                  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-                  router.push('/login');
+                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                  localStorage.removeItem("user");
+                  router.push("/login");
                 } catch (err) {
-                  console.error('Erro ao fazer logout', err);
+                  console.error("Erro ao fazer logout", err);
                 }
               }}
               className="w-full flex items-center justify-center py-2 px-4 rounded-md text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
