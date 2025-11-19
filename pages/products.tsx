@@ -149,6 +149,7 @@ function EditProductModal({ item, onClose, onSave }: { item: Item, onClose: () =
     id: item.id,
     name: item.name,
     sku: item.sku || '',
+    stockQuantity: item.stockQuantity,
     price: item.price,
     cost: item.cost || 0,
   });
@@ -175,7 +176,7 @@ function EditProductModal({ item, onClose, onSave }: { item: Item, onClose: () =
               type="text" 
               required
               className="mt-1 w-full border border-gray-400 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-600"
-              placeholder={formData.name}
+              value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
           </div>
@@ -187,11 +188,19 @@ function EditProductModal({ item, onClose, onSave }: { item: Item, onClose: () =
                 type="text" 
                 required
                 className="mt-1 w-full border border-gray-400 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none text-gray-600"
-                placeholder={formData.sku}
+                value={formData.sku}
                 onChange={e => setFormData({...formData, sku: e.target.value})}
               />
             </div>
-             {/* Espaço vazio ou outro campo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-800">QTD.</label>
+              <input 
+                type="number"
+                className="mt-1 w-full border border-gray-400 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none text-gray-600"
+                value={formData.stockQuantity}
+                onChange={e => setFormData({...formData, price: parseInt(e.target.value)})}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
