@@ -1,8 +1,8 @@
 // pages/api/item-instances/create.ts (Leitura de JWT de Cookie)
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken, AuthTokenPayload } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 import * as cookie from 'cookie'; // Importar a biblioteca 'cookie'
 

@@ -3,6 +3,20 @@
 import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import {
+  Box,
+  Layers,
+  Combine,
+  PackagePlus,
+  NotebookPen,
+  SendToBack,
+  Grid2X2Check,
+  Boxes,
+  MapPin,
+  FileDigit,
+  CirclePlus,
+  Search
+} from 'lucide-react';
 
 // Reusando interfaces (pode ser centralizado em um arquivo de tipos)
 interface Item {
@@ -216,6 +230,10 @@ export default function InstancesPage() {
     }
   };
 
+  const isPhysicalSpace = (instance: ItemInstance): boolean => {
+    return instance.item.sku === LOCATION_SKU;
+  };
+
   if (loading) {
     return (
       <Layout title="Itens Físicos & Ativos - MegaNuv Inventory">
@@ -242,14 +260,21 @@ export default function InstancesPage() {
         <Head>
           <title>Itens Físicos & Ativos - MegaNuv Inventory</title>
         </Head>
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">Gerenciar Itens Físicos & Ativos</h1>
+        <h1 className="text-3xl font-bold text-blue-950 flex mb-6">
+          <Box className="mr-3 text-blue-900" />
+          Gerenciar Itens Físicos & Ativos
+        </h1>
         
         {/* Formulário para Adicionar Novo Produto */}
         <div className="bg-white p-6 rounded-lg shadow-lg mb-8 border border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-4">Adicionar Novo Produto</h2>
+          <h2 className="text-2xl flex font-semibold text-blue-900 mb-4">
+            <PackagePlus className="mr-2 " />
+            Adicionar Novo Produto
+          </h2>
           <form onSubmit={handleCreateInstance} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-1">
-              <label htmlFor="newItemId" className="block text-gray-700 text-sm font-bold mb-2">
+              <label htmlFor="newItemId" className="flex text-blue-800 text-sm font-bold mb-2">
+                <Boxes className="mr-1 h-4 w-4" />
                 Tipo de Produto (Definição):
               </label>
               <select
@@ -259,14 +284,15 @@ export default function InstancesPage() {
                 onChange={(e) => setNewItemId(e.target.value)}
                 required
               >
-                <option value="">Selecione um Tipo de Item</option>
+                <option value="" disabled>Selecione um Tipo de Item</option>
                 {availableItems.map((item) => (
                   <option key={item.id} value={item.id}>{item.name} ({item.sku})</option>
                 ))}
               </select>
             </div>
             <div className="md:col-span-1">
-              <label htmlFor="newSerialNumber" className="block text-gray-700 text-sm font-bold mb-2">
+              <label htmlFor="newSerialNumber" className="flex text-blue-800 text-sm font-bold mb-2">
+                <FileDigit className="mr-1 h-4 w-4" />
                 Número de Série / Identificador Único:
               </label>
               <input
@@ -279,8 +305,9 @@ export default function InstancesPage() {
               />
             </div>
             <div className="md:col-span-1">
-              <label htmlFor="newLocation" className="block text-gray-700 text-sm font-bold mb-2">
-                Localização (Ex: "Slot 1", "Gaveta A", "Mesa 3"):
+              <label htmlFor="newLocation" className="flex text-blue-800 text-sm font-bold mb-2">
+                <MapPin className="mr-1 h-4 w-4" />
+                Localização:
               </label>
               <input
                 type="text"
@@ -292,19 +319,23 @@ export default function InstancesPage() {
               />
             </div>
             <div className="md:col-span-1">
-              <label htmlFor="newParentId" className="block text-gray-700 text-sm font-bold mb-2">
-                Item Pai (Opcional - Ex: Servidor, Rack):
+              <label htmlFor="newParentId" className="flex text-blue-800 text-sm font-bold mb-2">
+                <Layers className="mr-1 h-4 w-4" />
+                Espaço Pai:
               </label>
               <select
                 id="newParentId"
                 className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 value={newParentId}
                 onChange={(e) => setNewParentId(e.target.value)}
+                required
               >
-                <option value="">Nenhum Item Pai (Nível Superior)</option>
-                {availableParents.map((parent) => (
-                  <option key={parent.id} value={parent.id}>
-                    {parent.item?.name || 'Item Desconhecido'} ({parent.serialNumber}) {parent.location ? ` - ${parent.location}` : ''}
+                <option value="" disabled>Nenhum Espaço-Pai</option>
+                {availableParents
+                  .filter((inst) => isPhysicalSpace(inst))
+                  .map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.item?.name || 'Item Desconhecido'} ({inst.serialNumber}) {inst.location ? ` - ${inst.location}` : ''}
                   </option>
                 ))}
               </select>
@@ -317,12 +348,14 @@ export default function InstancesPage() {
                 checked={newIsInUse}
                 onChange={(e) => setNewIsInUse(e.target.checked)}
               />
-              <label htmlFor="newIsInUse" className="text-gray-700 text-sm font-bold">
+              <label htmlFor="newIsInUse" className="text-blue-800 text-sm font-bold flex">
                 Está em Uso?
+                <Grid2X2Check className="ml-1 h-4 w-4" />
               </label>
             </div>
             <div className="md:col-span-2 mb-6">
-              <label htmlFor="newNotes" className="block text-gray-700 text-sm font-bold mb-2">
+              <label htmlFor="newNotes" className="flex text-blue-800 text-sm font-bold mb-2">
+                <NotebookPen className="mr-1 h-4 w-4" />
                 Notas:
               </label>
               <textarea
@@ -337,10 +370,11 @@ export default function InstancesPage() {
             <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md focus:outline-none focus:shadow-outline transition duration-200"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 flex rounded-md focus:outline-none focus:shadow-outline transition duration-200"
                 disabled={formLoading}
               >
-                {formLoading ? 'Adicionando...' : 'Criar Instância'}
+                <Layers className="mr-2" />
+                {formLoading ? 'Adicionando...' : 'Adicionar Produto'}
               </button>
             </div>
           </form>
@@ -348,12 +382,16 @@ export default function InstancesPage() {
 
         {/* Formulário para Mover Produto */}
         <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-4">Mover Produto</h2>
+          <h2 className="text-2xl font-semibold text-blue-900 mb-4 flex">
+            <SendToBack className="mr-2" />
+            Mover Produto
+          </h2>
           <form onSubmit={handleMoveInstance} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             
             {/* Coluna 1: Item a Mover */}
             <div className="md:col-span-1">
-              <label htmlFor="moveInstanceId" className="block text-gray-700 text-sm font-bold mb-2">
+              <label htmlFor="moveInstanceId" className="flex text-teal-800 text-sm font-bold mb-2 items-center">
+                <Search className="h-4 w-4 mr-1 text-teal-600" />
                 Item a ser Movido:
               </label>
               <select
@@ -364,18 +402,20 @@ export default function InstancesPage() {
                 required
               >
                 <option value="">Selecione o item...</option>
-                {/* Usamos 'availableParents' pois é a lista de todas as instâncias */}
-                {availableParents.map((inst) => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.item?.name || 'Item'} ({inst.serialNumber})
-                  </option>
-                ))}
+                {availableParents
+                  .filter((inst) => !isPhysicalSpace(inst))
+                  .map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.item?.name || 'Item'} ({inst.serialNumber})
+                    </option>
+                  ))}
               </select>
             </div>
             
             {/* Coluna 2: Novo Pai (Destino) */}
             <div className="md:col-span-1">
-              <label htmlFor="moveNewParentId" className="block text-gray-700 text-sm font-bold mb-2">
+              <label htmlFor="moveNewParentId" className="text-indigo-900 text-sm font-bold mb-2 flex items-center">
+                <Combine className="h-4 w-4 mr-1 text-indigo-500" />
                 Mover Para Dentro de:
               </label>
               <select
@@ -386,12 +426,13 @@ export default function InstancesPage() {
                 required
               >
                 <option value="">Selecione o novo destino...</option>
-                {/* Usamos 'availableParents' pois é a lista de todas as instâncias */}
-                {availableParents.map((parent) => (
-                  <option key={parent.id} value={parent.id}>
-                    {parent.item?.name || 'Item'} ({parent.serialNumber}) {parent.location ? ` - ${parent.location}` : ''}
-                  </option>
-                ))}
+                {availableParents
+                  .filter((inst) => isPhysicalSpace(inst))
+                  .map((parent) => (
+                    <option key={parent.id} value={parent.id}>
+                      {parent.item?.name || 'Item'} ({parent.serialNumber}) {parent.location ? ` - ${parent.location}` : ''}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -399,16 +440,17 @@ export default function InstancesPage() {
             <div className="md:col-span-1 flex justify-start">
               <button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md focus:outline-none focus:shadow-outline transition duration-200"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 flex items-center rounded-md focus:outline-none focus:shadow-outline transition duration-200"
                 disabled={moveLoading}
               >
+                <SendToBack className="mr-2" />
                 {moveLoading ? 'Movendo...' : 'Mover Item'}
               </button>
             </div>
 
             {/* Feedback */}
-            {moveError && <p className="md:col-span-3 text-red-600 text-sm mt-2">{moveError}</p>}
-            {moveSuccess && <p className="md:col-span-3 text-green-600 text-sm mt-2">{moveSuccess}</p>}
+            {moveError && <p className="md:col-span-3 bg-red-200 text-red-600 rounded-full py-1 px-3 text-sm mt-2">{moveError}</p>}
+            {moveSuccess && <p className="md:col-span-3 bg-green-200 text-green-600 rounded-full py-1 px-3 text-sm mt-2">{moveSuccess}</p>}
 
           </form>
         </div>

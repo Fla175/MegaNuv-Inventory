@@ -1,8 +1,8 @@
 // pages/api/items/list.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken, AuthTokenPayload } from '@/lib/auth';
 import * as cookie from 'cookie';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
