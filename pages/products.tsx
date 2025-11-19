@@ -1,7 +1,7 @@
 import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { Pencil, X } from 'lucide-react'; // Adicionei o X
+import { Pencil, X } from 'lucide-react';
 
 // Interfaces (Mantidas)
 interface Item {
