@@ -1,4 +1,4 @@
-// lib/prisma.ts (ou .js)
+// lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
 
 // Adiciona o Prisma Client ao objeto global em desenvolvimento

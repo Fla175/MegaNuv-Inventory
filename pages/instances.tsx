@@ -1,4 +1,4 @@
-// pages/instances.tsx (Adiciona max-w ao Wrapper Interno)
+// pages/instances.tsx (Completo com formulário de Mover)
 
 import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
@@ -31,6 +31,9 @@ interface ItemInstance {
   children?: ItemInstance[]; // Instâncias filhas (não incluiremos por padrão nesta lista)
 }
 
+// SKU de Espaços Físicos (Pais e Filhos)
+const LOCATION_SKU = "INTERNAL_LOCATION_SPACE";
+
 export default function InstancesPage() {
   const [instances, setInstances] = useState<ItemInstance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,13 @@ export default function InstancesPage() {
   // Estados para buscar Itens e ItemInstances para os dropdowns (selects)
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [availableParents, setAvailableParents] = useState<ItemInstance[]>([]);
+
+  // Estados para Mover Instância
+  const [moveInstanceId, setMoveInstanceId] = useState('');
+  const [moveNewParentId, setMoveNewParentId] = useState('');
+  const [moveLoading, setMoveLoading] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [moveSuccess, setMoveSuccess] = useState<string | null>(null);
 
   // Funções de fetch
   const fetchInstances = async () => {
@@ -145,6 +155,67 @@ export default function InstancesPage() {
     }
   };
 
+  // Nova Função para Mover Instância
+  const handleMoveInstance = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMoveLoading(true);
+    setMoveError(null);
+    setMoveSuccess(null);
+
+    if (!moveInstanceId || !moveNewParentId) {
+      setMoveError('Você precisa selecionar o item a ser movido e o novo destino.');
+      setMoveLoading(false);
+      return;
+    }
+
+    if (moveInstanceId === moveNewParentId) {
+      setMoveError('Um item não pode ser movido para dentro de si mesmo.');
+      setMoveLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/item-instances/move', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          instanceId: moveInstanceId,
+          newParentId: moveNewParentId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Falha ao mover instância.');
+      }
+
+      setMoveSuccess('Instância movida com sucesso!');
+      
+      // Limpar formulário
+      setMoveInstanceId('');
+      setMoveNewParentId('');
+      
+      // Recarregar listas para refletir a mudança
+      await fetchInstances();
+      await fetchAvailableItemsAndParents();
+
+    } catch (err: any) {
+      console.error('Erro ao mover instância:', err);
+      setMoveError(err.message || 'Ocorreu um erro ao mover a instância.');
+    } finally {
+      setMoveLoading(false);
+      
+      // Limpar feedback após alguns segundos
+      setTimeout(() => {
+          setMoveError(null);
+          setMoveSuccess(null);
+      }, 4000);
+    }
+  };
+
   if (loading) {
     return (
       <Layout title="Itens Físicos & Ativos - MegaNuv Inventory">
@@ -167,20 +238,19 @@ export default function InstancesPage() {
 
   return (
     <Layout title="Itens Físicos & Ativos - MegaNuv Inventory">
-      {/* NOVO: Adicionado max-w-6xl mx-auto para centralizar o conteúdo da página */}
       <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8"> 
         <Head>
           <title>Itens Físicos & Ativos - MegaNuv Inventory</title>
         </Head>
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Gerenciar Itens Físicos & Ativos</h1>
         
-        {/* Formulário para Adicionar Nova Instância */}
+        {/* Formulário para Adicionar Novo Produto */}
         <div className="bg-white p-6 rounded-lg shadow-lg mb-8 border border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-4">Adicionar Nova Instância de Item</h2>
+          <h2 className="text-2xl font-semibold text-gray-700 mb-4">Adicionar Novo Produto</h2>
           <form onSubmit={handleCreateInstance} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-1">
               <label htmlFor="newItemId" className="block text-gray-700 text-sm font-bold mb-2">
-                Tipo de Item (Definição):
+                Tipo de Produto (Definição):
               </label>
               <select
                 id="newItemId"
@@ -276,45 +346,71 @@ export default function InstancesPage() {
           </form>
         </div>
 
-        {/* Lista de Instâncias Existentes */}
+        {/* Formulário para Mover Produto */}
         <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Todas as Instâncias de Itens Físicos</h2>
-          {instances.length === 0 ? (
-            <p className="text-center text-gray-600">Nenhuma instância de item físico cadastrada ainda.</p>
-          ) : (
-            <div className="overflow-x-auto"> {/* Mantém overflow-x-auto para tabelas largas */}
-              <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
-                <thead className="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                  <tr>
-                    <th className="py-3 px-6 text-left">N. Série</th>
-                    <th className="py-3 px-6 text-left">Tipo de Item</th>
-                    <th className="py-3 px-6 text-left">Localização</th>
-                    <th className="py-3 px-6 text-left">Item Pai</th>
-                    <th className="py-3 px-6 text-left">Em Uso?</th>
-                    <th className="py-3 px-6 text-left">Custo (R$)</th>
-                    <th className="py-3 px-6 text-left">Preço (R$)</th>
-                    <th className="py-3 px-6 text-left">Notas</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-600 text-sm font-light">
-                  {instances.map((instance) => (
-                    <tr key={instance.id} className="border-b border-gray-200 hover:bg-gray-100">
-                      <td className="py-3 px-6 text-left whitespace-nowrap font-medium">{instance.serialNumber}</td>
-                      <td className="py-3 px-6 text-left">{instance.item?.name || 'Desconhecido'} ({instance.item?.sku || 'N/A'})</td>
-                      <td className="py-3 px-6 text-left">{instance.location || 'N/A'}</td>
-                      <td className="py-3 px-6 text-left">
-                        {instance.parentId ? `${instance.parent?.serialNumber || 'N/A'} (${instance.parent?.location || 'N/A'})` : 'Nenhum'}
-                      </td>
-                      <td className="py-3 px-6 text-left">{instance.isInUse ? 'Sim' : 'Não'}</td>
-                      <td className="py-3 px-6 text-left">R$ {instance.item?.cost ? instance.item.cost.toFixed(2).replace('.', ',') : 'N/A'}</td>
-                      <td className="py-3 px-6 text-left">R$ {instance.item?.price ? instance.item.price.toFixed(2).replace('.', ',') : 'N/A'}</td>
-                      <td className="py-3 px-6 text-left max-w-xs overflow-hidden text-ellipsis whitespace-nowrap" title={instance.notes || ''}>{instance.notes || 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <h2 className="text-2xl font-semibold text-gray-700 mb-4">Mover Produto</h2>
+          <form onSubmit={handleMoveInstance} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            
+            {/* Coluna 1: Item a Mover */}
+            <div className="md:col-span-1">
+              <label htmlFor="moveInstanceId" className="block text-gray-700 text-sm font-bold mb-2">
+                Item a ser Movido:
+              </label>
+              <select
+                id="moveInstanceId"
+                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                value={moveInstanceId}
+                onChange={(e) => setMoveInstanceId(e.target.value)}
+                required
+              >
+                <option value="">Selecione o item...</option>
+                {/* Usamos 'availableParents' pois é a lista de todas as instâncias */}
+                {availableParents.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.item?.name || 'Item'} ({inst.serialNumber})
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+            
+            {/* Coluna 2: Novo Pai (Destino) */}
+            <div className="md:col-span-1">
+              <label htmlFor="moveNewParentId" className="block text-gray-700 text-sm font-bold mb-2">
+                Mover Para Dentro de:
+              </label>
+              <select
+                id="moveNewParentId"
+                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                value={moveNewParentId}
+                onChange={(e) => setMoveNewParentId(e.target.value)}
+                required
+              >
+                <option value="">Selecione o novo destino...</option>
+                {/* Usamos 'availableParents' pois é a lista de todas as instâncias */}
+                {availableParents.map((parent) => (
+                  <option key={parent.id} value={parent.id}>
+                    {parent.item?.name || 'Item'} ({parent.serialNumber}) {parent.location ? ` - ${parent.location}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Coluna 3: Botão */}
+            <div className="md:col-span-1 flex justify-start">
+              <button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-md focus:outline-none focus:shadow-outline transition duration-200"
+                disabled={moveLoading}
+              >
+                {moveLoading ? 'Movendo...' : 'Mover Item'}
+              </button>
+            </div>
+
+            {/* Feedback */}
+            {moveError && <p className="md:col-span-3 text-red-600 text-sm mt-2">{moveError}</p>}
+            {moveSuccess && <p className="md:col-span-3 text-green-600 text-sm mt-2">{moveSuccess}</p>}
+
+          </form>
         </div>
       </div>
     </Layout>
