@@ -2,8 +2,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import prisma from '../../../lib/prisma';
-import { AuthTokenPayload, verifyAuthToken } from '../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { AuthTokenPayload, verifyAuthToken } from '@/lib/auth';
 import * as cookie from 'cookie';
 
 const CONTA_AZUL_CLIENT_ID = process.env.CLIENT_ID;

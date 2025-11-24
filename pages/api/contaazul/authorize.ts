@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import * as cookie from 'cookie';
-import { verifyAuthToken } from '../../../lib/auth';
+import { verifyAuthToken } from '@/lib/auth';
 
 const CONTAAZUL_CLIENT_ID = process.env.CLIENT_ID;
 const CONTAAZUL_REDIRECT_URI = process.env.CONTAAZUL_REDIRECT_URI;

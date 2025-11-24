@@ -2,8 +2,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import prisma from '../../../lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken, AuthTokenPayload } from '@/lib/auth';
 import * as cookie from 'cookie';
 import { Prisma } from '@prisma/client';
 

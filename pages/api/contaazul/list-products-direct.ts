@@ -2,8 +2,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import prisma from '../../../lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken, AuthTokenPayload } from '@/lib/auth';
 import * as cookie from 'cookie';
 
 const CONTA_AZUL_API_V2_BASE_URL = process.env.CONTA_AZUL_API_V2_BASE_URL || 'https://api-v2.contaazul.com';
