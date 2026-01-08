@@ -1,55 +1,29 @@
 // pages/api/item-instances/children/delete.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../../lib/prisma';
-import { verifyAuthToken } from '../../../../lib/auth';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken } from '@/lib/auth';
 import * as cookie from 'cookie';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'DELETE') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
-  }
+  if (req.method !== 'DELETE') return res.status(405).end();
 
-  // --- AUTENTICAÇÃO ---
-  const authHeader = req.headers.authorization;
-  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : cookies.auth_token;
+  const cookies = cookie.parse(req.headers.cookie || '');
+  const token = req.headers.authorization?.split(' ')[1] || cookies.auth_token;
+  if (!token || !verifyAuthToken(token)) return res.status(401).json({ message: 'Unauthorized' });
 
-  if (!token) return res.status(401).json({ message: 'Token ausente.' });
-
-  const decoded = verifyAuthToken(token);
-  if (!decoded?.userId) return res.status(401).json({ message: 'Token JWT inválido.' });
+  const { childId } = req.query; // No front-end, passas ?childId=...
 
   try {
-    const { childId, recursive } = req.query;
-
-    if (!childId) return res.status(400).json({ message: 'Parâmetro childId é obrigatório.' });
-
-    const recursiveDelete = recursive === 'true';
-
-    // --- Função recursiva: apaga filhos e subfilhos ---
-    const deleteRecursive = async (id: string): Promise<void> => {
-      const children = await prisma.itemInstance.findMany({ where: { parentId: id } });
-      for (const child of children) {
-        await deleteRecursive(child.id);
-      }
-      await prisma.itemInstance.delete({ where: { id } });
-    };
-
-    if (recursiveDelete) {
-      await deleteRecursive(String(childId));
-    } else {
-      await prisma.itemInstance.delete({ where: { id: String(childId) } });
-    }
-
-    return res.status(200).json({
-      message: recursiveDelete
-        ? 'Filho e seus descendentes deletados com sucesso.'
-        : 'Filho deletado com sucesso.',
-      childId,
+    // No teu novo schema, 'ItemInstance' tem relação 'children' e 'items'
+    // Como definimos 'onDelete: Cascade' no Prisma, basta apagar o pai:
+    await prisma.itemInstance.delete({
+      where: { id: String(childId) }
     });
-  } catch (error) {
-    console.error('Erro ao deletar filho:', error);
-    return res.status(500).json({ message: 'Erro interno ao deletar filho.' });
+
+    return res.status(200).json({ message: 'Espaço e dependências eliminados com sucesso.' });
+  } catch (error: any) {
+    // Se o erro for P2025, o item já não existia
+    if (error.code === 'P2025') return res.status(404).json({ message: 'ID não encontrado.' });
+    return res.status(500).json({ message: error.message });
   }
 }

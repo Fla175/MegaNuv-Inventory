@@ -91,9 +91,8 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
               {[
                 { href: "/dashboard", label: "Dashboard", icon: LineChart },
                 { href: "/", label: "Espaços Físicos", icon: Warehouse },
-                { href: "/instances", label: "Gerenciar Ativos", icon: Box },
-                { href: "/products", label: "Definição de Produtos (CA)", icon: ShoppingCart },
-                { href: "/sync-contaazul", label: "Sincronizar Conta Azul", icon: RefreshCw },
+                { href: "/products", label: "Gerenciar Produtos", icon: Box },
+                { href: "/definitions", label: "Definições de Produtos", icon: ShoppingCart },
                 { href: "/settings", label: "Configurações", icon: Settings },
               ].map((item) => (
                 <li key={item.href} className="mb-2">
@@ -140,7 +139,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
         {/* Overlay mobile */}
         {isSidebarOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden backdrop-blur-sm"
+            className="fixed inset-0 bg-black/20 z-20 lg:hidden backdrop-blur-sm"
             onClick={() => setIsSidebarOpen(false)}
           ></div>
         )}

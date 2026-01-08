@@ -1,367 +1,178 @@
 // pages/index.tsx
 import Layout from "../components/Layout";
 import { useState, useEffect } from "react";
-import AddLocationModal from "../components/AddLocationModal";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { PlusCircle, Eye, Box, MapPin, Layers, Warehouse, Trash2 } from "lucide-react"; // Adicionado Trash2
-import { useUser } from "../lib/context/UserContext";
+import { PlusCircle, Eye, MapPin, Warehouse, Trash2, Layers, Box } from "lucide-react";
+import AddLocationModal from "../components/AddLocationModal";
 
-// Tipagens (mantidas)
-interface Item {
-  name: string;
-  sku: string;
-  contaAzulId?: string;
-  status: string;
-  price: number;
-  cost: number | null;
-}
-
-interface ItemInstance {
+interface ItemInstanceLocation {
   id: string;
-  itemId: string;
-  serialNumber: string;
-  location: string | null;
-  qrCodePath: string | null;
-  isInUse: boolean;
-  notes: string | null;
+  name: string;
   parentId: string | null;
-  item: Item;
-  children?: ItemInstance[];
+  _count?: {
+    items: number;
+    children: number;
+  };
 }
-// Constante para o SKU de Locação
-const LOCATION_SKU = "INTERNAL_LOCATION_SPACE";
 
 export default function LocationsPage() {
   const router = useRouter();
-  const { user, setUser } = useUser();
-
-  const [locations, setLocations] = useState<ItemInstance[]>([]);
-  const [topLevelItems, setTopLevelItems] = useState<ItemInstance[]>([]);
-
+  const [locations, setLocations] = useState<ItemInstanceLocation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [addingLocation, setAddingLocation] = useState(false);
-  const [addLocationError, setAddLocationError] = useState<string | null>(null);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [feedbackType, setFeedbackType] = useState<"success" | "error" | null>(null);
+  const [feedback, setFeedback] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  const showFeedback = (message: string, type: "success" | "error") => {
-    setFeedbackMessage(message);
-    setFeedbackType(type);
-    setTimeout(() => {
-      setFeedbackMessage(null);
-      setFeedbackType(null);
-    }, 4000);
+  const showFeedback = (msg: string, type: "success" | "error") => {
+    setFeedback({ msg, type });
+    setTimeout(() => setFeedback(null), 4000);
   };
 
   const fetchLocations = async () => {
     setLoading(true);
-    setError(null);
     try {
-      const response = await fetch("/api/item-instances/list?parentId=null&fetchChildren=true", {
+      const response = await fetch("/api/item-instances/list?onlyRoots=true", {
         credentials: "include",
       });
-
-      if (response.status === 401) {
-        router.push("/login");
-        return;
-      }
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Falha ao buscar espaços físicos.");
-      }
-
       const data = await response.json();
-      
-      const allInstances = data.itemInstances as ItemInstance[];
-      
-      const physicalSpaces = allInstances.filter(
-        (instance) => instance.item.sku === LOCATION_SKU
-      );
-      
-      const items = allInstances.filter(
-        (instance) => instance.item.sku !== LOCATION_SKU
-      );
-
-      setLocations(physicalSpaces);
-      setTopLevelItems(items);
-      
-    } catch (err: any) {
-      console.error("Erro ao buscar espaços físicos:", err);
-      setError(err.message || "Ocorreu um erro ao carregar os espaços físicos.");
+      setLocations(data.itemInstances || []);
+    } catch (err) {
+      showFeedback("Erro ao carregar inventário.", "error");
     } finally {
       setLoading(false);
     }
   };
-  
-  // ==========================================================
-  // == FUNÇÃO DE DELEÇÃO (Implementada do inventory-view.tsx) ==
-  // ==========================================================
-  const handleDeleteChild = async (childId: string, isRecursive: boolean = false) => {
-    // Confirmação dupla para deleção recursiva de topo de nível
-    if (isRecursive && !window.confirm("CONFIRME: Deletar RECURSIVAMENTE apagará TUDO dentro deste item/espaço. Tem certeza?")) {
-        return;
-    }
 
-    const query = new URLSearchParams({
-      childId: childId,
-      recursive: isRecursive.toString()
-    }).toString();
-
-    const url = `/api/item-instances/children/delete?${query}`;
-
+  // FUNÇÃO DE EXCLUSÃO CORRIGIDA E SINCRONIZADA
+  const handleDeleteLocation = async (id: string, isForced = false): Promise<void> => {
     try {
-      const response = await fetch(url, {
+      const res = await fetch(`/api/item-instances/delete?id=${id}${isForced ? '&force=true' : ''}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Falha ao deletar item/espaço.");
+  
+      const data = await res.json();
+  
+      // Se a API pedir confirmação por ter conteúdo
+      if (res.status === 409 && data.requireConfirmation) {
+        const confirmacao = window.confirm(
+          `Atenção: Este espaço contém ${data.details?.items || 0} itens e ${data.details?.subspaces || 0} subespaços. ` +
+          "Ao confirmar, TUDO será excluído permanentemente. Deseja continuar?"
+        );
+  
+        if (confirmacao) {
+          return handleDeleteLocation(id, true);
+        }
+        return; 
       }
-
-      showFeedback(`Deletado com sucesso! (ID: ${childId})`, "success");
-      await fetchLocations(); // Recarrega
-    } catch (err: any) {
+  
+      if (res.ok) {
+        showFeedback("Espaço removido com sucesso", "success");
+        fetchLocations(); 
+      } else {
+        showFeedback(data.message || "Não foi possível excluir o espaço.", "error");
+      }
+    } catch (err) {
       console.error("Erro ao deletar:", err);
-      showFeedback(`Erro: ${err.message}`, "error");
+      showFeedback("Erro de conexão ao tentar excluir.", "error");
     }
   };
 
-  useEffect(() => {
-    fetchLocations();
-  }, []);
-
-  const handleAddLocation = async (name: string, serialNumber: string, notes: string) => {
-    setAddingLocation(true);
-    setAddLocationError(null);
+  const handleAddLocation = async (name: string) => {
     try {
-      const itemResponse = await fetch("/api/internal/ensure-location-item", {
-        credentials: "include",
-      });
-      if (!itemResponse.ok) {
-        const errData = await itemResponse.json();
-        throw new Error(errData.message || "Falha ao obter item de localização interno.");
-      }
-      const itemData = await itemResponse.json();
-      const locationItemId = itemData.locationItemId;
-
-      const response = await fetch("/api/item-instances/create", {
+      const res = await fetch("/api/item-instances/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          itemId: locationItemId,
-          serialNumber,
-          location: name,
-          isInUse: true,
-          notes,
-          parentId: null,
-        }),
+        body: JSON.stringify({ name, parentId: null }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || "Falha ao adicionar espaço físico.");
-      }
-
-      await fetchLocations();
+      if (!res.ok) throw new Error("Erro ao criar.");
+      fetchLocations();
       setIsModalOpen(false);
-      showFeedback("Espaço físico adicionado com sucesso!", "success");
+      showFeedback("Novo espaço pai criado!", "success");
     } catch (err: any) {
-      console.error("Erro ao adicionar espaço físico:", err);
-      setAddLocationError(err.message);
-      showFeedback(`Erro: ${err.message}`, "error");
-    } finally {
-      setAddingLocation(false);
+      showFeedback(err.message, "error");
     }
   };
 
-  const handleViewInstance = (instanceId: string | null) => {
-    router.push(`/inventory-view?location=${instanceId}`);
-  };
+  useEffect(() => { fetchLocations(); }, []);
 
-  if (loading) {
-    return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory">
-        <div className="flex items-center justify-center h-full text-gray-700">
-          <svg
-            className="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          Carregando...
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    return (
-      <Layout title="Espaços Físicos - MegaNuv Inventory">
-        <div className="text-red-600 text-center h-full flex items-center justify-center">
-          Erro: {error}
-        </div>
-      </Layout>
-    );
-  }
+  if (loading) return <Layout><div className="p-20 text-center font-black animate-pulse text-blue-900">CARREGANDO...</div></Layout>;
 
   return (
-    <Layout title="Espaços Físicos - MegaNuv Inventory">
-      <div
-        className={`max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 transition-filter duration-300 ${
-          isModalOpen ? "blur-sm pointer-events-none" : ""
-        }`}
-      >
-        <Head>
-          <title>Espaços Físicos - MegaNuv Inventory</title>
-        </Head>
+    <Layout title="Meu Inventário">
+      <div className={`max-w-6xl mx-auto py-8 px-4 transition-all ${isModalOpen ? "blur-sm" : ""}`}>
+        <Head><title>Inventário | MegaNuv</title></Head>
 
-        {/* Header (Botão de Adicionar só cria Espaços Físicos) */}
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4 sm:gap-0 border-b pb-4 border-gray-200"> {/* Divisor */}
-          <h1 className="text-3xl font-extrabold text-blue-950 text-center sm:text-left w-full sm:w-auto flex items-center">
-            <Warehouse size={32} className="mr-3 text-blue-600" />
-            Inventário
-          </h1>
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border">
+          <div className="flex items-center gap-5">
+            <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl shadow-blue-100">
+              <Warehouse size={32} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-blue-950 tracking-tighter">Meu Inventário</h1>
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Espaços Físicos</p>
+            </div>
+          </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-xl shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition duration-300 ease-in-out transform hover:scale-[1.02] text-sm sm:text-base w-full sm:w-auto justify-center"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-8 rounded-2xl shadow-xl transition-all flex items-center gap-2"
           >
-            <PlusCircle size={18} className="mr-2" />
-            Adicionar Novo Espaço
+            <PlusCircle size={20} /> Novo Espaço Pai
           </button>
         </div>
 
-        {feedbackMessage && (
-          <div
-            className={`mb-6 px-4 py-3 rounded-xl text-lg font-medium shadow-md ${
-              feedbackType === "success"
-                ? "bg-green-100 text-green-800 border border-green-300"
-                : "bg-red-100 text-red-800 border border-red-300"
-            }`}
-          >
-            {feedbackMessage}
+        {/* Feedback Alert */}
+        {feedback && (
+          <div className={`mb-8 p-4 rounded-2xl font-bold text-center border animate-in fade-in duration-300 ${feedback.type === "success" ? "bg-green-50 text-green-700 border-green-100" : "bg-red-50 text-red-700 border-red-100"}`}>
+            {feedback.msg}
           </div>
         )}
 
-        {/* ========================================================== */}
-        {/* == SEÇÃO DE ESPAÇOS FÍSICOS == */}
-        {/* ========================================================== */}
-        <div className="mb-12">
-           <h2 className="text-2xl font-bold text-blue-950 mb-6 border-b pb-3 flex items-center">
-             <MapPin size={24} className="mr-2 text-blue-500" />
-             Espaços Físicos ({locations.length})
-           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 border-gray-200">
-            {locations.length === 0 ? (
-              <p className="col-span-full text-center text-gray-600 py-10 text-lg rounded-lg bg-white shadow-inner">
-                Nenhum espaço físico cadastrado ainda.
-              </p>
-            ) : (
-              locations.map((loc) => {
-                const subSpaces = loc.children?.filter(child => child.item.sku === LOCATION_SKU).length ?? 0;
-                const itemsCount = loc.children?.filter(child => child.item.sku !== LOCATION_SKU).length ?? 0;
-                
-                return (
-                  <div
-                    key={loc.id}
-                    className="bg-white border border-gray-200 rounded-xl shadow-lg p-6 flex flex-col justify-between transform transition duration-300 hover:shadow-xl hover:-translate-y-1"
-                  >
-                    <div className="flex-grow">
-                      <div 
-                        className="flex items-center mb-3 cursor-pointer"
-                        onClick={() => handleViewInstance(loc.id)}
-                      >
-                        <MapPin size={28} className="text-blue-600 mr-3 p-1 bg-blue-50 rounded-full" />
-                        <h2 className="text-xl font-bold text-gray-800 leading-snug">
-                          {loc.location || loc.serialNumber}
-                        </h2>
-                      </div>
-                      {loc.notes && (
-                        <p className="text-gray-700 text-sm mb-4 line-clamp-2">
-                          {loc.notes}
-                        </p>
-                      )}
-                      
-                      <div className="space-y-2 pt-2 border-t border-gray-100">
-                        <p className="text-indigo-600 text-sm font-medium flex items-center">
-                          <Layers size={16} className="text-indigo-500 mr-2" />
-                          Subespaços:{" "}
-                          <span className="font-extrabold ml-1 text-indigo-700">
-                            {subSpaces}
-                          </span>
-                        </p>
-                        <p className="text-teal-600 text-sm font-medium flex items-center">
-                          <Box size={16} className="text-teal-500 mr-2" />
-                          Itens Contidos:{" "}
-                          <span className="font-extrabold ml-1 text-teal-700">
-                            {itemsCount}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex justify-between items-center"> {/* Alterado para incluir delete */}
-                      <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const recursive = window.confirm(
-                                "Você quer deletar também TODOS os itens e subespaços DENTRO deste espaço físico?"
-                            );
-                            handleDeleteChild(loc.id, recursive);
-                        }}
-                        className="flex-shrink-0 p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition duration-200"
-                        title="Deletar Espaço Físico"
-                      >
-                          <Trash2 size={20} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewInstance(loc.location); // CORREÇÃO: Usa ID aqui.
-                        }}
-                        className="flex items-center bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md transform hover:scale-[1.02]"
-                      >
-                        <Eye size={16} className="mr-2" />
-                        Ver Conteúdo
-                      </button>
-                    </div>
+        {/* Grid Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {locations.map((loc) => (
+            <div key={loc.id} className="group bg-white border rounded-[2.5rem] shadow-sm hover:shadow-2xl transition-all flex flex-col overflow-hidden">
+              <div className="p-8 flex-1">
+                <div className="flex justify-between mb-6">
+                  <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+                    <MapPin size={28} />
                   </div>
-                );
-              }))}
-          </div>
+                  <button 
+                    onClick={() => handleDeleteLocation(loc.id)} 
+                    className="text-gray-200 hover:text-red-500 transition-colors p-2"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+                <h2 className="text-2xl font-black text-blue-950 mb-6 group-hover:text-blue-600 transition-colors line-clamp-1">{loc.name}</h2>
+                <div className="flex gap-4">
+                  <div className="flex-1 bg-gray-50 p-4 rounded-2xl text-center border border-transparent group-hover:border-blue-50 transition-all">
+                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-tighter">Subespaços</p>
+                    <span className="text-xl font-black text-indigo-600">{loc._count?.children || 0}</span>
+                  </div>
+                  <div className="flex-1 bg-gray-50 p-4 rounded-2xl text-center border border-transparent group-hover:border-blue-50 transition-all">
+                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-tighter">Itens</p>
+                    <span className="text-xl font-black text-teal-600">{loc._count?.items || 0}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push(`/inventory-view?location=${loc.id}`)}
+                className="w-full bg-blue-50 group-hover:bg-blue-600 py-5 text-xs font-black uppercase text-blue-600 group-hover:text-white transition-all flex items-center justify-center gap-2 border-t border-blue-100/50 group-hover:border-transparent"
+              >
+                Explorar Inventário <Eye size={18} />
+              </button>
+            </div>
+          ))}
         </div>
-
       </div>
 
       <AddLocationModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setAddLocationError(null);
-        }}
+        onClose={() => setIsModalOpen(false)}
         onLocationAdded={handleAddLocation}
-        isLoading={addingLocation}
-        error={addLocationError}
+        isLoading={false}
+        error={null}
       />
     </Layout>
   );

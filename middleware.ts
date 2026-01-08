@@ -3,8 +3,8 @@ import { NextResponse, NextRequest } from "next/server";
 import * as jose from "jose";
 
 /**
- * Rotas públicas (exatas ou prefixos)
- * mantenha aqui tudo que precisa ser acessível sem auth.
+ * Rotas públicas (exatas ou prefixos).
+ * Inclui a rota de checagem de setup e a rota de cadastro inicial.
  */
 const PUBLIC_PATHS = [
   "/login",
@@ -13,80 +13,91 @@ const PUBLIC_PATHS = [
   "/api/auth/signup",
   "/api/auth/logout",
   "/api/auth/seed",
-  "/api/public",
+  "/api/public", // Permite acesso a /api/public/*
+  "/initial-setup", // Permite acesso a /initial-setup/*
   "/favicon.ico",
   "/logo-inventario.svg",
 ];
 
 // Função helper pra checar se um pathname é público (startsWith)
 function isPublicPath(pathname: string) {
-  // Checa igualdade exata ou prefixo para rotas de API
   return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p));
 }
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // LOG: sempre escreva quando o middleware for invocado
   console.log(`[middleware] interceptado: ${pathname}`);
 
   // Permite _next e assets sempre
   if (pathname.startsWith("/_next/") || pathname.startsWith("/static/")) {
-    console.log(`[middleware] permitindo asset: ${pathname}`);
     return NextResponse.next();
   }
+  
+  // ------------------------------------------------
+  // NOVO: VERIFICAÇÃO DE CONFIGURAÇÃO INICIAL (SETUP)
+  // ------------------------------------------------
+  // Executa a checagem no endpoint de API público
+  if (pathname === '/' || pathname === '/login') {
+      const apiURL = new URL('/api/public/initial-check', req.url).href;
+      
+      try {
+          // Nota: Você DEVE garantir que /api/public/initial-check.ts está criado!
+          const response = await fetch(apiURL);
+          const data = await response.json();
 
-  // Rotas públicas
+          if (data.requiresSetup) {
+              if (!pathname.startsWith('/initial-setup')) {
+                  console.log("[middleware] 0 usuários -> redirecionando para /initial-setup/register");
+                  return NextResponse.redirect(new URL("/initial-setup/register", req.url));
+              }
+          }
+      } catch (error) {
+          console.error("Erro ao verificar setup inicial:", error);
+          // Em caso de erro (DB off), assuma que precisa de setup
+          if (!pathname.startsWith('/initial-setup')) {
+              return NextResponse.redirect(new URL("/initial-setup/register", req.url));
+          }
+      }
+  }
+  // ------------------------------------------------
+  
+  // Rotas públicas (Após a checagem, verifica o caminho atual)
   if (isPublicPath(pathname)) {
     console.log(`[middleware] rota pública permitida: ${pathname}`);
     return NextResponse.next();
   }
 
-  // Lê cookie auth_token
+  // Se não é rota pública, exige token
   const token = req.cookies.get("auth_token")?.value;
   if (!token) {
     console.log("[middleware] token ausente -> redirecionando para /login");
-    const res = NextResponse.redirect(new URL("/login", req.url));
-    // marca header pra teste
-    res.headers.set("x-middleware-result", "no-token");
-    return res;
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   try {
-    // verifica token (TextEncoder para chave em string)
+    // verifica token (Mantida a lógica jose para a Edge Runtime)
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || "");
     await jose.jwtVerify(token, secret);
 
     // Token ok
     console.log("[middleware] token válido");
-    const res = NextResponse.next();
-    res.headers.set("x-middleware-result", "auth-ok");
-    return res;
+    return NextResponse.next();
   } catch (err) {
     console.error("[middleware] token inválido ou erro ao verificar:", err);
     const res = NextResponse.redirect(new URL("/login", req.url));
     // limpa cookie
     res.cookies.delete("auth_token");
-    res.headers.set("x-middleware-result", "invalid-token");
     return res;
   }
 }
 
 /**
  * Matcher que garante que o middleware será invocado para todas as rotas
- * (incluindo a raiz '/'). Depois filtramos as rotas públicas no próprio código.
  */
 export const config = {
   matcher: [
-    /*
-     * Corresponde a todos os caminhos de solicitação, exceto aqueles que começam com:
-     * - api (Rotas de API)
-     * - _next/static (Arquivos estáticos do Next.js)
-     * - _next/image (Otimização de imagem do Next.js)
-     * - favicon.ico (Arquivo Favicon)
-     * - assets públicos (svg, png, etc.)
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|logo-inventario.svg).*)',
-    '/' // Garante que a raiz também seja verificada
+    '/'
   ],
 };

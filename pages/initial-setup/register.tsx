@@ -120,10 +120,6 @@ export default function Signup() {
             {message}
           </p>
         )}
-
-        <p className="mt-8 text-center text-gray-500 text-sm">
-          Já possui conta? <a href="/login" className="text-blue-600 font-semibold hover:underline">Entre aqui</a>.
-        </p>
       </div>
     </div>
   );

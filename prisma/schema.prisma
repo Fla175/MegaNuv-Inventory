@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url       = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -16,86 +16,76 @@ enum UserRole {
 }
 
 model User {
-  id         String                @id @default(uuid())
-  email      String                @unique
-  password   String
-  name       String?
-  role       UserRole              @default(STAFF)
-  status     String                @default("ACTIVE")
-  lastLogin  DateTime?
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  name      String?
+  role      UserRole  @default(VIEWER)
+  status    String    @default("ACTIVE")
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
 
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
-
-  contaAzulIntegration ContaAzulIntegration?
+model ItemDefinition {
+  id                 String   @id @default(uuid())
+  name               String
+  sku                String?  @unique
+  description        String?
+  cost               Decimal? @db.Decimal(10, 2)
+  depreciationMethod String   @default("straight-line")
+  depreciationRate   Float    @default(0.20)
+  isNative           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  items              Item[]
 }
 
 model Item {
-  id                      String    @id @default(uuid()) // ID interno do seu sistema
-  contaAzulId             String?   @unique // ID do produto na Conta Azul (UUID), opcional para itens criados localmente antes da sync
-  idLegado                Int?      // Novo: ID Legado do produto da Conta Azul
-  name                    String
-  sku                     String?   @unique // SKU do produto, pode vir da Conta Azul
-  ean                     String?   // Novo: Código EAN da Conta Azul
-  description             String?
-  stockQuantity           Int       @default(0) // Quantidade em estoque, gerida pelo seu sistema
-  price                   Decimal   @default(0.00) @db.Decimal(10, 2) // Preço de venda
-  cost                    Decimal?  @db.Decimal(10, 2) // Custo do produto
-  type                    String    @default("PRODUCT") // Tipo: "PRODUTO" ou "SERVICO" (da Conta Azul)
-  status                  String    @default("ACTIVE") // Status: "ATIVO", "INATIVO" (da Conta Azul)
+  id           String         @id @default(uuid())
+  definitionId String
+  definition   ItemDefinition @relation(fields: [definitionId], references: [id])
+  tag          String         // IN-STOCK, IN-USE, TO-SELL
+  serialNumber String         @unique
   
-  variacao                Int?      // Quantidade de filhos/variações da Conta Azul (se for tipo VARIACAO/KIT)
-  stockLevel              String?   // Nível do estoque da Conta Azul (MINIMO, MAXIMO, PADRAO)
-  minStockQuantity        Int?      // Estoque mínimo da Conta Azul
-  maxStockQuantity        Int?      // Estoque máximo da Conta Azul
-  isMoved                 Boolean?  // Indica se o produto foi movimentado na Conta Azul
-  idParent                String?   // ID do produto pai (se for uma variação/filho)
-  isEcommerceIntegrated   Boolean?  // Indica se a integração com o e-commerce está ativa na Conta Azul
+  // Relacionamento com o Local (ItemInstance)
+  locationId   String?
+  location     ItemInstance?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
-  tags                    Json?     // Para armazenar um array de tags personalizadas
+  status       String         @default("ACTIVE")
+  notes        String?        @db.Text
   
-  lastContaAzulSync       DateTime? // Data da ultima sincronizacao com a Conta Azul
+  // --- Campos para Depreciação ---
+  purchaseDate     DateTime   @default(now())
+  usefulLifeMonths Int        @default(60)    // Padrão 5 anos
+  residualValue    Float      @default(0)
 
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  // Relação com instâncias individuais deste item
-  instances               ItemInstance[]
+  @@index([definitionId])
+  @@index([locationId])
 }
 
 model ItemInstance {
-  id                      String    @id @default(uuid())
-  itemId                  String    // Foreign key para o Item (o tipo/definicao de produto)
-  item                    Item      @relation(fields: [itemId], references: [id])
+  id        String         @id @default(uuid())
+  name      String   
+  parentId  String?
+  // O nome da relação deve ser consistente. Mudei para "LocationHierarchy" para bater com seu padrão
+  parent    ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  ItemInstance[] @relation("LocationHierarchy")
+  
+  // Itens vinculados a este local
+  items     Item[]
 
-  serialNumber            String    @unique // CRUCIAL: Numero de serie individual da unidade (exclusivo para seu sistema)
-  location                String?   // Localização física (ex: "Rack 1 / Slot 3", "Armario B2")
-  qrCodePath              String?   // Caminho/URL para pasta de documentos ou URL gerada do QR Code
-  isInUse                 Boolean   @default(false) // Indica se esta instancia especifica esta em uso (true/false)
+  // --- NOVOS CAMPOS PARA DEPRECIAÇÃO DO ESPAÇO ---
+  // (Opcionais, para casos como Racks, Containers ou móveis próprios)
+  cost             Decimal?  @db.Decimal(10, 2)
+  purchaseDate     DateTime?
+  usefulLifeMonths Int?      @default(60)
 
-  purchaseDate            DateTime? // Opcional: Data de compra desta unidade
-  warrantyEndDate         DateTime? // Opcional: Data de fim da garantia
-  lastMaintenanceDate     DateTime? // Opcional: Ultima manutencao
-  notes                   String?   @db.Text // Opcional: Notas especificas sobre esta unidade
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-
-  // NOVO: Relação de auto-referência para hierarquia (Pai-Filho)
-  parentId                String?       // ID da instância pai (ex: um servidor que contém esta RAM)
-  parent                  ItemInstance? @relation("ItemInstanceHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children                ItemInstance[] @relation("ItemInstanceHierarchy")
-}
-
-model ContaAzulIntegration {
-      id                 String    @id @default(uuid())
-      userId             String    @unique
-      user               User      @relation(fields: [userId], references: [id])
-      accessToken        String    @db.Text
-      refreshToken       String    @db.Text
-      expiresAt          DateTime
-      scope              String?   @db.VarChar(500)
-
-      createdAt          DateTime  @default(now())
-      updatedAt          DateTime  @updatedAt
+  @@index([parentId])
 }
