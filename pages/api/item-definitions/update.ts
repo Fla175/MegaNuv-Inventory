@@ -19,17 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Lógica de ATUALIZAÇÃO (Edição)
             try {
                 // Captura os dados enviados no corpo da requisição
-                const { name, sku, cost, depreciationRate, depreciationMethod } = req.body;
+                const { name, sku} = req.body;
                 
                 // Monta o objeto de dados para atualização, garantindo a conversão de tipos
                 const updateData: Prisma.ItemDefinitionUpdateInput = {};
 
                 if (name !== undefined) updateData.name = String(name);
                 if (sku !== undefined) updateData.sku = String(sku).toUpperCase().trim();
-                // O custo pode ser null ou number, garantimos o tipo correto
-                if (cost !== undefined) updateData.cost = cost !== null ? Number(cost) : null; 
-                if (depreciationRate !== undefined) updateData.depreciationRate = Number(depreciationRate);
-                if (depreciationMethod !== undefined) updateData.depreciationMethod = String(depreciationMethod);
 
                 const updatedDefinition = await prisma.itemDefinition.update({
                     where: { id: id },

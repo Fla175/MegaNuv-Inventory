@@ -8,18 +8,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Desestruturação segura
-  const { name, sku, cost, depreciationRate } = req.body;
+  const { name, sku } = req.body;
 
   try {
     const newDef = await prisma.itemDefinition.create({
       data: {
         name: String(name),
+        // Removido o erro de sintaxe que tinha aqui
         sku: sku ? String(sku).toUpperCase() : null,
-        // Usamos Number() ou parseFloat() para garantir que o Decimal do banco receba um número
-        cost: cost ? Number(cost) : null,
-        depreciationRate: depreciationRate ? Number(depreciationRate) : 0,
-        depreciationMethod: 'straight-line' 
+        // Forçamos o isNative como true para bater com o default do seu schema
+        isNative: true 
       }
     });
     

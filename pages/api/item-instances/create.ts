@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { name, parentId, cost, purchaseDate, usefulLifeMonths } = req.body;
+  const { name, parentId } = req.body;
 
   if (!name) return res.status(400).json({ message: 'Nome é obrigatório.' });
 
@@ -14,10 +14,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         name,
         parentId: parentId || null,
-        // Converte string vazia para null e números corretamente
-        cost: cost ? Number(cost) : null,
-        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
-        usefulLifeMonths: usefulLifeMonths ? Number(usefulLifeMonths) : null,
       }
     });
 

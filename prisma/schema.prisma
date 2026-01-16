@@ -28,64 +28,49 @@ model User {
 }
 
 model ItemDefinition {
-  id                 String   @id @default(uuid())
-  name               String
-  sku                String?  @unique
-  description        String?
-  cost               Decimal? @db.Decimal(10, 2)
-  depreciationMethod String   @default("straight-line")
-  depreciationRate   Float    @default(0.20)
-  isNative           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  items              Item[]
+  id          String   @id @default(uuid())
+  name        String
+  sku         String?  @unique
+  description String?
+  isNative    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Item        Item[]
 }
 
 model Item {
   id           String         @id @default(uuid())
+  serialNumber ItemDefinition? @relation(fields: [serialNumber], references: [sku])        
   definitionId String
   definition   ItemDefinition @relation(fields: [definitionId], references: [id])
-  tag          String         // IN-STOCK, IN-USE, TO-SELL
-  serialNumber String         @unique
-  
+  tag          String // IN-STOCK, IN-USE, TO-SELL
+
   // Relacionamento com o Local (ItemInstance)
-  locationId   String?
-  location     ItemInstance?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  locationId String?
+  location   ItemInstance? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
-  status       String         @default("ACTIVE")
-  notes        String?        @db.Text
-  
-  // --- Campos para Depreciação ---
-  purchaseDate     DateTime   @default(now())
-  usefulLifeMonths Int        @default(60)    // Padrão 5 anos
-  residualValue    Float      @default(0)
+  status String  @default("ACTIVE")
+  notes  String? @db.Text
 
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([definitionId])
   @@index([locationId])
 }
 
 model ItemInstance {
-  id        String         @id @default(uuid())
-  name      String   
-  parentId  String?
-  // O nome da relação deve ser consistente. Mudei para "LocationHierarchy" para bater com seu padrão
-  parent    ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children  ItemInstance[] @relation("LocationHierarchy")
-  
+  id       String         @id @default(uuid())
+  name     String         @unique
+  parentId String?
+  parent   ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children ItemInstance[] @relation("LocationHierarchy")
+
   // Itens vinculados a este local
-  items     Item[]
+  items Item[]
 
-  // --- NOVOS CAMPOS PARA DEPRECIAÇÃO DO ESPAÇO ---
-  // (Opcionais, para casos como Racks, Containers ou móveis próprios)
-  cost             Decimal?  @db.Decimal(10, 2)
-  purchaseDate     DateTime?
-  usefulLifeMonths Int?      @default(60)
-
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([parentId])
 }

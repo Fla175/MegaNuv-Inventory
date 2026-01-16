@@ -8,7 +8,7 @@ import {
   LineChart,
   Warehouse,
   Box,
-  ShoppingCart,
+  Tags,
   RefreshCw,
   Settings,
   LogOut,
@@ -91,8 +91,8 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
               {[
                 { href: "/dashboard", label: "Dashboard", icon: LineChart },
                 { href: "/", label: "Espaços Físicos", icon: Warehouse },
-                { href: "/products", label: "Gerenciar Produtos", icon: Box },
-                { href: "/definitions", label: "Definições de Produtos", icon: ShoppingCart },
+                { href: "/catalog", label: "Catálogo de Ativos", icon: Tags },
+                { href: "/actives", label: "Gestão de Ativos", icon: Box },
                 { href: "/settings", label: "Configurações", icon: Settings },
               ].map((item) => (
                 <li key={item.href} className="mb-2">
