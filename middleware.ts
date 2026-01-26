@@ -2,102 +2,91 @@
 import { NextResponse, NextRequest } from "next/server";
 import * as jose from "jose";
 
-/**
- * Rotas públicas (exatas ou prefixos).
- * Inclui a rota de checagem de setup e a rota de cadastro inicial.
- */
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
-  "/api/auth/login",
-  "/api/auth/signup",
-  "/api/auth/logout",
-  "/api/auth/seed",
-  "/api/public", // Permite acesso a /api/public/*
-  "/initial-setup", // Permite acesso a /initial-setup/*
+  "/api/auth",
+  "/api/public",
+  "/api/storage/upload-url",
+  "/initial-setup",
   "/favicon.ico",
   "/logo-inventario.svg",
 ];
 
-// Função helper pra checar se um pathname é público (startsWith)
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p));
+  return PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + "/"));
 }
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  console.log(`[middleware] interceptado: ${pathname}`);
-
-  // Permite _next e assets sempre
-  if (pathname.startsWith("/_next/") || pathname.startsWith("/static/")) {
+  // --- ESCUDO DE PRIORIDADE 1: APIs PÚBLICAS E ESTÁTICOS ---
+  if (
+    pathname.startsWith('/api/public') || 
+    pathname.startsWith('/_next/') || 
+    pathname.includes('.')
+  ) {
     return NextResponse.next();
   }
-  
-  // ------------------------------------------------
-  // NOVO: VERIFICAÇÃO DE CONFIGURAÇÃO INICIAL (SETUP)
-  // ------------------------------------------------
-  // Executa a checagem no endpoint de API público
+
+  // --- ESCUDO DE PRIORIDADE 2: CHECAGEM DE SETUP ---
+  // Apenas para navegação de páginas (root ou login)
   if (pathname === '/' || pathname === '/login') {
+    try {
       const apiURL = new URL('/api/public/initial-check', req.url).href;
+      const response = await fetch(apiURL);
       
-      try {
-          // Nota: Você DEVE garantir que /api/public/initial-check.ts está criado!
-          const response = await fetch(apiURL);
-          const data = await response.json();
-
-          if (data.requiresSetup) {
-              if (!pathname.startsWith('/initial-setup')) {
-                  console.log("[middleware] 0 usuários -> redirecionando para /initial-setup/register");
-                  return NextResponse.redirect(new URL("/initial-setup/register", req.url));
-              }
-          }
-      } catch (error) {
-          console.error("Erro ao verificar setup inicial:", error);
-          // Em caso de erro (DB off), assuma que precisa de setup
-          if (!pathname.startsWith('/initial-setup')) {
-              return NextResponse.redirect(new URL("/initial-setup/register", req.url));
-          }
+      const contentType = response.headers.get("content-type");
+      if (response.ok && contentType?.includes("application/json")) {
+        const data = await response.json();
+        if (data.requiresSetup && !pathname.startsWith('/initial-setup')) {
+          return NextResponse.redirect(new URL("/initial-setup/register", req.url));
+        }
       }
+    } catch (e) {
+      console.error("Erro no check de setup:", e);
+      // Se a API de check falhar, não bloqueia o middleware
+    }
   }
-  // ------------------------------------------------
-  
-  // Rotas públicas (Após a checagem, verifica o caminho atual)
+
+  // --- ESCUDO DE PRIORIDADE 3: ROTAS PÚBLICAS ---
   if (isPublicPath(pathname)) {
-    console.log(`[middleware] rota pública permitida: ${pathname}`);
     return NextResponse.next();
   }
 
-  // Se não é rota pública, exige token
+  // --- ESCUDO DE PRIORIDADE 4: VALIDAÇÃO DE TOKEN ---
   const token = req.cookies.get("auth_token")?.value;
+
   if (!token) {
-    console.log("[middleware] token ausente -> redirecionando para /login");
+    // BLINDAGEM: Se for API, retorna JSON. Nunca redirect.
+    if (pathname.startsWith("/api/")) {
+      return new NextResponse(
+        JSON.stringify({ error: "Unauthorized", message: "Token ausente" }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      );
+    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
   try {
-    // verifica token (Mantida a lógica jose para a Edge Runtime)
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || "");
     await jose.jwtVerify(token, secret);
-
-    // Token ok
-    console.log("[middleware] token válido");
     return NextResponse.next();
   } catch (err) {
-    console.error("[middleware] token inválido ou erro ao verificar:", err);
+    // BLINDAGEM: Se o token falhar na API, retorna JSON.
+    if (pathname.startsWith("/api/")) {
+      return new NextResponse(
+        JSON.stringify({ error: "Unauthorized", message: "Token expirado ou inválido" }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      );
+    }
     const res = NextResponse.redirect(new URL("/login", req.url));
-    // limpa cookie
     res.cookies.delete("auth_token");
     return res;
   }
 }
 
-/**
- * Matcher que garante que o middleware será invocado para todas as rotas
- */
+// O Matcher deve ser amplo, mas o código interno do middleware filtra o que importa
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|logo-inventario.svg).*)',
-    '/'
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo-inventario.svg).*)'],
 };
