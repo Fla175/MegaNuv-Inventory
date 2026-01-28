@@ -2,39 +2,41 @@
   "name": "invetario-meganuv",
   "version": "0.1.0",
   "private": true,
-  "prisma": {
-    "seed": "ts-node prisma/seed.ts"
-  },
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "dev": "rm -rf .next && next dev -H 0.0.0.0 -p 3000 --turbopack",
     "build": "next build --no-lint",
     "start": "next start",
     "lint": "next lint",
-    "seed": "npm run build && ts-node prisma/seed.ts"
+    "seed": "npm run build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@prisma/client": "6.18.0",
+    "@tailwindcss/container-queries": "^0.1.1",
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.3",
     "cookie": "^1.0.2",
     "eruda": "^3.4.3",
+    "formidable": "^3.5.4",
     "framer-motion": "^12.20.1",
     "jose": "^6.1.0",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.525.0",
+    "minio": "^8.0.6",
     "next": "15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-rnd": "^10.5.2",
-    "recharts": "^3.3.0"
+    "recharts": "^3.3.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
+    "@types/formidable": "^3.4.6",
     "@types/js-cookie": "^3.0.6",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20",

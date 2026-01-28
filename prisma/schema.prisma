@@ -21,7 +21,6 @@ model User {
   password  String
   name      String?
   role      UserRole  @default(VIEWER)
-  status    String    @default("ACTIVE")
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -30,6 +29,7 @@ model User {
 model ItemDefinition {
   id          String   @id @default(uuid())
   name        String
+  imageUrl    String?
   sku         String?  @unique
   description String?
   isNative    Boolean  @default(true)
@@ -40,16 +40,14 @@ model ItemDefinition {
 
 model Item {
   id           String         @id @default(uuid())
-  serialNumber ItemDefinition? @relation(fields: [serialNumber], references: [sku])        
   definitionId String
   definition   ItemDefinition @relation(fields: [definitionId], references: [id])
+  imageUrl    String?
   tag          String // IN-STOCK, IN-USE, TO-SELL
 
   // Relacionamento com o Local (ItemInstance)
   locationId String?
   location   ItemInstance? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-
-  status String  @default("ACTIVE")
   notes  String? @db.Text
 
   createdAt DateTime @default(now())
@@ -62,6 +60,8 @@ model Item {
 model ItemInstance {
   id       String         @id @default(uuid())
   name     String         @unique
+  imageUrl    String?
+  fixedValue Float        @default(0)
   parentId String?
   parent   ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children ItemInstance[] @relation("LocationHierarchy")

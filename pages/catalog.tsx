@@ -1,29 +1,43 @@
 // pages/catalog.tsx
 import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
-import { Tags, Pencil, Trash2, PlusCircle, PackageOpen, Loader2, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  Tags, Pencil, Trash2, PlusCircle, PackageOpen, Loader2, X, Search, 
+  ChevronLeft, ChevronRight, ImageIcon, Save 
+} from 'lucide-react';
+import ImageUpload from '../components/imageUpload';
+import { useRouter } from 'next/router';
 
 interface ItemDefinition {
   id: string;
   name: string;
   sku: string;
+  imageUrl?: string | null;
 }
 
+const getCookie = (name: string) => {
+  if (typeof window === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+};
+
 export default function CatalogPage() {
+  const router = useRouter();
   const [definitions, setDefinitions] = useState<ItemDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Estados de Formulário
   const [newName, setNewName] = useState('');
   const [newSku, setNewSku] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formProcessing, setFormProcessing] = useState(false);
 
-  // Estados de Paginação e Busca
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 8;
 
   const fetchDefs = async () => {
     setLoading(true);
@@ -40,7 +54,6 @@ export default function CatalogPage() {
 
   useEffect(() => { fetchDefs(); }, []);
 
-  // Lógica de Filtragem e Paginação
   const filteredDefinitions = definitions.filter(def => 
     def.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     def.sku.toLowerCase().includes(searchTerm.toLowerCase())
@@ -57,18 +70,19 @@ export default function CatalogPage() {
   const resetForm = () => {
     setNewName('');
     setNewSku('');
+    setNewImageUrl(null);
     setEditingId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormProcessing(true);
+    const token = getCookie('auth_token');
 
     const payload = { 
       name: newName, 
       sku: newSku.toUpperCase(),
-      cost: 0,
-      usefulLifeMonths: 60
+      imageUrl: newImageUrl,
     };
 
     const url = editingId ? `/api/item-definitions/update?id=${editingId}` : '/api/item-definitions/create';
@@ -76,8 +90,11 @@ export default function CatalogPage() {
 
     try {
       const res = await fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload),
       });
 
@@ -85,6 +102,9 @@ export default function CatalogPage() {
         setIsModalOpen(false);
         resetForm();
         fetchDefs();
+      } else if (res.status === 401) {
+          alert("Sessão expirada. Por favor, faça login novamente.");
+          router.push('/login');
       } else {
         const errorData = await res.json();
         alert(`Erro: ${errorData.message || 'Falha ao salvar'}`);
@@ -100,6 +120,7 @@ export default function CatalogPage() {
     setEditingId(def.id);
     setNewName(def.name);
     setNewSku(def.sku);
+    setNewImageUrl(def.imageUrl || null);
     setIsModalOpen(true);
   };
 
@@ -116,26 +137,25 @@ export default function CatalogPage() {
 
   return (
     <Layout title="Catálogo">
-      <div className="max-w-6xl mx-auto py-6 md:py-10 px-4 md:px-6">
+      <div className="max-w-6xl mx-auto py-4 md:py-10 px-3 sm:px-6">
         
-        {/* Header com Pesquisa */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6 bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-50">
-          <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto items-center">
-             <div className="flex items-center gap-4 w-full sm:w-auto">
-                <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-md shadow-gray-300"><Tags size={28}/></div>
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-black text-blue-950 tracking-tight italic">Catálogo</h1>
-                    <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Gerenciar Modelos</p>
+        {/* Header Ultra-Adaptável */}
+        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center mb-6 gap-4 bg-white p-4 sm:p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-gray-50">
+          <div className="flex flex-col sm:flex-row gap-4 items-center flex-1">
+             <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="bg-blue-600 p-2.5 rounded-xl text-white shrink-0"><Tags size={22}/></div>
+                <div className="min-w-0">
+                    <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-blue-950 italic truncate tracking-tight">Catálogo</h1>
+                    <p className="text-gray-400 font-bold text-[9px] md:text-[10px] uppercase tracking-widest truncate">Modelos</p>
                 </div>
              </div>
              
-             {/* Barra de Pesquisa */}
-             <div className="relative w-full sm:w-64 lg:w-80">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+             <div className="relative w-full sm:max-w-[240px] md:max-w-sm flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
                 <input 
                     type="text" 
-                    placeholder="Buscar ativo ou SKU..." 
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-xl font-bold text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="Buscar..." 
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl font-bold text-[13px] md:text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all border border-transparent"
                     value={searchTerm}
                     onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 />
@@ -144,91 +164,114 @@ export default function CatalogPage() {
 
           <button 
             onClick={() => { resetForm(); setIsModalOpen(true); }} 
-            className="w-full lg:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
+            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0"
           >
-            <PlusCircle size={20}/> Novo Ativo
+            <PlusCircle size={18}/> <span>Novo Item</span>
           </button>
         </div>
 
-        {/* Lista de Itens */}
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden min-h-[400px] flex flex-col justify-between">
+        {/* Lista de Itens Otimizada para Mobile */}
+        <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden min-h-[400px] flex flex-col justify-between">
           <div>
             {currentItems.length > 0 ? (
                 <div className="divide-y divide-gray-50">
                 {currentItems.map((def) => (
-                    <div key={def.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-6 hover:bg-blue-50/30 transition-colors gap-4 animate-in fade-in">
-                    <div className="flex-1 min-w-0">
-                        <p className="font-black text-blue-950 text-lg truncate">{def.name}</p>
-                        <span className="inline-block bg-gray-100 text-gray-500 text-[10px] font-black px-2 py-1 rounded-md mt-1 uppercase tracking-wider">
-                        SKU: {def.sku}
-                        </span>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                        <button onClick={() => startEdit(def)} className="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-                        <Pencil size={18}/>
-                        </button>
-                        <button onClick={() => handleDelete(def.id)} className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                        <Trash2 size={18}/>
-                        </button>
-                    </div>
+                    <div key={def.id} className="flex items-center justify-between p-3.5 sm:p-6 hover:bg-blue-50/20 transition-colors gap-3 animate-in fade-in">
+                        <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                            <div className="h-11 w-11 md:h-14 md:w-14 rounded-lg md:rounded-2xl bg-gray-50 flex-shrink-0 overflow-hidden border border-gray-100 flex items-center justify-center">
+                                {def.imageUrl ? (
+                                    <img src={def.imageUrl} className="w-full h-full object-cover" alt={def.name} />
+                                ) : (
+                                    <ImageIcon className="text-gray-300" size={18} />
+                                )}
+                            </div>
+                            <div className="min-w-0 flex flex-col">
+                                <p className="font-black text-blue-950 text-[13px] sm:text-base md:text-lg truncate leading-tight">{def.name}</p>
+                                <div className="mt-1">
+                                  <span className="bg-gray-100 text-gray-500 text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider truncate">
+                                      SKU: {def.sku}
+                                  </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-0.5 sm:gap-2 shrink-0">
+                            <button onClick={() => startEdit(def)} className="p-2 md:p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                <Pencil size={15} className="md:w-[18px] md:h-[18px]"/>
+                            </button>
+                            <button onClick={() => handleDelete(def.id)} className="p-2 md:p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                <Trash2 size={15} className="md:w-[18px] md:h-[18px]"/>
+                            </button>
+                        </div>
                     </div>
                 ))}
                 </div>
             ) : (
-                <div className="py-20 text-center">
-                <PackageOpen size={48} className="mx-auto text-gray-200 mb-4" />
-                <h3 className="text-lg font-black text-gray-400 uppercase">
-                    {searchTerm ? "Nenhum resultado encontrado" : "Catálogo Vazio"}
-                </h3>
+                <div className="py-20 text-center px-4">
+                    <PackageOpen size={40} className="mx-auto text-gray-200 mb-3" />
+                    <h3 className="text-[13px] md:text-base font-black text-gray-400 uppercase tracking-widest">
+                        Nenhum resultado
+                    </h3>
                 </div>
             )}
           </div>
 
-          {/* Paginação Estilo "Setinha pros 2 lados" */}
+          {/* Paginação Compacta */}
           {filteredDefinitions.length > 0 && (
-              <div className="p-6 border-t border-gray-50 flex items-center justify-between bg-gray-50/50">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Página {currentPage} de {totalPages}
+              <div className="p-3.5 md:p-6 border-t border-gray-50 flex items-center justify-between bg-gray-50/30">
+                  <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Pg {currentPage} de {totalPages}
                   </span>
-                  <div className="flex gap-2">
-                      <button 
-                        onClick={() => goToPage(currentPage - 1)} 
-                        disabled={currentPage === 1}
-                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      >
-                          <ChevronLeft size={20} />
-                      </button>
-                      <button 
-                        onClick={() => goToPage(currentPage + 1)} 
-                        disabled={currentPage === totalPages}
-                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      >
-                          <ChevronRight size={20} />
-                      </button>
+                  <div className="flex gap-1.5 md:gap-2">
+                      <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="p-1.5 md:p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 disabled:opacity-40 transition-all"><ChevronLeft size={16} /></button>
+                      <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="p-1.5 md:p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 disabled:opacity-40 transition-all"><ChevronRight size={16} /></button>
                   </div>
               </div>
           )}
         </div>
       </div>
 
-      {/* Modal permanece igual... (Omitido para economizar espaço, mantenha o seu anterior) */}
+      {/* Modal Ajustado para Mobile */}
       {isModalOpen && (
-          <div className="fixed inset-0 bg-blue-950/60 z-50 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in">
-          <form onSubmit={handleSubmit} className="bg-white rounded-[2.5rem] p-6 md:p-10 w-full max-w-md shadow-2xl relative">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-gray-300 hover:text-red-500 transition-colors"><X/></button>
-            <h3 className="text-2xl font-black text-blue-950 mb-6 tracking-tight">{editingId ? 'Editar Ativo' : 'Novo Ativo'}</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block">Nome</label>
-                <input className="w-full bg-gray-50 text-gray-500 border-2 border-transparent rounded-2xl p-4 font-bold outline-none focus:border-blue-500 transition-all" value={newName} onChange={e => setNewName(e.target.value)} required />
+          <div className="fixed inset-0 bg-blue-950/70 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4 animate-in fade-in">
+          <form 
+            onSubmit={handleSubmit} 
+            className="bg-white rounded-t-[2rem] sm:rounded-[2.5rem] p-6 md:p-10 w-full max-w-md shadow-2xl relative max-h-[92vh] overflow-y-auto"
+          >
+            <button 
+                type="button" 
+                onClick={() => { setIsModalOpen(false); resetForm(); }} 
+                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors p-2"
+            >
+                <X size={20}/>
+            </button>
+            
+            <h3 className="text-lg md:text-2xl font-black text-blue-950 mb-5 tracking-tight">{editingId ? 'Editar Item' : 'Novo Item'}</h3>
+            
+            <div className="space-y-4 md:space-y-6">
+              <ImageUpload 
+                value={newImageUrl} 
+                onChange={setNewImageUrl} 
+                label="Foto (Opcional)"
+              />
+
+              <div className="space-y-1">
+                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1 block">Produto</label>
+                <input className="w-full bg-gray-50 text-gray-700 border-2 border-transparent rounded-xl p-3 md:p-4 font-bold outline-none focus:border-blue-500 transition-all text-[13px] md:text-base" value={newName} onChange={e => setNewName(e.target.value)} required placeholder="Nome do produto" />
               </div>
-              <div>
-                <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-1 block">SKU / Código</label>
-                <input className="w-full bg-gray-50 text-gray-500 border-2 border-transparent rounded-2xl p-4 font-bold outline-none focus:border-blue-500 transition-all uppercase" value={newSku} onChange={e => setNewSku(e.target.value)} required />
+              
+              <div className="space-y-1">
+                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1 block">SKU</label>
+                <input className="w-full bg-gray-50 text-gray-700 border-2 border-transparent rounded-xl p-3 md:p-4 font-bold outline-none focus:border-blue-500 transition-all uppercase text-[13px] md:text-base" value={newSku} onChange={e => setNewSku(e.target.value)} required placeholder="CÓDIGO-001" />
               </div>
             </div>
-            <button type="submit" disabled={formProcessing} className="w-full mt-8 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-              {formProcessing ? <Loader2 className="animate-spin" size={20}/> : 'Salvar no Catálogo'}
+
+            <button 
+                type="submit" 
+                disabled={formProcessing} 
+                className="w-full mt-6 md:mt-8 py-3.5 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black text-xs md:text-sm shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:bg-gray-400"
+            >
+              {formProcessing ? <Loader2 className="animate-spin" size={18}/> : <><Save size={16}/> <span>Salvar Item</span></>}
             </button>
           </form>
         </div>

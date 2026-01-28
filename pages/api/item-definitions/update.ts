@@ -1,11 +1,9 @@
-// pages/api/item-definitions/[id].ts
+// pages/api/item-definitions/update.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma'; // Corrigido para usar o singleton
+import { Prisma } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    // Captura o ID da URL dinâmica (ex: /item-definitions/abc-123)
     const { id } = req.query; 
     const { method } = req;
 
@@ -16,16 +14,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     switch (method) {
         case 'PUT':
         case 'PATCH':
-            // Lógica de ATUALIZAÇÃO (Edição)
             try {
-                // Captura os dados enviados no corpo da requisição
-                const { name, sku} = req.body;
+                // Adicionado imageUrl na desestruturação
+                const { name, sku, imageUrl } = req.body;
                 
-                // Monta o objeto de dados para atualização, garantindo a conversão de tipos
                 const updateData: Prisma.ItemDefinitionUpdateInput = {};
 
                 if (name !== undefined) updateData.name = String(name);
                 if (sku !== undefined) updateData.sku = String(sku).toUpperCase().trim();
+                
+                // Lógica de atualização da imagem
+                if (imageUrl !== undefined) {
+                    updateData.imageUrl = imageUrl || null; 
+                    // Nota: Se quiser ser muito avançado no futuro, aqui você poderia buscar o item antigo
+                    // e deletar a imagem antiga do MinIO caso a nova seja diferente.
+                    // Por enquanto, vamos apenas atualizar o link.
+                }
 
                 const updatedDefinition = await prisma.itemDefinition.update({
                     where: { id: id },
@@ -37,10 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             } catch (error) {
                 if (error instanceof Prisma.PrismaClientKnownRequestError) {
-                    if (error.code === 'P2025') { // Registro não encontrado
-                        return res.status(404).json({ success: false, message: `Item Definition with ID ${id} not found.` });
+                    if (error.code === 'P2025') {
+                        return res.status(404).json({ success: false, message: `Item Definition not found.` });
                     }
-                    if (error.code === 'P2002') { // Chave única duplicada (ex: SKU já existe)
+                    if (error.code === 'P2002') {
                         return res.status(409).json({ success: false, message: 'SKU already exists.' });
                     }
                 }
@@ -52,10 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     error: (error as Error).message 
                 });
             }
-        
-        // Você pode adicionar o método 'GET' aqui para buscar um item individualmente.
-        // case 'GET':
-        //    // ... lógica de GET ...
         
         default:
             res.setHeader('Allow', ['PUT', 'PATCH']);

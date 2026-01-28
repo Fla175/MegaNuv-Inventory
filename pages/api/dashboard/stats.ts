@@ -6,56 +6,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
   try {
-    // 1. Cálculo de ATIVOS (Model Item)
+    // 1. Contagem de Itens (Ativos)
     const totalAtivos = await prisma.item.count();
 
-    // 2. Cálculo de VALOR TOTAL (Soma do fixedValue em ItemInstance)
+    // 2. Soma de Valor (Soma o fixedValue da tabela ItemInstance)
     const valueStats = await prisma.itemInstance.aggregate({
-      _sum: {
-        fixedValue: true,
-      }
+      _sum: { fixedValue: true }
     });
 
-    // 3. Estatísticas de ESPAÇOS FÍSICOS (Model ItemInstance)
+    // 3. Contagem de Espaços
     const totalEspacos = await prisma.itemInstance.count();
+    const espacosPai = await prisma.itemInstance.count({ where: { parentId: null } });
+    const subEspacos = await prisma.itemInstance.count({ where: { parentId: { not: null } } });
 
-    const espacosPai = await prisma.itemInstance.count({
-      where: { parentId: null },
-    });
-
-    const subEspacos = await prisma.itemInstance.count({
-      where: { parentId: { not: null } },
-    });
-
-    // 4. Últimos 5 ATIVOS com os nomes de suas definições
+    // 4. Últimos Ativos (Com include para pegar o nome da definição)
     const recentAtivosRaw = await prisma.item.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      include: {
-        definition: {
-          select: { name: true }
-        }
-      }
+      include: { definition: { select: { name: true } } }
     });
 
-    // Formatando para o frontend não quebrar
     const recentAtivos = recentAtivosRaw.map(item => ({
       id: item.id,
-      name: item.definition.name, // Nome oficial vem da definição
-      fixedValue: 0, // No seu schema, o valor está na Instância, não no Item
-      tag: item.tag
+      name: item.definition?.name || "Sem Nome",
+      tag: item.tag || "N/A"
     }));
 
+    // SEMPRE retorne um status e um objeto JSON
     return res.status(200).json({
       totalValue: valueStats._sum?.fixedValue ?? 0,
-      totalAtivos,
-      totalEspacos,
-      espacosPai,
-      subEspacos,
-      recentAtivos,
+      totalAtivos: totalAtivos || 0,
+      totalEspacos: totalEspacos || 0,
+      espacosPai: espacosPai || 0,
+      subEspacos: subEspacos || 0,
+      recentAtivos: recentAtivos || []
     });
+
   } catch (error) {
     console.error("ERRO DASHBOARD API:", error);
-    return res.status(500).json({ error: 'Falha ao processar estatísticas' });
+    // Em caso de erro, retorna um objeto vazio mas VÁLIDO para o JSON.parse não quebrar
+    return res.status(500).json({ 
+      error: 'Falha ao processar estatísticas',
+      totalValue: 0,
+      totalAtivos: 0,
+      totalEspacos: 0,
+      espacosPai: 0,
+      subEspacos: 0,
+      recentAtivos: []
+    });
   }
 }

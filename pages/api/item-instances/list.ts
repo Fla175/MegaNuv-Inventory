@@ -6,12 +6,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { id, onlyRoots, fetchChildren, includeItems } = req.query;
 
   try {
-    // 1. Se passarmos um ID, queremos apenas aquele local (Inventory View Drill-down)
+    // 1. Caso: Inventory View Drill-down (ID específico)
     if (id && id !== 'undefined') {
       const location = await prisma.itemInstance.findUnique({
         where: { id: String(id) },
         include: {
-          children: true, // Subespaços imediatos
+          // Buscamos os filhos e injetamos o _count neles
+          children: {
+            include: {
+              _count: { select: { items: true, children: true } }
+            }
+          },
           items: includeItems === 'true' ? { include: { definition: true } } : false,
           _count: { select: { items: true, children: true } }
         }
@@ -19,28 +24,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ itemInstances: location ? [location] : [] });
     }
 
-    // 2. Se não tem ID, mas queremos a ÁRVORE COMPLETA (Actives / Dashboard)
+    // 2. Caso: ÁRVORE COMPLETA (Dashboard / Hierarquia)
     if (fetchChildren === 'true' && !id) {
       const allData = await prisma.itemInstance.findMany({
         include: {
           items: includeItems === 'true' ? { include: { definition: true } } : false,
+          _count: { select: { items: true, children: true } } // Fundamental aqui
         }
       });
 
-      // Montagem da árvore em memória (Recursão Infinita)
       const map = new Map();
-      allData.forEach(item => map.set(item.id, { ...item, children: [] }));
+      allData.forEach(item => {
+        map.set(item.id, { 
+          ...item, 
+          children: [],
+          // Garantimos que o contador seja acessível mesmo após a montagem da árvore
+          totalAtivos: item._count?.items || 0 
+        });
+      });
       
       const tree: any[] = [];
       allData.forEach(item => {
+        const current = map.get(item.id);
         if (item.parentId && map.has(item.parentId)) {
-          map.get(item.parentId).children.push(map.get(item.id));
+          map.get(item.parentId).children.push(current);
         } else {
-          tree.push(map.get(item.id));
+          tree.push(current);
         }
       });
 
-      // Se quiser apenas as raízes da árvore
       if (onlyRoots === 'true') {
         return res.status(200).json({ itemInstances: tree });
       }
@@ -50,7 +62,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Caso padrão: Lista simples (Raízes ou Tudo)
     const items = await prisma.itemInstance.findMany({
       where: onlyRoots === 'true' ? { parentId: null } : {},
-      include: { _count: { select: { items: true, children: true } } }
+      include: { 
+        _count: { select: { items: true, children: true } } 
+      }
     });
 
     return res.status(200).json({ itemInstances: items });

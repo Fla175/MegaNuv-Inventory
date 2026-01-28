@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth';
 import * as cookie from 'cookie';
+import { deleteFileFromMinio } from '@/lib/minio'; // <--- Importação do helper
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') return res.status(405).end();
@@ -16,16 +17,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!id) return res.status(400).json({ message: 'ID é obrigatório' });
 
   try {
-    // 1. Busca profunda para verificar dependências
     const instance = await prisma.itemInstance.findUnique({
       where: { id: String(id) },
       include: {
-        children: {
-          select: { id: true }
-        },
-        _count: {
-          select: { items: true, children: true }
-        }
+        children: { select: { id: true } },
+        _count: { select: { items: true, children: true } }
       }
     });
 
@@ -33,7 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const hasContent = instance._count.items > 0 || instance._count.children > 0;
 
-    // 2. Bloqueio de segurança sem confirmação
     if (hasContent && force !== 'true') {
       return res.status(409).json({ 
         message: "Este espaço contém itens ou subespaços.",
@@ -45,43 +40,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 3. Exclusão em Cadeia Manual (Garante que o MySQL não bloqueie)
     if (force === 'true') {
-      // Função recursiva para coletar IDs de todos os subespaços (descendentes)
-      const getAllDescendantIds = async (parentId: string): Promise<string[]> => {
+      // 1. Alteramos a função para coletar IDs e ImageUrls (para limpeza do MinIO)
+      const getDescendantsData = async (parentId: string): Promise<{id: string, imageUrl: string | null}[]> => {
         const children = await prisma.itemInstance.findMany({
           where: { parentId },
-          select: { id: true }
+          select: { id: true, imageUrl: true }
         });
         
-        let ids = children.map(c => c.id);
+        let data = children.map(c => ({ id: c.id, imageUrl: c.imageUrl }));
         for (const child of children) {
-          const subIds = await getAllDescendantIds(child.id);
-          ids = [...ids, ...subIds];
+          const subData = await getDescendantsData(child.id);
+          data = [...data, ...subData];
         }
-        return ids;
+        return data;
       };
 
-      const descendantIds = await getAllDescendantIds(String(id));
-      const allTargetIds = [String(id), ...descendantIds];
+      const descendants = await getDescendantsData(String(id));
+      
+      // 2. Criamos a lista completa de alvos (Pai + Descendentes)
+      const allTargetData = [
+        { id: instance.id, imageUrl: (instance as any).imageUrl }, // Cast caso o TS reclame do schema ainda não migrado
+        ...descendants
+      ];
+      
+      const allTargetIds = allTargetData.map(item => item.id);
 
-      // Executa a limpeza em uma transação para garantir que ou apaga tudo ou nada
+      // 3. LIMPEZA MINIO: Deleta as imagens de todos os espaços que serão apagados
+      for (const item of allTargetData) {
+        if (item.imageUrl) {
+          await deleteFileFromMinio(item.imageUrl);
+        }
+      }
+
+      // 4. Executa a limpeza no Banco (Sua lógica original preservada)
       await prisma.$transaction([
-        // Limpa os itens de TODOS os espaços envolvidos (Pai e Filhos)
         prisma.item.deleteMany({
           where: { locationId: { in: allTargetIds } }
         }),
-        // Deleta os espaços (O Prisma cuidará da ordem inversa devido à relação)
         prisma.itemInstance.delete({
           where: { id: String(id) }
         })
       ]);
     } else {
-      // Se estiver vazio, deleta direto
+      // Se não for forçado (espaço vazio), deleta a imagem do pai e o registro
+      if ((instance as any).imageUrl) {
+        await deleteFileFromMinio((instance as any).imageUrl);
+      }
       await prisma.itemInstance.delete({ where: { id: String(id) } });
     }
 
-    return res.status(200).json({ success: true, message: "Espaço e conteúdos removidos." });
+    return res.status(200).json({ success: true, message: "Espaço e mídias removidos." });
 
   } catch (error: any) {
     console.error("[DELETE LOCATION ERROR]:", error);

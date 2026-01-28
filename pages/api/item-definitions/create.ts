@@ -8,15 +8,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const { name, sku } = req.body;
+  // Adicionado imageUrl na desestruturação
+  const { name, sku, imageUrl } = req.body;
 
   try {
     const newDef = await prisma.itemDefinition.create({
       data: {
         name: String(name),
-        // Removido o erro de sintaxe que tinha aqui
         sku: sku ? String(sku).toUpperCase() : null,
-        // Forçamos o isNative como true para bater com o default do seu schema
+        // Salva a URL se existir, ou null
+        imageUrl: imageUrl || null,
         isNative: true 
       }
     });

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `ItemInstance` ADD COLUMN `fixedValue` DOUBLE NOT NULL DEFAULT 0;
