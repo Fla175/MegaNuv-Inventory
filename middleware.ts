@@ -7,7 +7,9 @@ const PUBLIC_PATHS = [
   "/signup",
   "/api/auth",
   "/api/public",
+  "/api/qrcode",
   "/api/storage/upload-url",
+  "/qrcode",
   "/initial-setup",
   "/favicon.ico",
   "/logo-inventario.svg",
@@ -45,7 +47,6 @@ export async function middleware(req: NextRequest) {
       }
     } catch (e) {
       console.error("Erro no check de setup:", e);
-      // Se a API de check falhar, não bloqueia o middleware
     }
   }
 
@@ -58,7 +59,6 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;
 
   if (!token) {
-    // BLINDAGEM: Se for API, retorna JSON. Nunca redirect.
     if (pathname.startsWith("/api/")) {
       return new NextResponse(
         JSON.stringify({ error: "Unauthorized", message: "Token ausente" }),
@@ -73,7 +73,6 @@ export async function middleware(req: NextRequest) {
     await jose.jwtVerify(token, secret);
     return NextResponse.next();
   } catch (err) {
-    // BLINDAGEM: Se o token falhar na API, retorna JSON.
     if (pathname.startsWith("/api/")) {
       return new NextResponse(
         JSON.stringify({ error: "Unauthorized", message: "Token expirado ou inválido" }),
@@ -86,7 +85,6 @@ export async function middleware(req: NextRequest) {
   }
 }
 
-// O Matcher deve ser amplo, mas o código interno do middleware filtra o que importa
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo-inventario.svg).*)'],
+  matcher: ['/((?!api/qrcode|qrcode|_next/static|_next/image|favicon.ico|logo-inventario.svg).*)'],
 };

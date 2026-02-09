@@ -1,10 +1,10 @@
 {
-  "name": "invetario-meganuv",
+  "name": "inventory-meganuv",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "rm -rf .next && next dev -H 0.0.0.0 -p 3000 --turbopack",
-    "build": "next build --no-lint",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "seed": "npm run build"
@@ -26,6 +26,7 @@
     "lucide-react": "^0.525.0",
     "minio": "^8.0.6",
     "next": "15.3.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-rnd": "^10.5.2",

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `defaultSort` VARCHAR(191) NOT NULL DEFAULT 'name';

@@ -1,9 +1,7 @@
 // pages/api/item-instances/children/add.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { verifyAuthToken, AuthTokenPayload } from '@/lib/auth';
-import * as cookie from 'cookie';
+import { verifyAuthToken } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -11,10 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // --- AUTENTICAÇÃO ---
-  const authHeader = req.headers.authorization;
-  const cookies = req.headers.cookie ? cookie.parse(req.headers.cookie) : {};
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : cookies.auth_token;
+  const token = req.headers.authorization?.split(' ')[1] || req.cookies['auth_token'];
 
   if (!token) {
     return res.status(401).json({ message: 'Token de autenticação ausente.' });
@@ -26,42 +21,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { parentId, itemId, serialNumber, location, isInUse, purchaseDate, warrantyEndDate, lastMaintenanceDate, notes } = req.body;
+    const { parentId, name, imageUrl, fixedValue } = req.body;
 
-    if (!parentId || !itemId || !serialNumber) {
-      return res.status(400).json({ message: 'Campos obrigatórios: parentId, itemId e serialNumber.' });
+    if (!parentId || !name) {
+      return res.status(400).json({ message: 'Campos obrigatórios: parentId e name.' });
     }
 
-    // Verifica se o pai existe
-    const parent = await prisma.itemInstance.findUnique({ where: { id: parentId } });
+    const parent = await prisma.itemInstance.findUnique({ 
+      where: { id: parentId } 
+    });
+    
     if (!parent) {
-      return res.status(404).json({ message: 'Instância pai não encontrada.' });
+      return res.status(404).json({ message: 'Local pai não encontrado.' });
     }
 
-    // Cria o filho vinculado
     const newChild = await prisma.itemInstance.create({
       data: {
-        itemId,
-        serialNumber,
-        location: location || null,
-        isInUse: isInUse ?? false,
-        purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
-        warrantyEndDate: warrantyEndDate ? new Date(warrantyEndDate) : null,
-        lastMaintenanceDate: lastMaintenanceDate ? new Date(lastMaintenanceDate) : null,
-        notes: notes || null,
-        parentId,
+        name: name,
+        parentId: parentId,
+        imageUrl: imageUrl || null,
+        fixedValue: Number(fixedValue) || 0,
       },
     });
 
     return res.status(201).json({
-      message: 'Filho criado e vinculado com sucesso.',
+      message: 'Sub-local criado com sucesso.',
       child: newChild,
     });
+
   } catch (error) {
-    console.error('Erro ao adicionar filho:', error);
+    console.error('Erro ao adicionar sub-local:', error);
+
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return res.status(409).json({ message: 'Número de série já existe.' });
+      return res.status(409).json({ message: 'Já existe um local com este nome.' });
     }
-    return res.status(500).json({ message: 'Erro interno ao adicionar filho.' });
+    
+    return res.status(500).json({ message: 'Erro interno ao adicionar sub-local.' });
   }
 }

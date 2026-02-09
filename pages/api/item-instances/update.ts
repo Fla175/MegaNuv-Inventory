@@ -2,18 +2,23 @@
 import prisma from '@/lib/prisma';
 import { NextApiRequest, NextApiResponse } from 'next';
 
+interface UpdateData {
+  name?: string;
+  parentId?: string | null;
+  imageUrl?: string;
+  fixedValue?: number;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') return res.status(405).end();
   
   const { id, name, parentId, fixedValue, imageUrl } = req.body;
 
-  // Prepara o objeto de dados dinamicamente
-  const dataToUpdate: any = {};
+  const dataToUpdate: UpdateData = {};
   if (name !== undefined) dataToUpdate.name = name;
   if (parentId !== undefined) dataToUpdate.parentId = parentId || null;
   if (imageUrl !== undefined) dataToUpdate.imageUrl = imageUrl;
 
-  // Lógica de Tratamento de Moeda no Update
   if (fixedValue !== undefined) {
     if (fixedValue === '' || fixedValue === null) {
         dataToUpdate.fixedValue = 0;
@@ -31,7 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     return res.status(200).json(updated);
   } catch (error) {
-    console.error(error);
+    const err = error as Error;
+    console.error(err.message);
     return res.status(500).json({ message: "Erro ao atualizar espaço." });
   }
 }

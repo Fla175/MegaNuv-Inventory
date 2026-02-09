@@ -66,23 +66,17 @@ export default function Login() {
     }
   };
 
-  // 🚪 Logout manual (pode ser usado em qualquer página protegida)
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    router.replace('/login');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#004AAD] to-[#38B6FF] p-4 font-inter">
       <Head>
-        <title>Login MegaNuv Inventory</title>
+        <title>Login Inventory</title>
       </Head>
 
       <div className="bg-white p-8 sm:p-10 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md border border-gray-200">
         <div className="flex justify-center mb-8">
           <Image
-            src="/logo-inventario.svg"
-            alt="MegaNuv Inventory Logo"
+            src="/logo-inventory.svg"
+            alt="Inventory Logo"
             width={200}
             height={60}
             priority

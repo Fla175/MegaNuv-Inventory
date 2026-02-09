@@ -9,7 +9,6 @@ import {
   Warehouse,
   Box,
   Tags,
-  RefreshCw,
   Settings,
   LogOut,
   Menu,
@@ -28,12 +27,11 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
   const router = useRouter();
   const { user } = useUser();
 
-  // Fecha a sidebar ao navegar
   useEffect(() => {
     if (isSidebarOpen) setIsSidebarOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.asPath]);
 
-  // Função para marcar item ativo
   const isActive = (pathname: string) => {
     if (pathname === "/") return router.pathname === pathname;
     return router.pathname.startsWith(pathname);
@@ -46,13 +44,9 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
-      <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100 font-inter">
+      <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100 dark:bg-black font-inter transition-colors duration-300">
         {/* Mobile Header */}
         <header className="lg:hidden fixed top-0 left-0 right-0 bg-gray-800 text-white p-4 flex items-center justify-between z-20 shadow-md">
           <button
@@ -61,10 +55,19 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <div className="text-2xl font-bold text-blue-400">MegaNuv</div>
+          <div className="text-2xl font-bold text-blue-400 text-center items-center flex w-auto">
+            <span className="pr-2.5">Inventory&trade;</span>
+            <Image
+              src="/logo-inventory.svg"
+              alt="Inventory™ Logo"
+              width={50}
+              height={50}
+              priority
+            />
+          </div>
           <div className="flex items-center space-x-2 text-sm">
             <UserCircle size={20} />
-            <span>{user?.name || "Usuário"}</span>
+            <span className="truncate max-w-[100px]">{user?.name || "Usuário"}</span>
           </div>
         </header>
 
@@ -74,10 +77,9 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out lg:shadow-xl lg:rounded-r-lg`}
         >
-          {/* Logo */}
           <div className="flex justify-center items-center py-4 px-2 mb-8 border-b border-gray-700">
             <Image
-              src="/logo-inventario.svg"
+              src="/logo-inventory.svg"
               alt="MegaNuv Logo"
               width={160}
               height={50}
@@ -85,7 +87,6 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             />
           </div>
 
-          {/* Navegação */}
           <nav className="flex-grow">
             <ul>
               {[
@@ -112,11 +113,10 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          {/* Usuário + Logout */}
           <div className="mt-auto pt-4 border-t border-gray-700 flex flex-col items-center">
             <div className="flex items-center text-gray-300 text-base mb-3">
               <UserCircle size={22} className="mr-2" />
-              <span>{user?.name || "Usuário"}</span>
+              <span className="truncate max-w-[150px]">{user?.name || "Usuário"}</span>
             </div>
             <button
               onClick={async () => {
@@ -136,17 +136,17 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
           </div>
         </aside>
 
-        {/* Overlay mobile */}
         {isSidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/20 z-20 lg:hidden backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden backdrop-blur-sm"
             onClick={() => setIsSidebarOpen(false)}
           ></div>
         )}
 
-        {/* Conteúdo principal */}
-        <main className="flex-grow p-8 pt-20 lg:pt-8 h-screen overflow-y-auto bg-white lg:rounded-r-lg">
-          {children}
+        <main className="flex-1 p-6 md:p-10 mt-[64px] lg:mt-0 h-[calc(100vh-64px)] lg:h-screen overflow-y-auto bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
     </>

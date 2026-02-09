@@ -1,4 +1,3 @@
-// pages/api/auth/login.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -9,7 +8,6 @@ if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined');
 }
 const JWT_SECRET = process.env.JWT_SECRET;
-const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -32,16 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { expiresIn: '1h' }
     );
 
-    // Configura cookie corretamente
-    const url = new URL(NEXT_PUBLIC_BASE_URL);
-    const isHttps = url.protocol === 'https:';
-
     res.setHeader('Set-Cookie', serialize('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60*60, // 1 hora
+      maxAge: 60 * 60,
       path: '/',
-      sameSite: 'lax', // Use 'lax' em HTTP local
+      sameSite: 'lax',
     }));
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });

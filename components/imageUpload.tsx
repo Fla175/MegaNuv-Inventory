@@ -1,4 +1,5 @@
 // components/imageUpload.tsx
+/* eslint-disable @next/next/no-img-element */
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 
@@ -32,11 +33,13 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
         const data = JSON.parse(text);
         if (!res.ok) throw new Error(data.error || "Erro no upload");
         onChange(data.publicUrl);
-      } catch (parseError) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_parseError) { // Prefixo _ para indicar variável propositalmente não usada
         console.error("Conteúdo recebido do servidor:", text);
         alert("O SERVIDOR ENVIOU HTML EM VEZ DE JSON. INÍCIO DO ERRO:\n\n" + text.substring(0, 500));
         return;
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
     } finally {

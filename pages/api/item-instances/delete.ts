@@ -1,9 +1,13 @@
 // pages/api/item-instances/delete.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { verifyAuthToken } from '@/lib/auth';
 import * as cookie from 'cookie';
-import { deleteFileFromMinio } from '@/lib/minio'; // <--- Importação do helper
+import { deleteFileFromMinio } from '@/lib/minio';
+
+interface TargetData {
+  id: string;
+  imageUrl: string | null;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') return res.status(405).end();
@@ -13,7 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token) return res.status(401).json({ message: 'Não autorizado' });
 
   const { id, force } = req.query;
-
   if (!id) return res.status(400).json({ message: 'ID é obrigatório' });
 
   try {
@@ -27,27 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!instance) return res.status(404).json({ message: "Espaço não encontrado." });
 
-    const hasContent = instance._count.items > 0 || instance._count.children > 0;
-
-    if (hasContent && force !== 'true') {
+    if ((instance._count.items > 0 || instance._count.children > 0) && force !== 'true') {
       return res.status(409).json({ 
-        message: "Este espaço contém itens ou subespaços.",
+        message: "Este espaço contém conteúdo.",
         requireConfirmation: true,
-        details: {
-          items: instance._count.items,
-          subspaces: instance._count.children
-        }
+        details: { items: instance._count.items, subspaces: instance._count.children }
       });
     }
 
     if (force === 'true') {
-      // 1. Alteramos a função para coletar IDs e ImageUrls (para limpeza do MinIO)
-      const getDescendantsData = async (parentId: string): Promise<{id: string, imageUrl: string | null}[]> => {
+      const getDescendantsData = async (parentId: string): Promise<TargetData[]> => {
         const children = await prisma.itemInstance.findMany({
           where: { parentId },
           select: { id: true, imageUrl: true }
         });
-        
         let data = children.map(c => ({ id: c.id, imageUrl: c.imageUrl }));
         for (const child of children) {
           const subData = await getDescendantsData(child.id);
@@ -57,48 +53,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
 
       const descendants = await getDescendantsData(String(id));
-      
-      // 2. Criamos a lista completa de alvos (Pai + Descendentes)
-      const allTargetData = [
-        { id: instance.id, imageUrl: (instance as any).imageUrl }, // Cast caso o TS reclame do schema ainda não migrado
+      const allTargetData: TargetData[] = [
+        { id: instance.id, imageUrl: instance.imageUrl },
         ...descendants
       ];
       
       const allTargetIds = allTargetData.map(item => item.id);
 
-      // 3. LIMPEZA MINIO: Deleta as imagens de todos os espaços que serão apagados
       for (const item of allTargetData) {
-        if (item.imageUrl) {
-          await deleteFileFromMinio(item.imageUrl);
-        }
+        if (item.imageUrl) await deleteFileFromMinio(item.imageUrl);
       }
 
-      // 4. Executa a limpeza no Banco (Sua lógica original preservada)
       await prisma.$transaction([
-        prisma.item.deleteMany({
-          where: { locationId: { in: allTargetIds } }
-        }),
-        prisma.itemInstance.delete({
-          where: { id: String(id) }
-        })
+        prisma.item.deleteMany({ where: { locationId: { in: allTargetIds } } }),
+        prisma.itemInstance.delete({ where: { id: String(id) } })
       ]);
     } else {
-      // Se não for forçado (espaço vazio), deleta a imagem do pai e o registro
-      if ((instance as any).imageUrl) {
-        await deleteFileFromMinio((instance as any).imageUrl);
-      }
+      if (instance.imageUrl) await deleteFileFromMinio(instance.imageUrl);
       await prisma.itemInstance.delete({ where: { id: String(id) } });
     }
 
-    return res.status(200).json({ success: true, message: "Espaço e mídias removidos." });
-
-  } catch (error: any) {
-    console.error("[DELETE LOCATION ERROR]:", error);
-    if (error.code === 'P2003') {
-      return res.status(409).json({ 
-        message: "Erro de restrição: Remova os produtos manualmente antes de excluir este espaço." 
-      });
-    }
-    return res.status(500).json({ message: error.message });
+    return res.status(200).json({ success: true, message: "Removido." });
+  } catch (error) {
+    const err = error as Error;
+    console.error(err);
+    return res.status(500).json({ message: err.message });
   }
 }

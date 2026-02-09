@@ -15,56 +15,65 @@ enum UserRole {
   VIEWER
 }
 
+enum Theme {
+  DARK
+  LIGHT
+  SISTEM
+}
+
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  name      String?
-  role      UserRole  @default(VIEWER)
-  lastLogin DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  email       String    @unique
+  password    String
+  name        String?
+  role        UserRole  @default(VIEWER)
+  theme       Theme     @default(SISTEM)
+  defaultSort String    @default("name")
+  lastLogin   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model ItemDefinition {
-  id          String   @id @default(uuid())
-  name        String
-  imageUrl    String?
-  sku         String?  @unique
-  description String?
-  isNative    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  Item        Item[]
+  id             String   @id @default(uuid())
+  name           String
+  brand          String?
+  line           String?
+  imageUrl       String?
+  sku            String?  @unique
+  description    String?
+  specifications Json?
+  isNative       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  Item           Item[]
 }
 
 model Item {
-  id           String         @id @default(uuid())
-  definitionId String
-  definition   ItemDefinition @relation(fields: [definitionId], references: [id])
-  imageUrl    String?
-  tag          String // IN-STOCK, IN-USE, TO-SELL
-
-  // Relacionamento com o Local (ItemInstance)
-  locationId String?
-  location   ItemInstance? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  notes  String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String         @id @default(uuid())
+  definitionId   String
+  definition     ItemDefinition @relation(fields: [definitionId], references: [id])
+  imageUrl       String?
+  tag            String // IN-STOCK, IN-USE, TO-SELL
+  locationId     String?
+  location       ItemInstance? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  notes          String? @db.Text
+  specifications Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([definitionId])
   @@index([locationId])
 }
 
 model ItemInstance {
-  id       String         @id @default(uuid())
-  name     String         @unique
-  imageUrl    String?
+  id         String         @id @default(uuid())
+  name       String         @unique
+  imageUrl   String?
   fixedValue Float        @default(0)
-  parentId String?
-  parent   ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children ItemInstance[] @relation("LocationHierarchy")
+  parentId   String?
+  parent     ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   ItemInstance[] @relation("LocationHierarchy")
 
   // Itens vinculados a este local
   items Item[]

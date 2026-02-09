@@ -1,15 +1,25 @@
 // lib/context/UserContext.tsx
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 
-type User = {
-  name: string;
-  email?: string;
+export type Role = 'ADMIN' | 'MANAGER' | 'VIEWER';
+export type Theme = 'DARK' | 'LIGHT' | 'SISTEM';
+
+export type User = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: Role;
+  theme: Theme;
+  defaultSort?: string;
+  lastLogin?: string;
+  createdAt: string;
 };
 
 type UserContextType = {
   user: User | null;
   loading: boolean;
   setUser: (user: User | null) => void;
+  refreshUser: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -18,29 +28,52 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar usuário:", err);
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user || data); 
+      } else {
         setUser(null);
-      } finally {
-        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar usuário:", err);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  
+    const apply = () => {
+      const currentTheme = user?.theme || 'SISTEM';
+      const isDark = currentTheme === 'DARK' || (currentTheme === 'SISTEM' && mediaQuery.matches);
+      
+      if (isDark) {
+        root.classList.add('dark');
+        root.style.colorScheme = 'dark';
+      } else {
+        root.classList.remove('dark');
+        root.style.colorScheme = 'light';
       }
     };
 
-    fetchUser();
-  }, []);
+    apply();
+
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, [user?.theme]);
 
   return (
-    <UserContext.Provider value={{ user, loading, setUser }}>
+    <UserContext.Provider value={{ user, loading, setUser, refreshUser: fetchUser }}>
       {children}
     </UserContext.Provider>
   );

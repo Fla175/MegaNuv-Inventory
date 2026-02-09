@@ -1,23 +1,33 @@
 // types/inventory.ts
+export interface ItemDefinition {
+  id: string;
+  name: string;
+  sku: string | null;
+  imageUrl?: string | null;
+  isNative: boolean;
+}
 
 export interface Item {
-    name: string;
-    sku: string;
-    contaAzulId?: string;
-    status: string;
-    price: number;
-    cost: number | null;
-  }
-  
-  export interface ItemInstance {
-    id: string;
-    itemId: string;
-    serialNumber: string;
-    location: string | null;
-    qrCodePath: string | null;
-    isInUse: boolean;
-    notes: string | null;
-    parentId: string | null;
-    item: Item;
-    children?: ItemInstance[]; // A presença desta chave (mesmo como []) indica um "espaço"
-  }
+  id: string;
+  definitionId: string;
+  definition: ItemDefinition;
+  imageUrl?: string | null;
+  tag: string; // IN-STOCK, IN-USE, TO-SELL
+  locationId?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ItemInstance {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  fixedValue: number;
+  parentId?: string | null;
+  parent?: ItemInstance | null;
+  children?: ItemInstance[];
+  items?: Item[];
+  createdAt: string;
+  updatedAt: string;
+}

@@ -1,9 +1,6 @@
 // pages/api/item-instances/move.ts (Corrigido)
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-// CORREÇÃO: Remova as chaves de 'prisma'
 import prisma from '@/lib/prisma'; 
-// Importe sua lógica de autenticação/sessão aqui, se houver.
 
 export default async function handle(req: NextApiRequest, res: NextApiResponse) {
   // 1. Apenas aceitar o método PATCH
@@ -22,8 +19,6 @@ export default async function handle(req: NextApiRequest, res: NextApiResponse) 
   if (instanceId === newParentId) {
     return res.status(400).json({ message: 'Um item não pode ser movido para dentro de si mesmo.' });
   }
-  
-  // TODO: Adicionar lógica para prevenir mover um pai para dentro de um filho (loop)
 
   try {
     // 3. Atualizar o item no banco de dados
@@ -33,13 +28,12 @@ export default async function handle(req: NextApiRequest, res: NextApiResponse) 
       },
       data: {
         parentId: newParentId,
-        // Opcional: Limpar a localização explícita, já que agora está "dentro" de algo
-        // location: null, 
       },
     });
 
     return res.status(200).json(updatedInstance);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Erro ao mover instância:', error);
     if (error.code === 'P2025') {

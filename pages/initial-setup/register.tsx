@@ -1,4 +1,5 @@
-// pages/signup.tsx
+// pages/initial-setup/register.tsx
+/* eslint-disable @next/next/no-page-custom-font */
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -44,13 +45,13 @@ export default function Signup() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#004AAD] to-[#38B6FF] p-4 font-inter">
       <Head>
-        <title>Cadastro MegaNuv Inventory</title>
+        <title>Cadastro Inventory</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
       <div className="bg-white p-8 sm:p-10 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md border border-gray-200 transform transition duration-300 hover:scale-[1.01]">
         <div className="flex justify-center mb-8">
-          <Image src="/logo-inventario.svg" alt="MegaNuv Inventory Logo" width={200} height={60} priority />
+          <Image src="/logo-inventory.svg" alt="MegaNuv Inventory Logo" width={200} height={60} priority />
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 mb-8 text-center tracking-tight">
@@ -59,7 +60,7 @@ export default function Signup() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="name" className="block text-gray-700 text-sm font-semibold mb-2">Nome:</label>
+            <label htmlFor="name" className="flex text-gray-700 text-sm font-semibold mb-2">Nome:</label>
             <input
               type="text"
               id="name"

@@ -16,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: `${result.count} itens criados com sucesso!`,
       count: result.count 
     });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return res.status(500).json({ message: "Erro ao salvar no banco." });
   }

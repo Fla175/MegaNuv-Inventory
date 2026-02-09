@@ -1,3 +1,4 @@
+// pages/api/items/list.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth';
@@ -26,21 +27,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           select: {
             name: true,
             sku: true,
-            cost: true,
           }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Formatação segura para evitar erros de tipos Decimal do Prisma
     const formattedItems = items.map(item => ({
       ...item,
-      // O custo vem da definição agora
-      cost: item.definition.cost ? Number(item.definition.cost) : 0,
     }));
 
     return res.status(200).json({ items: formattedItems });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
   }
