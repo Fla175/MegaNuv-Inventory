@@ -2,6 +2,7 @@
 
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
+<<<<<<< HEAD
 ## 🚀 Features
 
 * **Role-Based Access Control (RBAC):** Hierarchical permissions for `ADMIN`, `MANAGER`, and `VIEWER`.
@@ -12,6 +13,10 @@
 
 ## 🛠 Tech Stack
 
+=======
+## 🛠 Tech Stack
+
+>>>>>>> e238217bd9699501e74f8512b608d24705696568
 * **Framework:** [Next.js](https://nextjs.org/) (Pages Router)
 * **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/)
 * **Styling:** [Tailwind CSS](https://tailwindcss.com)
@@ -76,11 +81,19 @@ The system implements a strict permission logic:
 
 * **Managers:** Can manage VIEWER accounts but cannot delete or edit ADMINS.
 
+<<<<<<< HEAD
 * **Owners:** Users can always edit their own profile or delete their own account.
+=======
+* **Viewers:** Users that only can look the inventory, but can't do any process.
+>>>>>>> e238217bd9699501e74f8512b608d24705696568
 
 > ## Learn More
 > To learn more about Next.js, take a look at the following resources:
 >
 > * [***Next.js Documentation*** - learn about Next.js features and API.](https://nextjs.org/docs)
 >
+<<<<<<< HEAD
 > * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
+=======
+> * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
+>>>>>>> e238217bd9699501e74f8512b608d24705696568
