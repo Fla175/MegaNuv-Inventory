@@ -9,23 +9,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PUT' || req.method === 'PATCH') {
         try {
-            const { name, sku, imageUrl, brand, line } = req.body;
+            const { name, sku, imageUrl, manufacturer, model, datasheetUrl } = req.body;
             const updateData: any = {};
 
             if (name !== undefined) updateData.name = String(name);
             if (sku !== undefined) updateData.sku = String(sku).toUpperCase().trim();
             if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
-            if (brand !== undefined) updateData.brand = brand || null;
-            if (line !== undefined) updateData.line = line || null;
+            if (manufacturer !== undefined) updateData.manufacturer = manufacturer || null;
+            if (model !== undefined) updateData.model = model || null;
+
+            if (datasheetUrl !== undefined) updateData.datasheetUrl = datasheetUrl || null;
 
             const updated = await prisma.itemDefinition.update({
                 where: { id },
                 data: updateData,
             });
+
             return res.status(200).json({ success: true, item: updated });
         } catch (error: any) {
+            console.error("Erro na atualização do catálogo:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     }
+    
     return res.status(405).end();
 }

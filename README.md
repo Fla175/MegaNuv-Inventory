@@ -13,9 +13,9 @@
 ## 🛠 Tech Stack
 
 * **Framework:** [Next.js](https://nextjs.org/) (Pages Router)
-* **Database:** MySQL with [Prisma ORM](https://www.prisma.io/)
-* **Styling:** Tailwind CSS
-* **Icons:** Lucide React
+* **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/)
+* **Styling:** [Tailwind CSS](https://tailwindcss.com)
+* **Icons:** [Lucide React](https://lucide.dev)
 * **Authentication:** JSON Web Tokens (JWT) & BcryptJS
 
 ---
@@ -26,7 +26,7 @@
 
 * Node.js (LTS version)
 * Yarn or NPM
-* A running MySQL instance
+* A running MySQL/MariaDB instance
 
 ### Installation
 

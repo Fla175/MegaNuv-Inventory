@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const form = formidable({});
   
   try {
-    const [, files] = await form.parse(req); // Usando vírgula para ignorar o primeiro parâmetro
+    const [, files] = await form.parse(req);
     const file = files.file?.[0];
     if (!file) throw new Error("Arquivo não recebido");
 

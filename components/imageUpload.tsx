@@ -1,5 +1,7 @@
 // components/imageUpload.tsx
 /* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 
@@ -33,13 +35,11 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
         const data = JSON.parse(text);
         if (!res.ok) throw new Error(data.error || "Erro no upload");
         onChange(data.publicUrl);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (_parseError) { // Prefixo _ para indicar variável propositalmente não usada
+      } catch (any) {
         console.error("Conteúdo recebido do servidor:", text);
         alert("O SERVIDOR ENVIOU HTML EM VEZ DE JSON. INÍCIO DO ERRO:\n\n" + text.substring(0, 500));
         return;
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
     } finally {
@@ -52,25 +52,25 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
       <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block">{label}</label>
       <div 
         onClick={() => !loading && fileInputRef.current?.click()}
-        className={`relative w-full h-44 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer overflow-hidden
+        className={`relative w-full h-44 rounded-[2rem] border border-dashed border-gray-500 transition-all cursor-pointer overflow-hidden
           ${value ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-400'}`}
       >
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
         
         {loading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-600 bg-white/80 backdrop-blur-sm z-10">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-600 bg-white/80 dark:bg-zinc-800 backdrop-blur-sm z-10">
             <Loader2 className="animate-spin mb-2" size={32} />
             <span className="text-[10px] font-black uppercase tracking-widest">Enviando via Servidor...</span>
           </div>
         ) : value ? (
           <>
-            <img src={value} alt="Preview" className="w-full h-full object-cover" />
+            <img src={value} alt="Preview" className="w-full h-full object-cover bg-white/ dark:bg-zinc-800" />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                <button type="button" onClick={(e) => { e.stopPropagation(); onChange(null); }} className="bg-white p-2 rounded-xl text-red-500 shadow-lg"><X size={20}/></button>
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray dark:bg-zinc-800">
             <UploadCloud size={28} className="mb-2" />
             <span className="text-[10px] font-black uppercase tracking-widest text-center px-4">Clique para enviar</span>
           </div>

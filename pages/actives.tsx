@@ -3,8 +3,7 @@ import Layout from '../components/Layout';
 import { useState, useEffect, useRef, useCallback, JSX } from 'react';
 import { 
   Box, Layers, PackagePlus, SendToBack, CheckSquare, X, Loader2, MapPin, 
-  ChevronRight, ChevronDown, Search, Pencil, Save, Tag as TagIcon, 
-  FileText
+  ChevronRight, ChevronDown, Search, Pencil, Hash
 } from 'lucide-react';
 import { useUser } from "@/lib/context/UserContext";
 
@@ -21,6 +20,8 @@ interface Item {
   definition: ItemDefinition;
   tag: string;
   notes?: string;
+  color?: string;
+  serialNumber?: string;
   createdAt: string;
 }
 
@@ -99,7 +100,12 @@ export default function ActivesPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editTag, setEditTag] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editSerialNumber, setEditSerialNumber] = useState('');
+  const [editColor, setEditColor] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+
+  const [hoverNote, setHoverNote] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [availableDefinitions, setAvailableDefinitions] = useState<ItemDefinition[]>([]);
@@ -107,13 +113,53 @@ export default function ActivesPage() {
   const [flatSpaces, setFlatSpaces] = useState<{ id: string; name: string }[]>([]); 
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
 
+  // Estados do Novo Ativo
   const [newDefinitionId, setNewDefinitionId] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState('');
   const [tag, setTag] = useState('IN-STOCK');
   const [newParentId, setNewParentId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [serialNumbers, setSerialNumbers] = useState<string[]>(['']);
+  const [color, setColor] = useState("");
 
-  // Ordenação tipada
+  useEffect(() => {
+    setSerialNumbers(prev => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const newArr = [...prev];
+      if (quantity > prev.length) {
+        return [...prev, ...Array(quantity - prev.length).fill('')];
+      } else if (quantity < prev.length) {
+        return prev.slice(0, quantity);
+      }
+      return prev;
+    });
+  }, [quantity]);
+
+  const handleSnChange = (index: number, value: string) => {
+    const newSns = [...serialNumbers];
+    newSns[index] = value;
+    setSerialNumbers(newSns);
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent, assetId: string, notes?: string) => {
+    if (!notes) return; // Se não houver nota, não faz nada
+  
+    const { clientX, clientY } = e;
+  
+    // Inicia o contador de 2 segundos (2000ms)
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverNote({ id: assetId, text: notes, x: clientX, y: clientY });
+    }, 2000);
+  };
+  
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverNote(null);
+  };
+
   const sortData = useCallback(<T extends { name?: string; createdAt?: string; definition?: { name: string } }>(data: T[], type: 'node' | 'asset'): T[] => {
     return [...data].sort((a, b) => {
       const sortType = user?.defaultSort || 'name';
@@ -145,7 +191,7 @@ export default function ActivesPage() {
       const defsData = await defsRes.json();
       const spacesData = await spacesRes.json();
       
-      const defs = defsData.items || [];
+      const defs = defsData.itemDefinitions || defsData.items || [];
       const spaces = spacesData.itemInstances || [];
       
       setAvailableDefinitions(sortData(defs, 'node'));
@@ -163,12 +209,39 @@ export default function ActivesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if(!newDefinitionId || !newParentId) return;
+    
     setFormLoading(true);
-    const payload = Array.from({ length: quantity }, () => ({ definitionId: newDefinitionId, locationId: newParentId, tag, notes }));
+
+    const payload = Array.from({ length: quantity }, (_, index) => ({ 
+      definitionId: newDefinitionId, 
+      locationId: newParentId, 
+      tag,
+      notes: notes || null,
+      color: color || null,
+      serialNumber: serialNumbers[index] || null,
+    }));
+  
     try {
-      const res = await fetch('/api/items/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (res.ok) { setQuantity(1); setNotes(''); setNewDefinitionId(''); fetchData(); }
-    } finally { setFormLoading(false); }
+      const res = await fetch('api/items/create', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
+      });
+  
+      if (res.ok) {
+        setQuantity(1); 
+        setSerialNumbers(['']);
+        setNewDefinitionId('');
+        setColor('');
+        fetchData(); 
+      } else {
+        console.error("Erro ao criar itens");
+      }
+    } catch (error) {
+      console.error("Erro de conexão", error);
+    } finally { 
+      setFormLoading(false); 
+    }
   };
 
   const handleMoveAssets = async (destinationId: string) => {
@@ -192,88 +265,141 @@ export default function ActivesPage() {
     e.preventDefault();
     if(!editingItem) return;
     setEditLoading(true);
+    
     try {
-        const res = await fetch(`/api/items/update`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingItem.id, tag: editTag, notes: editNotes }) });
-        if (res.ok) { setEditingItem(null); fetchData(); }
-    } finally { setEditLoading(false); }
+        const res = await fetch(`/api/items/update`, { 
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                id: editingItem.id, 
+                tag: editTag, 
+                notes: editNotes,
+                color: editColor,
+            }) 
+        });
+  
+        if (res.ok) { 
+            setEditingItem(null); 
+            fetchData();
+        } else {
+            const errorData = await res.json();
+            alert("Erro ao atualizar: " + errorData.message);
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Erro de conexão.");
+    } finally { 
+        setEditLoading(false); 
+    }
   };
 
   const renderViewTree = (nodes: ItemInstance[], depth = 0): (JSX.Element | null)[] => {
     const query = assetSearch.toLowerCase();
     const sortedNodes = sortData(nodes, 'node');
-
+  
     return sortedNodes.map((node) => {
-        const filteredItems = node.items?.filter((asset) => 
-            asset.definition?.name.toLowerCase().includes(query) ||
-            asset.definition?.sku?.toLowerCase().includes(query) ||
-            asset.tag.toLowerCase().includes(query) ||
-            (asset.notes && asset.notes.toLowerCase().includes(query))
-        ) || [];
-        
-        const sortedItems = sortData(filteredItems, 'asset');
-        const childrenTree = node.children ? renderViewTree(node.children, depth + 1) : [];
-        const hasVisibleChildren = childrenTree.some((c) => c !== null);
-        
-        if (query && sortedItems.length === 0 && !hasVisibleChildren) return null;
-
-        const isExpanded = expandedNodes[node.id] || (query !== "");
-        const hasContent = sortedItems.length > 0 || hasVisibleChildren;
-
-        return (
-            <div key={node.id} className="mb-1 animate-in fade-in duration-200">
-                <div 
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors group cursor-pointer" 
-                  style={{ paddingLeft: `${depth * 0.5}rem` }}
-                  onClick={() => toggleNode(node.id)}
-                >
-                    <div className="flex items-center flex-1 min-w-0">
-                        {hasContent ? (
-                            <ChevronRight size={14} className={`mr-1.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
-                        ) : <div className="w-[14px] mr-1.5 shrink-0" />} 
-                        <Layers size={14} className={`mr-2 shrink-0 ${isExpanded ? 'text-blue-600' : 'text-gray-300 dark:text-gray-700'}`} />
-                        <span className={`text-[10px] md:text-[11px] font-black uppercase tracking-wider truncate ${isExpanded ? 'text-blue-900 dark:text-blue-400' : 'text-gray-500 dark:text-gray-500'}`}>
-                          {node.name}
-                        </span>
-                    </div>
-                </div>
-
-                {isExpanded && (
-                    <div className="border-l border-gray-100 dark:border-white/5 ml-3 md:ml-4">
-                        {sortedItems.map((asset) => (
-                            <div 
-                                key={asset.id}
-                                onClick={() => setSelectedAssetIds(prev => prev.includes(asset.id) ? prev.filter(i => i !== asset.id) : [...prev, asset.id])}
-                                className={`group relative flex items-center p-3 md:p-4 my-1.5 ml-2 md:ml-4 rounded-xl md:rounded-2xl cursor-pointer border transition-all ${selectedAssetIds.includes(asset.id) ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white dark:bg-zinc-950 border-gray-100 dark:border-white/5 hover:border-blue-200 dark:hover:border-blue-500/50'}`}
-                            >
-                                <CheckSquare size={16} className={`mr-3 shrink-0 ${selectedAssetIds.includes(asset.id) ? 'text-white' : 'text-gray-300 dark:text-gray-700'}`} />
-                                <div className="min-w-0 flex-1 pr-6 md:pr-10">
-                                    <p className={`font-black text-[12px] md:text-sm truncate leading-tight ${selectedAssetIds.includes(asset.id) ? 'text-white' : 'text-blue-950 dark:text-gray-200'}`}>{asset.definition?.name}</p>
-                                    <div className="flex flex-wrap gap-1.5 items-center mt-1">
-                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${selectedAssetIds.includes(asset.id) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>{asset.tag}</span>
-                                        {asset.notes && <span className={`text-[9px] font-bold truncate max-w-[120px] md:max-w-none ${selectedAssetIds.includes(asset.id) ? 'text-blue-100' : 'text-gray-400 dark:text-gray-600'}`}>• {asset.notes}</span>}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setEditingItem(asset); setEditTag(asset.tag); setEditNotes(asset.notes || ''); }}
-                                    className={`absolute right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all 
-                                      ${selectedAssetIds.includes(asset.id) ? 'bg-blue-500 text-white hover:bg-white hover:text-blue-600' : 'bg-gray-50 dark:bg-zinc-800 text-gray-400 hover:bg-blue-600 hover:text-white'} 
-                                      md:opacity-0 md:group-hover:opacity-100 opacity-100`}
-                                >
-                                    <Pencil size={14} />
-                                </button>
-                            </div>
-                        ))}
-                        {childrenTree}
-                    </div>
-                )}
+      const filteredItems = node.items?.filter((asset) => 
+        asset.definition?.name.toLowerCase().includes(query) ||
+        asset.definition?.sku?.toLowerCase().includes(query) ||
+        asset.serialNumber?.toUpperCase().includes(query) ||
+        asset.tag.toLowerCase().includes(query)
+      ) || [];
+      
+      const sortedItems = sortData(filteredItems, 'asset');
+      const childrenTree = node.children ? renderViewTree(node.children, depth + 1) : [];
+      const hasVisibleChildren = childrenTree.some((c) => c !== null);
+      
+      if (query && sortedItems.length === 0 && !hasVisibleChildren) return null;
+  
+      const isExpanded = expandedNodes[node.id] || (query !== "");
+      const hasContent = sortedItems.length > 0 || hasVisibleChildren;
+  
+      return (
+        <div key={node.id} className="mb-1 animate-in fade-in duration-200">
+          <div 
+            className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors group cursor-pointer" 
+            style={{ paddingLeft: `${depth * 0.5}rem` }}
+            onClick={() => toggleNode(node.id)}
+          >
+            <div className="flex items-center flex-1 min-w-0">
+              {hasContent ? (
+                <ChevronRight size={14} className={`mr-1.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
+              ) : <div className="w-[14px] mr-1.5 shrink-0" />} 
+              
+              <Layers size={14} className={`mr-2 shrink-0 ${isExpanded ? 'text-blue-600' : 'text-gray-300 dark:text-gray-700'}`} />
+              <span className={`text-[10px] md:text-[11px] font-black uppercase tracking-wider truncate ${isExpanded ? 'text-blue-900 dark:text-blue-400' : 'text-gray-500 dark:text-gray-500'}`}>
+                {node.name}
+              </span>
             </div>
-        );
+          </div>
+  
+          {isExpanded && (
+            <div className="border-l border-gray-100 dark:border-white/5 ml-3 md:ml-4">
+              {sortedItems.map((asset) => (
+                <div 
+                  key={asset.id}
+                  onMouseEnter={(e) => handleMouseEnter(e, asset.id, asset.notes)}
+                  onMouseLeave={handleMouseLeave}
+                  onClick={() => {
+                    handleMouseLeave();
+                    setSelectedAssetIds(prev => prev.includes(asset.id) ? prev.filter(i => i !== asset.id) : [...prev, asset.id]);
+                  }}
+                  className={`group relative flex items-center p-3 md:p-4 my-1.5 ml-2 md:ml-4 rounded-xl md:rounded-2xl cursor-pointer border transition-all ${selectedAssetIds.includes(asset.id) ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white dark:bg-zinc-950 border-gray-100 dark:border-white/5 hover:border-blue-200 dark:hover:border-blue-500/50'}`}
+                >
+                  <CheckSquare size={16} className={`mr-3 shrink-0 ${selectedAssetIds.includes(asset.id) ? 'text-white' : 'text-gray-300 dark:text-gray-700'}`} />
+                  <div className="min-w-0 flex-1 pr-8">
+                    <p className={`font-black text-[12px] md:text-sm truncate leading-tight ${selectedAssetIds.includes(asset.id) ? 'text-white' : 'text-blue-950 dark:text-gray-200'}`}>
+                      {asset.definition?.name}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                      {asset.color && (
+                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${selectedAssetIds.includes(asset.id) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
+                          {asset.color}
+                        </span>
+                      )}
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${selectedAssetIds.includes(asset.id) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
+                        {asset.tag}
+                      </span>
+                      {asset.serialNumber && (
+                        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${selectedAssetIds.includes(asset.id) ? 'border-blue-400 text-blue-100' : 'border-gray-100 dark:border-white/5 text-gray-400 dark:text-gray-500'}`}>
+                          <Hash size={8} className="rotate-12" />
+                          <span className="text-[8px] font-bold uppercase tracking-tight">
+                            SN: {asset.serialNumber}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingItem(asset);
+                      setEditTag(asset.tag);
+                      setEditNotes(asset.notes || '');
+                      setEditColor(asset.color || '');
+                      setEditSerialNumber(asset.serialNumber || '');
+                    }}
+                    className={`absolute right-3 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 ${
+                      selectedAssetIds.includes(asset.id) 
+                        ? 'hover:bg-blue-500 text-white' 
+                        : 'hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-400 hover:text-blue-600'
+                    }`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </div>
+              ))}
+              {childrenTree}
+            </div>
+          )}
+        </div>
+      );
     });
   };
 
   const renderSelectionTree = (nodes: ItemInstance[]) => {
     return sortData(nodes, 'node').map((node) => {
-      const isExpanded = expandedNodes[`modal-${node.id}`]; 
+      const isExpanded = expandedNodes[`modal-${node.id}`];
       return (
       <div key={node.id} className="mb-2">
          <div className="flex gap-1.5 md:gap-2">
@@ -319,6 +445,7 @@ export default function ActivesPage() {
                 <h2 className="text-sm md:text-lg font-black text-blue-900 dark:text-blue-400 flex items-center gap-2"><PackagePlus size={18}/>Entrada de Ativos</h2>
                 <div className="space-y-4">
                   <SearchableSelect label="Ativo Modelo" placeholder="Selecione..." options={availableDefinitions} value={newDefinitionId} onChange={setNewDefinitionId} />
+                  
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div className="space-y-1">
                       <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-2 block">Qtd</label>
@@ -332,8 +459,63 @@ export default function ActivesPage() {
                       </select>
                     </div>
                   </div>
-                  <SearchableSelect label="Local de Destino" options={flatSpaces} value={newParentId} onChange={setNewParentId} />
+
+                  {/* BLOCO DINÂMICO DE SERIAL NUMBERS */}
+                  <div className="space-y-3 bg-gray-50/50 dark:bg-zinc-950/50 p-4 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <Hash size={12}/> Número de Série
+                    </p>
+                    <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                      {serialNumbers.map((sn, idx) => (
+                        <div key={idx} className="relative group">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-gray-400">#{idx + 1}</span>
+                          <input 
+                            type="text"
+                            placeholder="Número de Série"
+                            className="w-full bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-300 pl-8 pr-4 py-2 rounded-lg text-xs font-bold outline-none border border-transparent focus:border-blue-500 transition-all uppercase"
+                            value={sn}
+                            onChange={(e) => handleSnChange(idx, e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 w-full">
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-2 block tracking-widest">
+                      Notas
+                    </label>
+                    <textarea
+                      rows={3} // Altura inicial
+                      className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-500 dark:text-gray-200 p-3 md:p-4 pt-3.5 md:pt-4.5 rounded-xl md:rounded-2xl font-bold text-sm md:text-base outline-none border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition-all pl-11 resize-none min-h-[120px]"
+                      value={notes}
+                      onChange={(e) => {
+                        setNotes(e.target.value);
+                        e.target.style.height = 'inherit';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      placeholder="Ex: estado, caracteristicas, funcionalidades, etc..."
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-2 block tracking-widest">
+                      Cor
+                    </label>
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text" 
+                        className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-500 dark:text-gray-200 p-3 md:p-4 rounded-xl md:rounded-2xl font-bold text-sm md:text-base outline-none border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition-all pl-11" 
+                        value={color} 
+                        onChange={(e) => setColor(e.target.value)}
+                        placeholder="Ex: Azul" 
+                      />
+                    </div>
+                  </div>
+
+                  <SearchableSelect label="Local de Destino" options={flatSpaces} value={newParentId} onChange={setNewParentId} placeholder="Selecione..." />
                 </div>
+
                 <button type="submit" disabled={formLoading || !newDefinitionId || !newParentId} className="w-full bg-blue-600 text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black text-xs md:text-sm shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:bg-gray-300 dark:disabled:bg-zinc-800">
                   {formLoading ? <Loader2 className="animate-spin mx-auto" size={20}/> : 'Registrar Ativos'}
                 </button>
@@ -342,7 +524,7 @@ export default function ActivesPage() {
 
           <div className="lg:col-span-8 order-1 lg:order-2 bg-white dark:bg-zinc-900 p-4 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm min-h-[450px] flex flex-col transition-colors">
             <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                <h2 className="text-sm md:text-lg font-black text-indigo-800 dark:text-white flex items-center gap-2"><SendToBack size={18}/>Mover ativos</h2>
+                <h2 className="text-sm md:text-lg font-black text-indigo-800 dark:text-white flex items-center gap-2"><SendToBack size={18}/>Mover Ativos</h2>
                 {selectedAssetIds.length > 0 && (
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button onClick={handleDeleteAssets} className="flex-1 sm:flex-none bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-4 py-2 rounded-xl font-bold text-[11px] md:text-xs hover:bg-red-100 transition-colors uppercase">Excluir ({selectedAssetIds.length})</button>
@@ -354,7 +536,7 @@ export default function ActivesPage() {
                {availableSpaces.length > 0 ? renderViewTree(availableSpaces) : (
                 <div className="text-center py-20">
                   <Box size={40} className="mx-auto text-gray-100 dark:text-zinc-800 mb-3"/>
-                  <p className="text-gray-400 dark:text-gray-600 font-bold uppercase text-[10px] tracking-widest">Nenhum ativo encontrado</p>
+                  <p className="text-gray-400 dark:text-gray-600 font-bold uppercase text-[10px] tracking-widest">Nenhum espaço físico encontrado</p>
                 </div>
                )}
             </div>
@@ -362,6 +544,7 @@ export default function ActivesPage() {
         </div>
       </div>
 
+      {/* MODAL DE MOVER (Design original mantido) */}
       {isMoveModalOpen && (
         <div className="fixed inset-0 bg-blue-950/70 z-[100] flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-zinc-900 rounded-t-[2rem] sm:rounded-[2.5rem] p-6 md:p-8 w-full max-w-lg shadow-2xl h-[90vh] sm:h-[80vh] flex flex-col border dark:border-white/10">
@@ -384,32 +567,96 @@ export default function ActivesPage() {
         </div>
       )}
 
+      {/* MODAL DE EDIÇÃO RÁPIDA */}
       {editingItem && (
         <div className="fixed inset-0 bg-blue-950/70 z-[110] flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <form onSubmit={handleUpdateItem} className="bg-white dark:bg-zinc-900 rounded-t-[2rem] sm:rounded-[2.5rem] p-6 md:p-8 w-full max-w-sm shadow-2xl relative border dark:border-white/10">
-            <button type="button" onClick={() => setEditingItem(null)} className="absolute top-4 right-4 md:top-6 md:right-6 text-gray-300 hover:text-red-500 p-2"><X size={24}/></button>
-            <h3 className="text-lg md:text-xl font-black text-blue-950 dark:text-white mb-1 flex items-center gap-2"><Pencil size={18} className="text-blue-500"/> Editar Detalhes</h3>
-            <p className="text-[10px] md:text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-6 truncate max-w-[250px]">{editingItem.definition?.name}</p>
+          <form 
+            onSubmit={handleUpdateItem}
+            className="bg-white dark:bg-zinc-900 rounded-t-[2rem] sm:rounded-[2.5rem] p-6 md:p-8 w-full max-w-sm shadow-2xl relative border dark:border-white/10"
+          >
+            <button type="button" onClick={() => setEditingItem(null)} className="absolute top-4 right-4 text-gray-300 hover:text-red-500 p-2"><X size={24}/></button>
+            
+            <h3 className="text-lg font-black text-blue-950 dark:text-white mb-6 flex items-center gap-2">
+              <Pencil size={18} className="text-blue-500"/> Editar Detalhes
+            </h3>
             
             <div className="space-y-4 mb-6">
               <div className="space-y-1">
-                <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-2 flex items-center gap-1"><TagIcon size={10}/> Status do Item</label>
-                <select className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-600 dark:text-gray-300 border-2 border-transparent p-3.5 md:p-4 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm outline-none focus:border-blue-500 transition-all" value={editTag} onChange={e => setEditTag(e.target.value)}>
+                <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Status</label>
+                <select 
+                  className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-700 dark:text-gray-300 p-3.5 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500 transition-all" 
+                  value={editTag} 
+                  onChange={e => setEditTag(e.target.value)}
+                >
                   <option value="IN-STOCK">Estoque</option>
                   <option value="IN-USE">Em Uso</option>
-                  <option value="TO-SELL">Venda</option>
                 </select>
               </div>
+
               <div className="space-y-1">
-                <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-2 flex items-center gap-1"><FileText size={10}/> Observações</label>
-                <textarea className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-700 dark:text-gray-300 border-2 border-transparent p-3.5 md:p-4 rounded-xl md:rounded-2xl font-bold text-xs md:text-sm outline-none focus:border-blue-500 resize-none" rows={3} value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Notas internas..." />
+                <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Cor</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-700 dark:text-gray-300 p-3.5 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500 transition-all" 
+                  value={editColor} 
+                  onChange={e => setEditColor(e.target.value)} 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Número de Série</label>
+                <input
+                  type="text" 
+                  className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-700 dark:text-gray-300 p-3.5 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500 transition-all uppercase" 
+                  value={editSerialNumber}
+                  onChange={ e => setEditSerialNumber(e.target.value) }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Notas</label>
+                <textarea
+                  rows={3}
+                  className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-500 dark:text-gray-200 p-3 md:p-4 pt-3.5 md:pt-4.5 rounded-xl md:rounded-2xl font-bold text-sm md:text-base outline-none border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition-all pl-11 resize-none min-h-[120px]"
+                  value={notes}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    e.target.style.height = 'inherit';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  placeholder="Ex: estado, caracteristicas, funcionalidades, etc..."
+                />
               </div>
             </div>
             
-            <button type="submit" disabled={editLoading} className="w-full py-3.5 md:py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black text-xs md:text-sm shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:bg-gray-300">
-              {editLoading ? <Loader2 className="animate-spin mx-auto" size={20}/> : <><Save size={16} className="inline mr-2"/> Salvar Alterações</>}
+            <button 
+              type="submit" 
+              disabled={editLoading} 
+              className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg hover:bg-blue-700 transition-all active:scale-95"
+            >
+              {editLoading ? <Loader2 className="animate-spin mx-auto" size={20}/> : "Salvar Alterações"}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Tooltip flutuante de Notas */}
+      {hoverNote && (
+        <div 
+          className="fixed z-[200] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+          style={{ 
+            left: hoverNote.x + 15, 
+            top: hoverNote.y + 15 
+          }}
+        >
+          <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 p-3 rounded-xl shadow-2xl border border-white/10 dark:border-zinc-200 max-w-xs">
+            <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-50 flex items-center gap-1">
+              <Pencil size={10}/> Nota do Ativo
+            </p>
+            <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap">
+              {hoverNote.text}
+            </p>
+          </div>
         </div>
       )}
     </Layout>

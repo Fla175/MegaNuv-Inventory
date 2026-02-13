@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Use PUT ou PATCH.' });
   }
 
-  const { id, tag, notes, specifications } = req.body;
+  const { id, tag, serialNumber, color } = req.body;
 
   if (!id) return res.status(400).json({ message: 'ID é obrigatório.' });
 
@@ -16,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: String(id) },
       data: {
         tag,
-        notes,
-        specifications: specifications || undefined,
+        color: color || null,
+        serialNumber: serialNumber || null,
       },
     });
 

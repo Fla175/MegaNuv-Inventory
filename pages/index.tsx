@@ -1,4 +1,5 @@
 // pages/index.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 import Layout from "../components/Layout";
 import { useState, useEffect, useMemo } from "react";
@@ -127,7 +128,6 @@ export default function LocationsPage() {
             body: JSON.stringify({ id: editingLoc?.id, name, fixedValue: Number(value), imageUrl, parentId: null }),
         });
         if (res.ok) { setIsModalOpen(false); setEditingLoc(null); fetchLocations(); }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) { alert("Erro ao salvar."); } finally { setFormLoading(false); }
   };
 
@@ -138,7 +138,6 @@ export default function LocationsPage() {
       if (res.status === 409) {
           if (confirm("Espaço contém itens! Deletar TUDO permanentemente?")) handleDelete(id, true);
       } else if (res.ok) fetchLocations();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) { alert("Erro de conexão"); }
   };
 
@@ -187,7 +186,7 @@ export default function LocationsPage() {
               <div className="p-5 md:p-8 flex-1">
                 <div className="flex justify-between items-start mb-4">
                   <div className="h-12 w-12 md:h-16 md:w-16 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center overflow-hidden border border-blue-100 dark:border-white/5">
-                    {loc.imageUrl ?  <img src={loc.imageUrl} className="w-full h-full object-cover" alt="Imagem do espaço físico" /> : <MapPin size={24} />}
+                    {loc.imageUrl ?  <img src={loc.imageUrl} className="w-full h-full object-cover" alt="Imagem do espaço" /> : <MapPin size={24} />}
                   </div>
                   <div className="flex gap-1">
                     <button onClick={() => { setEditingLoc(loc); setIsModalOpen(true); }} className="text-gray-300 dark:text-zinc-600 hover:text-blue-500 p-2 rounded-lg transition-colors"><Pencil size={16} /></button>
@@ -214,7 +213,13 @@ export default function LocationsPage() {
                 </div>
               </div>
               
-              <button onClick={() => router.push(`/inventory-view?location=${loc.id}`)} className="w-full bg-blue-50 dark:bg-white/5 group-hover:bg-blue-600 py-4 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 group-hover:text-white transition-all flex items-center justify-center gap-2 border-t border-gray-50 dark:border-white/5">
+              <button 
+                onClick={() => router.push({
+                    pathname: '/inventory-view',
+                    query: { location: loc.id }
+                })} 
+                className="w-full bg-blue-50 dark:bg-white/5 group-hover:bg-blue-600 py-4 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 group-hover:text-white transition-all flex items-center justify-center gap-2 border-t border-gray-50 dark:border-white/5"
+              >
                 Explorar Inventário <Eye size={14} />
               </button>
             </div>

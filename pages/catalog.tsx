@@ -3,18 +3,20 @@ import Layout from '../components/Layout';
 import { useState, useEffect } from 'react';
 import { 
   Tags, Pencil, Trash2, PlusCircle, PackageOpen, Loader2, X, Search, 
-  ChevronLeft, ChevronRight, ImageIcon, Save 
+  ChevronLeft, ChevronRight, ImageIcon, Save, FileText 
 } from 'lucide-react';
 import ImageUpload from '../components/imageUpload';
+import FileUpload from '@/components/FileUpload';
 import { useRouter } from 'next/router';
 
 interface ItemDefinition {
   id: string;
   name: string;
   sku: string;
-  brand?: string | null;
-  line?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
   imageUrl?: string | null;
+  datasheetUrl?: string | null;
 }
 
 const getCookie = (name: string) => {
@@ -31,14 +33,18 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Estados do Formulário
   const [newName, setNewName] = useState('');
   const [newSku, setNewSku] = useState('');
-  const [newBrand, setNewBrand] = useState('');
-  const [newLine, setNewLine] = useState('');
+  const [newManufacter, setNewManufacter] = useState('');
+  const [newModel, setNewModel] = useState('');
   const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
+  const [newDatasheetUrl, setNewDatasheetUrl] = useState<string | null>(null);
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formProcessing, setFormProcessing] = useState(false);
 
+  // Paginação e Busca
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -48,7 +54,6 @@ export default function CatalogPage() {
     try {
       const res = await fetch('/api/item-definitions/list');
       const data = await res.json();
-      // Ajuste para garantir que tratamos a estrutura de retorno da API corretamente
       const items = data.items || (Array.isArray(data) ? data : []);
       setDefinitions(items);
     } catch (err) { 
@@ -77,8 +82,22 @@ export default function CatalogPage() {
   const resetForm = () => {
     setNewName('');
     setNewSku('');
+    setNewManufacter('');
+    setNewModel('');
     setNewImageUrl(null);
+    setNewDatasheetUrl(null);
     setEditingId(null);
+  };
+
+  const startEdit = (def: ItemDefinition) => {
+    setEditingId(def.id);
+    setNewName(def.name);
+    setNewSku(def.sku);
+    setNewManufacter(def.manufacturer || '');
+    setNewModel(def.model || '');
+    setNewImageUrl(def.imageUrl || null);
+    setNewDatasheetUrl(def.datasheetUrl || null);
+    setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -89,13 +108,18 @@ export default function CatalogPage() {
     const payload = { 
       name: newName, 
       sku: newSku.toUpperCase(),
-      brand: newBrand,
-      line: newLine,
+      manufacturer: newManufacter,
+      model: newModel,
       imageUrl: newImageUrl,
+      datasheetUrl: newDatasheetUrl,
     };
 
     const url = editingId ? `/api/item-definitions/update?id=${editingId}` : '/api/item-definitions/create';
     const method = editingId ? 'PUT' : 'POST';
+
+    // Se for update, precisamos garantir que o ID vá no corpo ou query corretamente dependendo da sua API
+    // Assumindo que sua API de update espera o ID no body também:
+    const bodyPayload = editingId ? { ...payload, id: editingId } : payload;
 
     try {
       const res = await fetch(url, {
@@ -104,7 +128,7 @@ export default function CatalogPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (res.ok) {
@@ -123,14 +147,6 @@ export default function CatalogPage() {
     } finally {
       setFormProcessing(false);
     }
-  };
-
-  const startEdit = (def: ItemDefinition) => {
-    setEditingId(def.id);
-    setNewName(def.name);
-    setNewSku(def.sku);
-    setNewImageUrl(def.imageUrl || null);
-    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -205,8 +221,11 @@ export default function CatalogPage() {
                                 )}
                             </div>
                             <div className="min-w-0 flex flex-col">
-                                <p className="font-black text-blue-950 dark:text-gray-200 text-[13px] sm:text-base md:text-lg truncate leading-tight">{def.name}</p>
-                                <div className="mt-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-black text-blue-950 dark:text-gray-200 text-[13px] sm:text-base md:text-lg truncate leading-tight">{def.name}</p>
+                                  {def.datasheetUrl && <FileText size={14} className="text-blue-500" />}
+                                </div>
+                                <div className="mt-1 flex gap-2">
                                   <span className="bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 text-[8px] md:text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
                                       SKU: {def.sku}
                                   </span>
@@ -264,7 +283,18 @@ export default function CatalogPage() {
             </h3>
             
             <div className="space-y-4 md:space-y-6">
+              
+              {/* IMAGEM */}
               <ImageUpload value={newImageUrl} onChange={setNewImageUrl} label="Imagem de Referência" />
+
+              {/* DATASHEET / PDF (Novo Campo) */}
+              <div className="bg-blue-50/50 dark:bg-zinc-800/30 p-4 rounded-2xl border border-blue-100/50 dark:border-white/5">
+                <FileUpload 
+                  value={newDatasheetUrl} 
+                  onChange={setNewDatasheetUrl}
+                  label="Documentação Técnica" 
+                />
+              </div>
 
               <div className="space-y-1">
                 <label className="text-[9px] md:text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase ml-1 block">Nome do Produto</label>
@@ -277,14 +307,14 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mt-4 md:mt-6">
               <div className="space-y-1">
-                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1">Marca</label>
-                <input className="w-full bg-gray-50 dark:bg-zinc-950 border-2 border-transparent rounded-xl p-3 font-bold outline-none focus:border-blue-500 transition-all text-[13px] md:text-base" value={newBrand} onChange={e => setNewBrand(e.target.value)} placeholder="Ex: Seagate" />
+                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1">Fabricante</label>
+                <input className="w-full bg-gray-50 dark:bg-zinc-950 border-2 border-transparent rounded-xl p-3 font-bold outline-none focus:border-blue-500 transition-all text-[13px] md:text-base" value={newManufacter} onChange={e => setNewManufacter(e.target.value)} placeholder="Ex: Seagate" />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1">Linha</label>
-                <input className="w-full bg-gray-50 dark:bg-zinc-950 border-2 border-transparent rounded-xl p-3 font-bold outline-none focus:border-blue-500 transition-all text-[13px] md:text-base" value={newLine} onChange={e => setNewLine(e.target.value)} placeholder="Ex: Linha Exos" />
+                <label className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase ml-1">Modelo</label>
+                <input className="w-full bg-gray-50 dark:bg-zinc-950 border-2 border-transparent rounded-xl p-3 font-bold outline-none focus:border-blue-500 transition-all text-[13px] md:text-base" value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="Ex: Linha Exos" />
               </div>
             </div>
 

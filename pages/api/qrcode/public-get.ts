@@ -2,31 +2,37 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
-// Função auxiliar para buscar recursivamente
 async function getLocationWithChildren(locationId: string) {
   const location = await prisma.itemInstance.findUnique({
     where: { id: locationId },
     include: {
       items: {
-        include: {
+        select: {
+          id: true,
+          color: true,
+          tag: true,
+          imageUrl: true,
+          serialNumber: true,
           definition: {
-            select: { name: true, brand: true, imageUrl: true, sku: true }
+            select: { 
+              name: true, 
+              manufacturer: true, 
+              model: true, 
+              imageUrl: true, 
+              sku: true,
+              datasheetUrl: true
+            }
           }
-        },
-        where: {
-          // Opcional: Se quiser mostrar apenas o que está "EM ESTOQUE"
-          // tag: 'IN-STOCK' 
         }
       },
       children: {
-        select: { id: true } // Pegamos apenas o ID para buscar recursivamente depois
+        select: { id: true }
       }
     }
   });
 
   if (!location) return null;
 
-  // Formata o objeto atual para o formato de "Seção"
   const currentSection = {
     id: location.id,
     name: location.name,
@@ -34,22 +40,23 @@ async function getLocationWithChildren(locationId: string) {
     items: location.items.map(item => ({
       id: item.id,
       name: item.definition.name,
-      brand: item.definition.brand,
+      manufacturer: item.definition.manufacturer,
+      model: item.definition.model,
       sku: item.definition.sku,
+      serialNumber: item.serialNumber,
+      color: item.color,
       image: item.imageUrl || item.definition.imageUrl,
       tag: item.tag,
-      notes: item.notes
+      datasheetUrl: item.definition.datasheetUrl,
     }))
   };
 
   let allSections = [currentSection];
 
-  // Busca recursiva dos filhos (Deep Search)
   if (location.children && location.children.length > 0) {
     for (const child of location.children) {
       const childSections = await getLocationWithChildren(child.id);
       if (childSections) {
-        // Adiciona as seções do filho à lista principal
         allSections = [...allSections, ...childSections];
       }
     }
@@ -80,7 +87,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hierarchy = await getLocationWithChildren(id);
 
     // 3. Limpeza: Remove seções (subespaços) que não têm nenhum item
-    // (Opcional: remova o filter se quiser mostrar gavetas vazias)
     const filteredHierarchy = hierarchy?.filter(section => section.items.length > 0) || [];
 
     return res.status(200).json({

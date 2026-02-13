@@ -1,9 +1,8 @@
 import Layout from "../components/Layout";
 import { useState, useEffect, useMemo } from "react";
-import Head from "next/head";
 import {
-  LineChart, Package, Warehouse, DollarSign, Activity, Loader2,
-  Layers, Box, AlertCircle, TrendingUp, ArrowRight, Clock, ArrowDownAZ
+  LineChart, Package, DollarSign, Activity, Loader2,
+  Layers, Box, AlertCircle, TrendingUp, PackageOpen, ArrowRight, Clock, ArrowDownAZ
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser } from "@/lib/context/UserContext";
@@ -79,8 +78,7 @@ export default function DashboardPage() {
   const percentSub = stats.totalEspacos > 0 ? (stats.subEspacos / stats.totalEspacos) * 100 : 0;
 
   return (
-    <Layout title="Dashboard Geral">
-      <Head><title>Dashboard | Inventory</title></Head>
+    <Layout title="Dashboard">
 
       <div className="max-w-7xl mx-auto space-y-8 pb-10 transition-colors">
         
@@ -90,7 +88,7 @@ export default function DashboardPage() {
             <div className="bg-blue-600 p-4 rounded-xl md:rounded-2xl text-white shadow-lg"><LineChart size={28} /></div>
             <div>
               <h1 className="text-xl md:text-3xl font-black text-blue-950 dark:text-white italic leading-none">Dashboard</h1>
-              <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Status do Patrimônio</p>
+              <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Status</p>
             </div>
           </div>
 
@@ -103,13 +101,13 @@ export default function DashboardPage() {
         </div>
 
         {/* CARDS KPI */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
           {/* Valor Total */}
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group transition-colors">
             <div className="absolute top-0 right-0 p-8 text-teal-500/10 group-hover:scale-125 transition-transform duration-500"><TrendingUp size={80} /></div>
             <div className="relative z-10">
                 <div className="p-3 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl w-fit mb-6"><DollarSign size={24} /></div>
-                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Patrimônio</p>
+                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Patrimônio Total</p>
                 <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalValue)}
                 </h2>
@@ -117,18 +115,28 @@ export default function DashboardPage() {
           </div>
 
           {/* Total Ativos */}
-          <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm transition-colors">
-            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl w-fit mb-6"><Package size={24} /></div>
-            <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Total Ativos</p>
-            <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">{stats.totalAtivos} <span className="text-sm opacity-50 italic">unidades</span></h2>
-          </div>
-
-          {/* Espaços */}
-          <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm sm:col-span-2 lg:col-span-1 transition-colors">
-            <div className="p-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl w-fit mb-6"><Warehouse size={24} /></div>
-            <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Espaços</p>
-            <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">{stats.totalEspacos} <span className="text-sm opacity-50 italic">locais</span></h2>
-          </div>
+            <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group transition-colors">
+              <div className="absolute top-0 right-0 p-8 text-blue-500/10 group-hover:scale-125 transition-transform duration-500">
+                <PackageOpen size={80} />
+              </div>
+              <div className="relative z-10">
+                <div className="p-3 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl w-fit mb-6">
+                  <Package size={24} />
+                </div>
+                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">
+                  Total Ativos
+                </p>
+                {
+                  stats.totalAtivos > 0 ?
+                  <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
+                    {stats.totalAtivos}{" "}
+                    <span className="text-sm opacity-50 italic">{stats.totalAtivos === 1 ? "ativo" : "ativos"}</span>
+                  </h2>
+                  :
+                  <p className="text-sm opacity-50 font-black italic justify-center text-blue-900 dark:text-white">Nenhum Ativo Cadastrado</p>
+                }
+              </div>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -160,18 +168,27 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-4">
                 <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
-                    <span className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Espaços Pai</span>
-                    <span className="text-4xl font-black">{stats.espacosPai}</span>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Espaços Pai</span>
+                    <span className="text-4xl font-black bg-gradient-to-t from-blue-400 via-blue-500 to-blue-800 bg-clip-text text-transparent">{stats.espacosPai}</span>
                 </div>
                 <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
-                    <span className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Subespaços</span>
-                    <span className="text-4xl font-black text-blue-400">{stats.subEspacos}</span>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Subespaços</span>
+                    <span className="text-4xl font-black bg-gradient-to-b from-indigo-400 via-indigo-500 to-indigo-800 bg-clip-text text-transparent">{stats.subEspacos}</span>
                 </div>
               </div>
             </div>
             <div className="mt-12">
-              <div className="h-2.5 w-full bg-blue-900/50 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.5)] transition-all duration-1000" style={{ width: `${percentSub}%` }} />
+              <div className="h-2.5 w-full bg-blue-800/50 dark:bg-blue-400 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-r-full shadow-[0_0_15px_rgba(96,165,250,0.5)] transition-all duration-1000" style={{ width: `${percentSub}%` }} />
+              </div>
+              <div className="bg-white dark:bg-zinc-900 p-4 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm sm:col-span-2 lg:col-span-1 transition-colors mt-6 flex justify-center items-center gap-2">
+                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">Total de Espaços:</p>
+                {
+                  stats.totalEspacos > 0 ?
+                  <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tight">{stats.totalEspacos} <span className="text-sm opacity-50 italic">{stats.totalEspacos === 1 ? "espaço" : "espaços" }</span></h2>
+                  :
+                  <p className="text-sm opacity-50 font-black italic">Nenhum espaço cadastrado</p>
+                }
               </div>
               <button onClick={() => router.push('/')} className="mt-8 w-full py-4 bg-white/10 hover:bg-white hover:text-blue-950 transition-all rounded-2xl font-black text-[10px] uppercase border border-white/10 flex items-center justify-center gap-2">
                 Gerenciar Estrutura <ArrowRight size={14}/>

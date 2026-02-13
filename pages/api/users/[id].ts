@@ -2,6 +2,9 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 import jwt from "jsonwebtoken";
+import bcrypt from 'bcryptjs';
+
+const saltRounds = 10;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -41,13 +44,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       if (!canEdit) return res.status(403).json({ message: "Sem permissão para editar" });
 
-      const { name, email, role } = req.body;
+      const { name, email, role, password } = req.body;
 
       const finalRole = isAdmin ? role : targetUser.role;
 
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
       const updated = await prisma.user.update({
         where: { id: String(id) },
-        data: { name, email, role: finalRole }
+        data: { name, email, role: finalRole, password: hashedPassword }
       });
       return res.status(200).json(updated);
     }
