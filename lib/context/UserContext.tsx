@@ -29,31 +29,51 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUser = useCallback(async () => {
+    // Iniciamos o loading sempre que houver um refresh manual
+    setLoading(true); 
     try {
       const res = await fetch("/api/auth/me", { credentials: "include" });
+      
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user || data); 
+        
+        /**
+         * AJUSTE DE ESTRUTURA:
+         * Sua API retorna { user: { ... } }. 
+         * Verificamos se data.user existe para não salvar o objeto pai errado.
+         */
+        if (data && data.user) {
+          setUser(data.user);
+        } else {
+          // Caso a API mude o formato no futuro
+          setUser(data); 
+        }
       } else {
+        // Se a resposta for 401, 404 ou 500, limpamos o usuário
         setUser(null);
       }
     } catch (err) {
-      console.error("Erro ao buscar usuário:", err);
+      console.error("Erro crítico no UserContext:", err);
       setUser(null);
     } finally {
+      // O ponto mais importante: DESLIGA o "Sincronizando"
       setLoading(false);
     }
   }, []);
 
+  // Execução inicial ao carregar o app
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
 
+  // Lógica de aplicação de Tema (Dark/Light)
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const root = window.document.documentElement;
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   
-    const apply = () => {
+    const applyTheme = () => {
       const currentTheme = user?.theme || 'SISTEM';
       const isDark = currentTheme === 'DARK' || (currentTheme === 'SISTEM' && mediaQuery.matches);
       
@@ -66,10 +86,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    apply();
+    applyTheme();
 
-    mediaQuery.addEventListener('change', apply);
-    return () => mediaQuery.removeEventListener('change', apply);
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [user?.theme]);
 
   return (
@@ -81,6 +101,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext);
-  if (!context) throw new Error("useUser deve ser usado dentro de <UserProvider>");
+  if (!context) {
+    throw new Error("useUser deve ser usado dentro de <UserProvider>");
+  }
   return context;
 }

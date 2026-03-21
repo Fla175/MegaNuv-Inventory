@@ -1,5 +1,4 @@
 // prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -22,65 +21,107 @@ enum Theme {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  email       String    @unique
-  password    String
-  name        String?
-  role        UserRole  @default(VIEWER)
-  theme       Theme     @default(SISTEM)
-  defaultSort String    @default("name")
-  lastLogin   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String
+  name         String?
+  role         UserRole  @default(VIEWER)
+  theme        Theme     @default(SISTEM)
+  defaultSort  String    @default("name")
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relações
+  activesCreated Active[]      @relation("UserToActive")
+  spacesCreated  FatherSpace[] @relation("UserToSpace")
+  logs           Log[]         @relation("UserLogs")
 }
 
-model ItemDefinition {
-  id             String   @id @default(uuid())
-  name           String
-  manufacturer   String?
-  model          String?
-  imageUrl       String?
-  sku            String?  @unique
-  description    String?
-  datasheetUrl   String?
-  isNative       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  Item           Item[]
+model Area {
+  id        String   @id @default(uuid())
+  name      String   @unique // Ex: "Redes", "Servidor"
+  color     String?  // Opcional: para UX no frontend
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  actives   Active[]
 }
 
-model Item {
-  id             String         @id @default(uuid())
-  definitionId   String
-  definition     ItemDefinition @relation(fields: [definitionId], references: [id])
-  imageUrl       String?
-  tag            String // IN-STOCK, IN-USE, TO-SELL
-  locationId     String?
-  location       ItemInstance? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  color          String?
-  notes          String?
-  serialNumber   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model Log {
+  id        String   @id @default(uuid())
+  action    String   // Ex: "CREATE_ACTIVE", "LOGIN", "MOVE_ACTIVE", "DELETE_USER"
+  details   String   @db.Text // JSON ou string detalhando o que mudou
+  ip        String?
+  userAgent String?  @db.Text
+  
+  // Relacionamento com quem fez a ação
+  userId    String?
+  user      User?    @relation("UserLogs", fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([definitionId])
-  @@index([locationId])
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
 }
 
-model ItemInstance {
-  id         String         @id @default(uuid())
-  name       String         @unique
-  imageUrl   String?
-  fixedValue Float          @default(0)
-  parentId   String?
-  parent     ItemInstance?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children   ItemInstance[] @relation("LocationHierarchy")
+model FatherSpace {
+  id    String  @id @default(uuid())
+  name  String  @unique
+  notes String? @db.Text
 
-  // Itens vinculados a este local
-  items Item[]
+  createdById String?
+  createdBy   User?   @relation("UserToSpace", fields: [createdById], references: [id])
+
+  parentId String?
+  parent   FatherSpace?  @relation("SpaceHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children FatherSpace[] @relation("SpaceHierarchy")
+
+  actives Active[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([parentId])
+  @@index([createdById])
+}
+
+model Active {
+  id   String @id @default(uuid())
+  name String
+
+  // RELAÇÃO COM AREA (Substituindo o Enum)
+  areaId String?
+  area   Area?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  sku          String?
+  manufacturer String?
+  model        String?
+  serialNumber String?
+  fixedValue   Float   @default(0)
+
+  parentId String?
+  parent   Active?  @relation("ActiveHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Active[] @relation("ActiveHierarchy")
+
+  isPhysicalSpace Boolean
+  tag             String  @default("IN-STOCK")
+  notes           String? @db.Text
+
+  fatherSpaceId String?
+  fatherSpace   FatherSpace? @relation(fields: [fatherSpaceId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("UserToActive", fields: [createdById], references: [id])
+
+  imageUrl String?
+  fileUrl  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fatherSpaceId])
+  @@index([parentId])
+  @@index([createdById])
+  @@index([areaId])
 }

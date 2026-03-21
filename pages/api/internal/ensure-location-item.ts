@@ -1,4 +1,4 @@
-// pages/api/internal/ensure-location-item.ts (Leitura de JWT de Cookie)
+// pages/api/internal/ensure-location-item.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth';
@@ -8,47 +8,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
+  // 1. Verificação de Autenticação (Cookie ou Header)
   const token = req.headers.authorization?.split(' ')[1] || req.cookies['auth_token'];
   if (!token || !verifyAuthToken(token)) {
     return res.status(401).json({ message: 'Não autorizado.' });
   }
 
   try {
-    const internalSku = 'INTERNAL_LOCATION_SPACE';
+    // Identificador único para a estrutura base no novo modelo
+    const isPhysicalSpace = true;
 
-    const definition = await prisma.itemDefinition.upsert({
-      where: { sku: internalSku },
-      update: {}, 
-      create: {
-        name: 'Espaço Físico',
-        sku: internalSku,
-        description: 'Definição base para itens que representam subespaços ou ativos de estrutura.',
-        isNative: true,
-      },
+    /**
+     * No novo Schema, não temos mais ItemDefinition.
+     * Vamos usar a tabela Active com a flag isPhysicalSpace para representar
+     * esse "item de localização" genérico.
+     */
+    
+    let locationActive = await prisma.active.findFirst({
+      where: { isPhysicalSpace: isPhysicalSpace },
     });
 
-    let locationItem = await prisma.item.findFirst({
-      where: { definitionId: definition.id },
-    });
-
-    if (!locationItem) {
-      locationItem = await prisma.item.create({
+    if (!locationActive) {
+      locationActive = await prisma.active.create({
         data: {
-          definitionId: definition.id,
+          name: 'Estrutura de Espaço Físico',
+          sku: '',
+          area: 'SERVIDOR',
+          isPhysicalSpace: true,
           tag: 'IN-USE',
-          notes: 'Ativo gerado automaticamente para representar a estrutura física.',
+          quantity: 1,
+          notes: 'Ativo gerado automaticamente para representar definições de estrutura física no sistema.',
+          manufacturer: 'Sistema',
+          model: 'Base v2',
+          fixedValue: 0
         },
       });
     }
 
+    // Retornamos os IDs conforme o novo mapeamento
     return res.status(200).json({
-      message: 'Estrutura de definição e ativo garantida!',
-      locationItemId: locationItem.id,
-      definitionId: definition.id
+      message: 'Estrutura base de Ativo Físico garantida!',
+      activeId: locationActive.id,
+      isPhysical: locationActive.isPhysicalSpace,
+      area: locationActive.area
     });
 
   } catch (error) {
     console.error('Erro ao garantir item de localização:', error);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    return res.status(500).json({ 
+      message: 'Erro interno ao processar a estrutura de ativos.',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

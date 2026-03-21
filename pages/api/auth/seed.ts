@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ redirectTo: "/login" });
       } else {
         // Não há usuário → manda pro signup
-        return res.status(200).json({ redirectTo: "/signup" });
+        return res.status(200).json({ redirectTo: "/initial-setup/register" });
       }
     }
 

@@ -6,9 +6,7 @@ import { useRouter } from "next/router";
 import Image from "next/image";
 import {
   LineChart,
-  Warehouse,
   Box,
-  Tags,
   Settings,
   LogOut,
   Menu,
@@ -43,7 +41,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
         <title>{title}</title>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </Head>
 
       <div className="flex flex-col lg:flex-row min-h-screen bg-gray-100 dark:bg-black font-inter transition-colors duration-300">
@@ -91,9 +89,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             <ul>
               {[
                 { href: "/dashboard", label: "Dashboard", icon: LineChart },
-                { href: "/", label: "Espaços Físicos", icon: Warehouse },
-                { href: "/catalog", label: "Catálogo de Ativos", icon: Tags },
-                { href: "/actives", label: "Gestão de Ativos", icon: Box },
+                { href: "/", label: "Gestão de Ativos", icon: Box },
                 { href: "/settings", label: "Configurações", icon: Settings },
               ].map((item) => (
                 <li key={item.href} className="mb-2">
@@ -123,7 +119,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
                 try {
                   await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
                   localStorage.removeItem("user");
-                  router.push("/login");
+                  window.location.href = "/login";
                 } catch (err) {
                   console.error("Erro ao fazer logout", err);
                 }

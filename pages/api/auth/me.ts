@@ -1,7 +1,7 @@
 // pages/api/auth/me.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import jwt from "jsonwebtoken";
-import prisma from "@/lib/prisma"; // Importe o seu cliente do prisma
+import * as jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = req.cookies["auth_token"];
@@ -18,8 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error("Token sem email");
     }
 
-    // 2. BUSCA NO BANCO: Aqui está a mágica. 
-    // Vamos ao MySQL buscar os dados reais e atualizados.
+    // 2. BUSCA NO BANCO
     const user = await prisma.user.findUnique({
       where: { email: decoded.email },
       select: {
