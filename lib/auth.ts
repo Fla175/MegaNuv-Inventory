@@ -1,5 +1,4 @@
     // lib/auth.ts
-
     import { verify, sign, JwtPayload } from 'jsonwebtoken';
     import { UserRole } from '@prisma/client';
 

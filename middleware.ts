@@ -11,8 +11,8 @@ const PUBLIC_PATHS = [
   "/api/storage/upload-url",
   "/qrcode",
   "/initial-setup",
-  "/favicon.ico",
-  "/logo-inventario.svg",
+  "/favicon.svg",
+  "/logo-inventory.svg",
 ];
 
 function isPublicPath(pathname: string) {
@@ -93,5 +93,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/qrcode|qrcode|_next/static|_next/image|favicon.ico|logo-inventario.svg).*)'],
+  matcher: ['/((?!api/qrcode|qrcode|_next/static|_next/image|favicon.svg|logo-inventory.svg).*)'],
 };

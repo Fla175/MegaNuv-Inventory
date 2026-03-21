@@ -81,7 +81,7 @@ export default function FileUpload({ value, onChange, label = "Datasheet / PDF" 
         ) : (
            <>
               <UploadCloud className="text-gray-400" size={16}/>
-              <span className="text-[10px] font-bold text-gray-400 uppercase">Clique para enviar PDF</span>
+              <span className="text-[10px] pl-2 font-bold text-gray-400 uppercase">Enviar PDF</span>
            </>
         )}
       </div>

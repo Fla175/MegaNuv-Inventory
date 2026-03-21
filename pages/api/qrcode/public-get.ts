@@ -1,101 +1,87 @@
 // pages/api/qrcode/public-get.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
-async function getLocationWithChildren(locationId: string) {
-  const location = await prisma.itemInstance.findUnique({
-    where: { id: locationId },
+// Função auxiliar para buscar filhos recursivamente e montar as seções
+async function buildHierarchy(id: string, name: string, isFirstLevel = false) {
+  const active = await prisma.active.findUnique({
+    where: { id },
     include: {
-      items: {
-        select: {
-          id: true,
-          color: true,
-          tag: true,
-          imageUrl: true,
-          serialNumber: true,
-          definition: {
-            select: { 
-              name: true, 
-              manufacturer: true, 
-              model: true, 
-              imageUrl: true, 
-              sku: true,
-              datasheetUrl: true
-            }
-          }
-        }
-      },
       children: {
-        select: { id: true }
-      }
+        include: { createdBy: { select: { name: true } } }
+      },
+      createdBy: { select: { name: true } }
     }
   });
 
-  if (!location) return null;
+  if (!active) return [];
 
-  const currentSection = {
-    id: location.id,
-    name: location.name,
-    type: 'LOCATION',
-    items: location.items.map(item => ({
-      id: item.id,
-      name: item.definition.name,
-      manufacturer: item.definition.manufacturer,
-      model: item.definition.model,
-      sku: item.definition.sku,
-      serialNumber: item.serialNumber,
-      color: item.color,
-      image: item.imageUrl || item.definition.imageUrl,
-      tag: item.tag,
-      datasheetUrl: item.definition.datasheetUrl,
-    }))
-  };
+  let sections: any[] = [];
+  
+  // Itens que NÃO são espaços (ativos puros) nesta seção
+  const assetsOnly = active.children.filter(c => !c.isPhysicalSpace);
+  // Itens que SÃO espaços (sub-espaços)
+  const subSpaces = active.children.filter(c => c.isPhysicalSpace);
 
-  let allSections = [currentSection];
-
-  if (location.children && location.children.length > 0) {
-    for (const child of location.children) {
-      const childSections = await getLocationWithChildren(child.id);
-      if (childSections) {
-        allSections = [...allSections, ...childSections];
-      }
-    }
+  // Adiciona a seção atual se ela tiver ativos ou se for o nível raiz
+  if (assetsOnly.length > 0 || isFirstLevel) {
+    sections.push({
+      id: active.id,
+      name: isFirstLevel ? "Conteúdo Principal" : `Dentro de: ${active.name}`,
+      items: assetsOnly.map(a => ({
+        ...a,
+        image: a.imageUrl,
+        createdBy: a.createdBy?.name || "Sistema"
+      }))
+    });
   }
 
-  return allSections;
+  // Para cada sub-espaço, chamamos a função recursivamente para trazer os itens DELES
+  for (const space of subSpaces) {
+    const subSections = await buildHierarchy(space.id, space.name);
+    sections = [...sections, ...subSections];
+  }
+
+  return sections;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
-
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ message: 'ID do local é obrigatório.' });
-  }
+  if (!id || typeof id !== 'string') return res.status(400).json({ message: 'ID inválido' });
 
   try {
-    // 1. Busca nome do local raiz para o cabeçalho
-    const rootLocation = await prisma.itemInstance.findUnique({
+    // 1. Tenta buscar na tabela ACTIVE (o caso do seu Gabinete/SDKNGAMK)
+    const rootActive = await prisma.active.findUnique({
       where: { id },
-      select: { name: true, id: true }
+      include: { createdBy: { select: { name: true } } }
     });
 
-    if (!rootLocation) {
-      return res.status(404).json({ message: 'Local não encontrado.' });
+    if (rootActive) {
+      const isSpace = rootActive.isPhysicalSpace === true || (rootActive.isPhysicalSpace as any) === 1;
+
+      if (isSpace) {
+        const allSections = await buildHierarchy(id, rootActive.name, true);
+        return res.status(200).json({
+          root: {
+            ...rootActive,
+            isPhysicalSpace: true,
+            createdBy: rootActive.createdBy?.name || "Sistema"
+          },
+          sections: allSections
+        });
+      }
+
+      // Se for ativo individual
+      return res.status(200).json({
+        root: { ...rootActive, isPhysicalSpace: false, createdBy: rootActive.createdBy?.name || "Sistema" },
+        sections: []
+      });
     }
 
-    // 2. Gera a lista achatada de itens agrupados por subespaços
-    const hierarchy = await getLocationWithChildren(id);
-
-    // 3. Limpeza: Remove seções (subespaços) que não têm nenhum item
-    const filteredHierarchy = hierarchy?.filter(section => section.items.length > 0) || [];
-
-    return res.status(200).json({
-      root: rootLocation,
-      sections: filteredHierarchy
-    });
-
+    return res.status(404).json({ message: 'Não encontrado' });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Erro ao processar estrutura do local.' });
+    error = 'Erro interno';
+    return res.status(500).json({ message: error });
   }
 }
