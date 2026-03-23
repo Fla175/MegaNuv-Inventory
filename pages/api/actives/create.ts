@@ -18,48 +18,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const decoded = jwt.verify(token, JWT_SECRET!) as any;
     const userId = decoded.id || decoded.userId || decoded.sub;
 
-    if (decoded.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado. Apenas administradores criam espaços pai." });
-    }
-
     const data = req.body;
     
-    if (!data.name || data.name.trim().length < 2) {
-      return res.status(400).json({ error: "O nome do espaço é obrigatório e deve ter ao menos 2 caracteres." });
+    // Validações básicas para Ativo
+    if (!data.name || !data.areaId) {
+      return res.status(400).json({ error: "Nome e Área de Foco são obrigatórios." });
     }
 
-    // Lógica de ID único baseada no seu actives/create
-    let finalId = "";
-    let isUnique = false;
-    while (!isUnique) {
-      finalId = randomBytes(2).toString('hex').toUpperCase();
-      const exists = await db.fatherSpace.findUnique({ where: { id: finalId } });
-      if (!exists) isUnique = true;
+    const quantity = Math.max(1, parseInt(data.quantity) || 1);
+    const createdActives = [];
+
+    // Loop para suportar a criação de múltiplos ativos (Quantidade)
+    for (let i = 0; i < quantity; i++) {
+      // Gerador de ID Único de 4 caracteres (padrão Hex) para o Ativo
+      let finalId = "";
+      let isUnique = false;
+      while (!isUnique) {
+        finalId = randomBytes(2).toString('hex').toUpperCase();
+        const exists = await db.active.findUnique({ where: { id: finalId } });
+        if (!exists) isUnique = true;
+      }
+
+      // Pega o serial correspondente ao índice ou deixa vazio
+      const serialNumber = data.serialNumbers && data.serialNumbers[i] ? data.serialNumbers[i] : "";
+
+      const newActive = await db.active.create({
+        data: {
+          id: finalId,
+          name: data.name.trim(),
+          areaId: data.areaId,
+          tag: data.tag || "IN-STOCK",
+          manufacturer: data.manufacturer || null,
+          model: data.model || null,
+          serialNumber: serialNumber,
+          fixedValue: parseFloat(data.fixedValue) || 0,
+          notes: data.notes || null,
+          imageUrl: data.imageUrl || null,
+          fileUrl: data.fileUrl || null,
+          // Hierarquia: Pode estar dentro de um Espaço Pai ou de outro Ativo
+          fatherSpaceId: data.fatherSpaceId || null,
+          parentId: data.parentId || null,
+          isPhysicalSpace: !!data.isPhysicalSpace,
+          createdById: userId,
+        },
+      });
+      createdActives.push(newActive);
     }
 
-    const newSpace = await db.fatherSpace.create({
-      data: {
-        id: finalId, // Passando o ID manualmente para satisfazer o TS e seguir seu padrão
-        name: data.name.trim(),
-        notes: data.notes || null,
-        parentId: data.parentId || null,
-        createdById: userId,
-      },
-    });
-
-    // Auditoria
+    // Auditoria (Registra o primeiro ou um resumo)
     await createLog(
       req,
       userId,
-      "CREATE_SPACE",
-      `Criou o espaço pai: ${data.name} (ID: ${finalId})`
+      "CREATE_ACTIVE",
+      `Criou ${quantity} ativo(s): ${data.name} (Início ID: ${createdActives[0].id})`
     );
 
-    return res.status(201).json(newSpace);
+    return res.status(201).json(createdActives);
 
   } catch (error: any) {
-    console.error("ERRO father-spaces/create:", error.message);
-    if (error.code === 'P2002') return res.status(409).json({ error: "Já existe um espaço com este nome." });
-    return res.status(500).json({ error: "Erro interno.", details: error.message });
+    console.error("ERRO actives/create:", error.message);
+    return res.status(500).json({ error: "Erro interno ao criar ativo.", details: error.message });
   }
 }
