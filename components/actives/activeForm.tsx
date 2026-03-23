@@ -1,17 +1,22 @@
 // components/actives/activeForm.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
-import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2 } from "lucide-react";
+import { useRouter } from "next/router";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
+  const router = useRouter();
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [areas, setAreas] = useState<any[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
+  
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
     isPhysicalSpace: false,
     name: "",
-    area: "SERVIDOR" as any,
+    areaId: "" as string,
     sku: "",
     manufacturer: "",
     model: "",
@@ -26,8 +31,28 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     locationType: "" as "space" | "active" | "", 
   });
 
-  const areas = ["ENERGETICA", "REDES", "SERVIDOR", "MANUTENCAO"];
   const tags = ["IN-STOCK", "IN-USE"];
+
+  // Busca as Áreas do Banco
+  useEffect(() => {
+    async function fetchAreas() {
+      try {
+        const res = await fetch('/api/areas/list');
+        const data = await res.json();
+        if (res.ok) {
+          setAreas(data);
+          if (mode === 'create' && data.length > 0 && !formData.areaId) {
+            setFormData(prev => ({ ...prev, areaId: data[0].id }));
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar áreas:", err);
+      } finally {
+        setLoadingAreas(false);
+      }
+    }
+    fetchAreas();
+  }, [mode, formData.areaId]);
 
   useEffect(() => {
     if (initialData) {
@@ -36,11 +61,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
       setFormData({
         ...initialData,
+        areaId: initialData.areaId || "",
         isPhysicalSpace: initialData.isPhysicalSpace ?? false,
         locationId: locId,
         locationType: locType,
         id: mode === "clone" ? undefined : initialData.id,
-        // No modo EDIT, garantimos que pegamos o serialNumber único do objeto
         serialNumbers: mode === "clone" 
           ? Array(initialData.quantity || 1).fill("") 
           : [initialData.serialNumber || ""],
@@ -48,7 +73,14 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     }
   }, [initialData, mode]);
 
-  // ... (SearchableSelect mantido igual)
+  // Lógica de Grid Adaptável
+  const gridConfig = useMemo(() => {
+    const len = areas.length;
+    if (len === 0) return "grid-cols-1";
+    if (len <= 4) return `grid-cols-${len}`;
+    return "grid-cols-2 sm:grid-cols-4 justify-center"; 
+  }, [areas]);
+
   function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -122,16 +154,12 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     try {
       const isEdit = mode === "edit";
       const url = isEdit ? `/api/actives/update` : `/api/actives/create`;
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json", ...(token && { "Authorization": `Bearer ${token}` }) },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Erro na operação");
-      alert(mode === 'clone' ? "Clonado com sucesso!" : "Salvo com sucesso!");
+      if (!response.ok) throw new Error("Erro na operação");
       onClose();
     } catch (error: any) { alert("ERRO: " + error.message); }
   };
@@ -164,13 +192,45 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             </div>
           )}
 
+          {/* AREA DE FOCO */}
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 block tracking-widest">Área de Foco</label>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              {areas.map((area) => (
-                <button key={area} type="button" onClick={() => setFormData({ ...formData, area: area as any })} className={`flex-1 min-w-[120px] py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${formData.area === area ? "border-blue-600 bg-blue-50 text-blue-600 dark:bg-blue-600/20 dark:text-blue-400 dark:border-blue-500/50" : "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800"}`}>{area === "ENERGETICA" ? "Energética" : area === "MANUTENCAO" ? "Manutenção" : area}</button>
-              ))}
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Área de Foco</label>
+              <button 
+                type="button" 
+                onClick={() => router.push("/settings?tab=areas")}
+                className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
+              >
+                <Pencil size={12} />
+              </button>
             </div>
+
+            {loadingAreas ? (
+               <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando áreas...</div>
+            ) : (
+              <div className={`grid gap-2 ${gridConfig}`}>
+                {areas.map((area) => {
+                  const isSelected = formData.areaId === area.id;
+                  const color = area.color || '#2563eb';
+                  
+                  return (
+                    <button 
+                      key={area.id} 
+                      type="button" 
+                      onClick={() => setFormData({ ...formData, areaId: area.id })} 
+                      style={isSelected ? { 
+                        borderColor: color, 
+                        backgroundColor: `${color}15`, 
+                        color: color 
+                      } : {}}
+                      className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
+                    >
+                      {area.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -208,7 +268,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização (Onde está?)</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
               <SearchableSelect 
                 options={[
                   ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space" })),
@@ -216,16 +276,14 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 ]}
                 value={formData.locationId}
                 onChange={(id: string, type: any) => setFormData({ ...formData, locationId: id, locationType: type })}
-                placeholder="Ex: MegaNuv, Prateleira A..."
+                placeholder="Selecione local..."
               />
             </div>
-            {/* GRID DINÂMICA: No modo edit ocupa 1 coluna, senão 2 */}
             <div className={`grid ${mode === 'edit' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Vlr. Unitário</label>
                 <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData({...formData, fixedValue: parseFloat(e.target.value) || 0})} />
               </div>
-              {/* QUANTIDADE APENAS SE NÃO FOR MODO EDIÇÃO */}
               {mode !== "edit" && (
                 <div>
                   <label className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block">Quantidade</label>
@@ -254,9 +312,8 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2">
                   {formData.serialNumbers.map((sn, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      {/* OMITIMOS O INDEX (#1) SE FOR APENAS UM (MODO EDIÇÃO) */}
                       {mode !== "edit" && <span className="text-[9px] font-black text-zinc-400 w-4">#{idx + 1}</span>}
-                      <input className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm" placeholder="Insira o serial..." value={sn} onChange={e => handleSerialUpdate(idx, e.target.value)} />
+                      <input className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono uppercase placeholder:normal-case text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm" placeholder="Insira o serial..." value={sn} onChange={e => handleSerialUpdate(idx, e.target.value)} />
                     </div>
                   ))}
                 </div>

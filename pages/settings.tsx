@@ -1,12 +1,13 @@
 // pages/settings.tsx
 import Layout from "../components/Layout";
+import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import { 
   UserPlus, Moon, Sun, Monitor, Shield, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
   Plus, LayoutDashboard, ChevronRight, 
   CalendarFold, KeyRound, CirclePlus, ArrowDownAZ, CalendarArrowDown,
-  Activity, Target, ClipboardList
+  Activity, ClipboardList, Group
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import InteractiveFace from "@/components/svg/sad-face";
@@ -47,6 +48,8 @@ interface Log {
 type TabType = 'users' | 'spaces' | 'areas' | 'logs' | 'system';
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { tab } = router.query;
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
   const [saving, setSaving] = useState(false);
@@ -85,8 +88,11 @@ export default function SettingsPage() {
     if (activeTab === 'spaces' && isAdmin) fetchData('/api/father-spaces/list', setSpacesList);
     if (activeTab === 'areas' && isAdmin) fetchData('/api/areas/list', setAreasList);
     if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
+    if (tab) {
+      setActiveTab(tab as TabType);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, user]);
+  }, [activeTab, tab, user]);
 
   // --- HANDLERS ---
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -195,7 +201,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
     { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: isAdmin },
-    { id: 'areas', label: 'Áreas de Foco', icon: Target, show: isAdmin },
+    { id: 'areas', label: 'Áreas de Foco', icon: Group, show: isAdmin },
     { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
     { id: 'system', label: 'Preferências', icon: Monitor, show: true },
   ];
@@ -336,7 +342,7 @@ export default function SettingsPage() {
                   {areasList.map((area) => (
                     <div key={area.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
                       <div className="w-12 h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: area.color || '#2563eb' }}>
-                        <Target size={24} />
+                        <Group size={24} />
                       </div>
                       <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{area.name}</h4>
                       <div className="flex gap-2 mt-4">
