@@ -66,7 +66,7 @@ model Log {
 }
 
 model FatherSpace {
-  id    String  @id @default(uuid())
+  id    String  @id
   name  String  @unique
   notes String? @db.Text
 
@@ -87,7 +87,7 @@ model FatherSpace {
 }
 
 model Active {
-  id   String @id @default(uuid())
+  id   String  @id
   name String
 
   // RELAÇÃO COM AREA (Substituindo o Enum)
