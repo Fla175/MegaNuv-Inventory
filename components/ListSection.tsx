@@ -5,7 +5,7 @@ import Image from "next/image";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
-  MapPin, Box, Layers, Hash, ChevronDown, X, ChevronRight, Barcode
+  MapPin, Box, Layers, Hash, ChevronDown, X, ChevronRight, Barcode, Ghost, SearchX
 } from "lucide-react";
 
 interface ListSectionProps {
@@ -28,7 +28,6 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
   
-  // Ref para o menu de contexto para calcular dimensões reais
   const menuRef = useRef<HTMLDivElement>(null);
 
   // --- FECHAMENTO E POSICIONAMENTO DO MENU ---
@@ -42,26 +41,18 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     };
   }, []);
 
-  // Função de UX: Ajusta a posição do menu se ele for sair da tela
   const handleContextMenu = (e: React.MouseEvent, item: any, isPhysicalSpace: boolean) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const menuWidth = 256; // w-64 = 256px
-    const menuHeight = 280; // Altura aproximada baseada no número de botões
+    const menuWidth = 256; 
+    const menuHeight = 280; 
     
     let x = e.clientX;
     let y = e.clientY;
 
-    // Se o menu for ultrapassar a largura da janela, joga para a esquerda
-    if (x + menuWidth > window.innerWidth) {
-      x = x - menuWidth;
-    }
-
-    // Se o menu for ultrapassar a altura da janela, joga para cima
-    if (y + menuHeight > window.innerHeight) {
-      y = y - menuHeight;
-    }
+    if (x + menuWidth > window.innerWidth) x = x - menuWidth;
+    if (y + menuHeight > window.innerHeight) y = y - menuHeight;
 
     setContextMenu({ x, y, item, isPhysicalSpace });
   };
@@ -70,11 +61,22 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const filteredData = useMemo(() => {
     const query = filters.query?.toLowerCase() || "";
     const area = filters.area || "";
+    const manufacturer = filters.manufacturer?.toLowerCase() || "";
+    const model = filters.model?.toLowerCase() || "";
+
+    const hasFilters = query !== "" || area !== "" || manufacturer !== "" || model !== "";
 
     const matchesDirectly = (a: any) => {
-      const nameMatch = !query || a.name?.toLowerCase().includes(query) || a.serialNumber?.toLowerCase().includes(query);
-      const areaMatch = !area || a.area === area;
-      return nameMatch && areaMatch;
+      const nameMatch = query === "" || 
+                        a.name?.toLowerCase().includes(query) || 
+                        a.serialNumber?.toLowerCase().includes(query) ||
+                        a.sku?.toLowerCase().includes(query);
+                        
+      const areaMatch = area === "" || a.areaId === area || a.area?.name === area || a.area === area;
+      const manufacturerMatch = manufacturer === "" || a.manufacturer?.toLowerCase().includes(manufacturer);
+      const modelMatch = model === "" || a.model?.toLowerCase().includes(model);
+
+      return nameMatch && areaMatch && manufacturerMatch && modelMatch;
     };
 
     const visibleActiveIds = new Set<string>();
@@ -94,12 +96,19 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     const filteredActives = actives.filter(a => visibleActiveIds.has(a.id));
 
     const filteredSpaces = fatherSpaces.filter((space) => {
-      const matchesSpaceQuery = !query || space.name?.toLowerCase().includes(query);
       const hasVisibleActives = filteredActives.some(a => a.fatherSpaceId === space.id);
-      return matchesSpaceQuery || hasVisibleActives;
+      if (hasFilters) {
+        const spaceNameMatch = query !== "" && space.name?.toLowerCase().includes(query);
+        return hasVisibleActives || spaceNameMatch;
+      }
+      return true;
     });
 
-    return { spaces: filteredSpaces, actives: filteredActives, hasFilters: query !== "" || area !== "" };
+    return { 
+      spaces: filteredSpaces, 
+      actives: filteredActives, 
+      hasFilters 
+    };
   }, [filters, actives, fatherSpaces]);
 
   // --- AÇÕES ---
@@ -108,27 +117,22 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     setIsMovingLoading(true);
 
     try {
-      const payload = {
-        id: movingItem.id,
-        newFatherSpaceId: targetSpaceId,
-        newParentId: targetParentId || null, 
-      };
-
       const res = await fetch('/api/actives/move', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          id: movingItem.id,
+          newFatherSpaceId: targetSpaceId,
+          newParentId: targetParentId || null, 
+        }),
       });
 
       if (res.ok) {
         onRefresh();
         setMovingItem(null);
-      } else {
-        const errorData = await res.json();
-        alert(`Erro: ${errorData.error}`);
       }
     } catch (err) {
-      alert(`Erro de conexão: ${err}`);
+      console.error(err);
     } finally {
       setIsMovingLoading(false);
     }
@@ -146,17 +150,23 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     } catch (err) { alert(`Erro ao excluir: ${err}`); }
   };
 
-  // --- RENDERIZAÇÃO DA ÁRVORE (CORREÇÃO DE HIERARQUIA + CONTAGEM) ---
+  // --- RENDERIZAÇÃO DA ÁRVORE ---
   const renderActiveTree = (parentId: string | null, spaceId: string, level: number = 0) => {
     const children = filteredData.actives.filter(a => {
       const isTopLevel = !a.parentId || a.parentId === "";
-      if (parentId === null) {
-        return isTopLevel && a.fatherSpaceId === spaceId;
-      }
+      if (parentId === null) return isTopLevel && a.fatherSpaceId === spaceId;
       return a.parentId === parentId;
     });
 
-    if (children.length === 0) return null;
+    // EMPTY STATE DO ESPAÇO PAI (Quando não há ativos dentro deste espaço específico)
+    if (children.length === 0 && level === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 px-6 opacity-30 group-hover:opacity-50 transition-opacity">
+          <Ghost size={32} className="mb-2 text-zinc-400" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Nenhum ativo neste local</p>
+        </div>
+      );
+    }
 
     return (
       <div className={`${level > 0 ? "ml-6 border-l-2 dark:border-white/5 pl-2" : ""}`}>
@@ -192,17 +202,6 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(active.fixedValue || 0)}
                         </p>
                     </div>
-                    { active.isPhysicalSpace &&
-                      <div className="hidden sm:block">
-                        <p className="text-[9px] font-black text-blue-400/80 uppercase">Contém:</p>
-                        <p className="text-[10px] font-black dark:text-white">
-                          <span className="text-[13px]">
-                            {/* CONTAGEM CORRIGIDA: Apenas filhos diretos que não são espaços físicos */}
-                            {actives.filter(a => a.parentId === active.id).length}
-                          </span> {actives.filter(a => a.parentId === active.id).length > 1 ? "Ativos" : actives.filter(a => a.parentId === active.id).length === 1 ? "Ativo" : ""}
-                        </p>
-                      </div>
-                    }
                     {hasSubItems ? <ChevronDown size={16} className={`text-gray-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`} /> : <ChevronRight size={16} className="text-gray-300 opacity-0 group-hover:opacity-100" />}
                 </div>
               </div>
@@ -214,33 +213,81 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     );
   };
 
+  // Estados de Empty State
+  const isBaseCompletelyEmpty = fatherSpaces.length === 0;
+  const hasNoResultsFromFilter = fatherSpaces.length > 0 && filteredData.spaces.length === 0;
+
   return (
     <>
-      {/* LISTAGEM PRINCIPAL */}
       <div className="w-full pb-32 print:hidden">
         <div className="space-y-6">
-          {filteredData.spaces.map((space) => (
-            <div key={space.id} className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-sm">
-              <div 
-                onContextMenu={(e) => handleContextMenu(e, space, true)}
-                className="p-6 flex items-center justify-between bg-gray-50/50 dark:bg-white/[0.02] border-b dark:border-white/5"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
-                    <MapPin size={20} />
+          
+          {/* EMPTY STATE: GLOBAL OU FILTRO */}
+          {isBaseCompletelyEmpty || hasNoResultsFromFilter ? (
+            <div className="flex flex-col items-center justify-center py-24 px-6 bg-gray-50/50 dark:bg-white/[0.01] rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-white/5 animate-in fade-in zoom-in-95 duration-500">
+              <div className="relative mb-6">
+                  <div className="absolute inset-0 bg-blue-500/40 blur-2xl rounded-full"></div>
+                  <div className="relative w-24 h-24 bg-white dark:bg-zinc-800 rounded-[2rem] shadow-xl flex items-center justify-center border dark:border-white/10">
+                      {hasNoResultsFromFilter ? (
+                          <SearchX size={40} className="text-red-400" />
+                      ) : (
+                          <MapPin size={40} className="text-blue-500" />
+                      )}
                   </div>
-                  <h2 className="text-xl font-black italic text-gray-500 dark:text-white uppercase">{space.name}</h2>
-                </div>
               </div>
-              <div className="bg-white dark:bg-zinc-900/50">
-                {renderActiveTree(null, space.id)}
-              </div>
+              
+              <h3 className="text-xl font-black text-gray-800 dark:text-white uppercase italic tracking-tight mb-2 text-center">
+                  {hasNoResultsFromFilter ? "Nenhum resultado encontrado" : "Nenhum Espaço Cadastrado"}
+              </h3>
+              
+              <p className="text-[15px] font-bold text-gray-400 dark:text-zinc-500 text-center max-w-xs leading-relaxed">
+                  {hasNoResultsFromFilter 
+                      ? "Tente ajustar seus termos de busca ou limpar os filtros aplicados." 
+                      : "Para começar a organizar seu inventário, adicione primeiro um Espaço Pai."
+                  }
+              </p>
+              {!hasNoResultsFromFilter &&
+                <p
+                className="text-[14px] font-bold text-blue-500 text-center max-w-xs italic leading-relaxed"
+                
+                >
+                  + Adicionar novo espaço pai 
+                </p>
+              }
+
+              {hasNoResultsFromFilter && (
+                  <button 
+                      onClick={() => onRefresh()} 
+                      className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-blue-600/20 hover:scale-105 transition-transform"
+                  >
+                      Limpar Filtros
+                  </button>
+              )}
             </div>
-          ))}
+          ) : (
+            <>
+              {/* LISTA DE ESPAÇOS E SEUS ATIVOS */}
+              {filteredData.spaces.map((space) => (
+                <div key={space.id} className="group bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  <div className="p-6 flex items-center justify-between bg-gray-50/50 dark:bg-white/[0.02] border-b dark:border-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
+                        <MapPin size={20} />
+                      </div>
+                      <h2 className="text-xl font-black italic text-gray-500 dark:text-white uppercase">{space.name}</h2>
+                    </div>
+                  </div>
+                  <div onContextMenu={(e) => handleContextMenu(e, space, true)} className="bg-white dark:bg-zinc-900/50">
+                    {renderActiveTree(null, space.id)}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
-      {/* MODAL DE VISUALIZAR */}
+      {/* --- MODAIS (EXATAMENTE COMO NO ORIGINAL) --- */}
       {selectedViewItem && (
         <div className="fixed inset-0 z-[800] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-[3rem] border dark:border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95">
@@ -252,7 +299,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                     <p className="text-xl font-black dark:text-white uppercase italic">{selectedViewItem.name}</p>
                   </div>
                </div>
-               <button onClick={() => setSelectedViewItem(null)} className="p-3 hover:text-red-500/70 dark:hover:text-red-500/70 hover:rotate-6 transition-colors"><X/></button>
+               <button onClick={() => setSelectedViewItem(null)} className="p-3 hover:text-red-500 transition-colors"><X/></button>
             </div>
             
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -260,7 +307,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                   <InfoItem icon={<Hash size={16}/>} label="Número de Série" Class="" value={selectedViewItem.serialNumber || "N/A"} />
                   <InfoItem icon={<Layers size={16}/>} label="Quantidade" Class="" value={selectedViewItem.quantity || "1"} />
                   <InfoItem icon={<MapPin size={16}/>} label="Espaço de Origem" Class="" value={fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Não definido"} />
-                  <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono" value={selectedViewItem.id} />
+                  <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px]" value={selectedViewItem.id} />
                </div>
                <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-white/[0.03] rounded-[2rem] border dark:border-white/5">
                   <div className="bg-white p-4 rounded-3xl shadow-xl mb-4">
@@ -277,7 +324,6 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
         </div>
       )}
 
-      {/* MODAL DE IMPRESSÃO */}
       {selectedPrintItem && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md print:hidden">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl">
@@ -288,11 +334,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             <div className="p-10 flex flex-col items-center">
               <div id="printable-area" className="w-full bg-white dark:bg-zinc-800 p-8 rounded-[2rem] border-2 border-dashed border-zinc-200 dark:border-zinc-700 flex flex-col items-center shadow-inner text-black dark:text-white">
                 <div className="w-16 h-16 bg-[#38B6FF] rounded-2xl mb-4 p-3">
-                  <Image
-                  src="/logo-inventory.svg"
-                  alt="logo"
-                  className="w-full h-full"
-                  />
+                  <Image src="/logo-inventory.svg" alt="logo" width={64} height={64} className="w-full h-full" />
                 </div>
                 <h3 className="text-sm font-black uppercase tracking-widest mb-6 italic">MegaNuv Inventory™</h3>
                 <div className="bg-white p-4 rounded-3xl shadow-xl mb-6"><QRCode value={`${window.location.origin}/qrcode/view?id=${selectedPrintItem.id}`} size={160} fgColor="#000000" /></div>
@@ -308,7 +350,6 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
         </div>
       )}
 
-      {/* MODAL DE MOVIMENTAÇÃO */}
       {movingItem && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md">
            <div className="relative bg-white dark:bg-zinc-900 w-full max-w-lg rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl">
@@ -369,7 +410,6 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
         </div>
       )}
 
-      {/* MENU DE CONTEXTO (POSICIONAMENTO INTELIGENTE) */}
       {contextMenu && (
         <div 
              ref={menuRef}
