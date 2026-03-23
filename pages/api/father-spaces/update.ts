@@ -1,76 +1,46 @@
 // pages/api/father-spaces/update.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient, Area } from "@prisma/client";
+import db from "@/lib/prisma"; 
+import * as jwt from "jsonwebtoken";
+import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET;
 
-interface UpdateFatherSpacePayload {
-  id: string;
-  name?: string;
-  area?: Area;
-  notes?: string;
-  parentId?: string;
-}
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT" && req.method !== "PATCH") {
     return res.status(405).json({ error: "Método não permitido." });
   }
 
   try {
-    // 1. VERIFICAÇÃO DE SESSÃO E RBAC
-    // const session = await getServerSession(req, res, authOptions);
-    // if (!session) return res.status(401).json({ error: "Não autenticado." });
+    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    // Mock do usuário (Regra: APENAS ADMIN pode editar espaços)
-    const user = {
-      id: "",
-      role: "ADMIN" // Experimente mudar para "MANAGER" para testar o bloqueio
-    };
+    const decoded = jwt.verify(token, JWT_SECRET!) as any;
+    const userId = decoded.id || decoded.userId;
 
-    if (user.role !== "ADMIN") {
-      return res.status(403).json({ 
-        error: "Acesso negado. Apenas administradores podem alterar a estrutura de espaços." 
-      });
+    if (decoded.role !== "ADMIN") {
+      return res.status(403).json({ error: "Acesso negado. Apenas admins editam espaços." });
     }
 
-    // 2. VALIDAÇÃO DO PAYLOAD
-    const data = req.body as UpdateFatherSpacePayload;
-    
-    if (!data.id) {
-      return res.status(400).json({ error: "O ID do espaço é obrigatório." });
-    }
+    const { id, name, notes, parentId } = req.body;
+    if (!id) return res.status(400).json({ error: "ID obrigatório." });
 
-    // 3. EXECUÇÃO DA ATUALIZAÇÃO
-    const updatedSpace = await prisma.fatherSpace.update({
-      where: { id: data.id },
+    const updatedSpace = await db.fatherSpace.update({
+      where: { id },
       data: {
-        name: data.name,
-        area: data.area,
-        notes: data.notes,
-        parentId: data.parentId,
+        name,
+        notes,
+        parentId
       },
     });
 
+    await createLog(req, userId, "UPDATE_SPACE", `Editou o espaço pai: ${updatedSpace.name} (ID: ${id})`);
+
     return res.status(200).json(updatedSpace);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error("ERRO father-spaces/update:", error);
-
-    if (error.code === 'P2002') {
-      return res.status(409).json({ error: "Já existe um espaço pai com este nome." });
-    }
-
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: "Espaço pai não encontrado." });
-    }
-
-    return res.status(500).json({ error: "Erro interno ao atualizar o espaço pai." });
-  } finally {
-    await prisma.$disconnect();
+    return res.status(500).json({ error: "Erro ao atualizar o espaço pai." });
   }
 }
