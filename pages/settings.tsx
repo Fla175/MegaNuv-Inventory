@@ -196,7 +196,7 @@ export default function SettingsPage() {
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
     { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: isAdmin },
     { id: 'areas', label: 'Áreas de Foco', icon: Target, show: isAdmin },
-    { id: 'logs', label: 'Auditoria/Logs', icon: ClipboardList, show: canSeeLogs },
+    { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
     { id: 'system', label: 'Preferências', icon: Monitor, show: true },
   ];
 
@@ -206,8 +206,8 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3 mb-10">
           <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Settings size={24}/></div>
           <div>
-            <h1 className="text-3xl font-black text-blue-950 dark:text-white italic tracking-tighter uppercase">Configurações v2.0</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Painel de Controle e Governança</p>
+            <h1 className="text-3xl font-black text-blue-950 dark:text-white italic tracking-tighter uppercase">Configurações</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Painel de Controle e personalização</p>
           </div>
         </div>
         
@@ -332,14 +332,14 @@ export default function SettingsPage() {
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Áreas de Foco</h3>
                   <button onClick={() => { setSelectedArea(null); setIsAreaModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {areasList.map((area) => (
                     <div key={area.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
                       <div className="w-12 h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: area.color || '#2563eb' }}>
                         <Target size={24} />
                       </div>
                       <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{area.name}</h4>
-                      <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-2 mt-4">
                         <button onClick={() => { setSelectedArea(area); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
                         <button onClick={() => handleDelete('area', area.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
                       </div>
@@ -353,7 +353,7 @@ export default function SettingsPage() {
             {activeTab === 'logs' && canSeeLogs && (
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Auditoria Global</h3>
+                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Logs</h3>
                   {isAdmin && (
                     <button onClick={() => handleDelete('logs')} className="flex items-center gap-2 text-red-500 font-black text-[10px] uppercase tracking-widest hover:underline transition-all">
                       <Trash2 size={14}/> Limpar Tudo
