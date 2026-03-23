@@ -4,21 +4,24 @@ import * as jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = req.cookies["auth_token"];
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
+
+  const token = req.cookies["auth_token"] || req.headers.authorization?.replace("Bearer ", "");
 
   if (!token || !process.env.JWT_SECRET) {
-    return res.status(401).json({ message: "Não autenticado" });
+    return res.status(401).json({ message: "Sessão expirada ou não autenticado." });
   }
 
   try {
-    // 1. Decodificamos o token para saber QUEM é o usuário (pelo email)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET) as { email: string };
+    // Decodifica garantindo os tipos que setamos no login
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as { email: string, userId: string };
 
     if (!decoded.email) {
-      throw new Error("Token sem email");
+      return res.status(401).json({ message: "Token inválido ou corrompido." });
     }
 
-    // 2. BUSCA NO BANCO
     const user = await prisma.user.findUnique({
       where: { email: decoded.email },
       select: {
@@ -27,22 +30,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: true,
         role: true,
         theme: true,
-        defaultSort:true,
+        defaultSort: true,
         lastLogin: true,
         createdAt: true,
-        // Não incluímos o password por segurança
       }
     });
 
     if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado no banco" });
+      return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
-    // 3. Retornamos o objeto 'user' completo que veio do Prisma
     return res.status(200).json({ user });
 
   } catch (err) {
-    console.error("Erro ao verificar token ou buscar no banco:", err);
-    return res.status(401).json({ message: "Sessão inválida" });
+    if (err instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ message: "Sessão expirada. Faça login novamente." });
+    }
+    console.error("Erro na validação do token /me:", err);
+    return res.status(401).json({ message: "Acesso negado." });
   }
 }

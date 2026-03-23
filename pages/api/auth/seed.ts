@@ -5,20 +5,18 @@ import bcrypt from "bcryptjs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Apenas aceita GET (para verificação)
+    // GET: Verifica se o sistema precisa de configuração inicial
     if (req.method === "GET") {
       const user = await prisma.user.findFirst();
 
       if (user) {
-        // Já existe um usuário → manda pro login
-        return res.status(200).json({ redirectTo: "/login" });
+        return res.status(200).json({ redirectTo: "/login", isConfigured: true });
       } else {
-        // Não há usuário → manda pro signup
-        return res.status(200).json({ redirectTo: "/initial-setup/register" });
+        return res.status(200).json({ redirectTo: "/initial-setup/register", isConfigured: false });
       }
     }
 
-    // POST → cria o usuário inicial (admin)
+    // POST: Cria o primeiro usuário (Admin master)
     if (req.method === "POST") {
       const { email, password, name } = req.body;
 
@@ -26,9 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: "Email e senha são obrigatórios." });
       }
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) {
-        return res.status(400).json({ message: "Usuário já existe." });
+      // Trava de segurança: Garante que só funcione se a base estiver realmente vazia
+      const count = await prisma.user.count();
+      if (count > 0) {
+         return res.status(403).json({ message: "O sistema já possui usuários. Seed bloqueado." });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -42,8 +41,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
+      // SISTEMA DE LOGS: Registro de inicialização do sistema
+      await prisma.log.create({
+        data: {
+          action: "SYSTEM_INITIALIZED",
+          details: `Sistema iniciado. Admin master criado: ${email}.`,
+          userId: newUser.id,
+          ip: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || "Desconhecido",
+          userAgent: req.headers['user-agent'] || "Desconhecido"
+        }
+      });
+
       return res.status(201).json({
-        message: "Usuário inicial criado com sucesso!",
+        message: "Administrador inicial criado com sucesso!",
         user: { id: newUser.id, email: newUser.email },
         redirectTo: "/login",
       });
@@ -52,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: "Método não permitido." });
 
   } catch (error) {
-    console.error("Erro ao consultar/criar usuários:", error);
+    console.error("Erro no processo de seed:", error);
     return res.status(500).json({ message: "Erro interno no servidor." });
   }
 }
