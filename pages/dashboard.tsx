@@ -4,11 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import {
   LineChart, Package, DollarSign, Activity, Loader2,
   Layers, Box, AlertCircle, TrendingUp, PackageOpen, Clock, 
-  ArrowDownAZ, ArrowLeftRight, ChevronLeft, ChevronRight, X, Zap, Cpu, Server, Settings2, Inbox
+  ArrowDownAZ, ArrowLeftRight, ChevronLeft, ChevronRight, X, Inbox, Tag
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 
-// Interface do componente interno de Empty State para reutilização
+// Interface do componente interno de Empty State
 const EmptyState = ({ message }: { message: string }) => (
   <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-in fade-in zoom-in duration-300">
     <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-full text-gray-300 dark:text-gray-700 mb-4">
@@ -24,22 +24,30 @@ interface ActiveItem {
   id: string;
   name: string;
   tag: string;
-  quantity?: number;
-  area?: string;
+  category?: { name: string; color?: string };
+  area?: { name: string; color?: string };
   updatedAt?: string;
   createdAt?: string;
+}
+
+interface CategoryInfo {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface DashboardStats {
   totalValue: number;
   totalActives: number;
+  totalCategories: number;
+  categories: CategoryInfo[]; // <--- Nova propriedade com a lista real de categorias
   totalActivesQuantity: number;
   totalSpaces: number;
   fatherSpaces: number;
   PhysicalSpaces: number;
   recentActives: ActiveItem[];
   recentMovements?: ActiveItem[];
-  assetsByArea: Record<string, ActiveItem[]>;
+  assetsByCategory: Record<string, ActiveItem[]>;
 }
 
 export default function DashboardPage() {
@@ -48,7 +56,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [creationPage, setCreationPage] = useState(1);
   const [movementPage, setMovementPage] = useState(1);
   const itemsPerPage = 10;
@@ -60,9 +68,13 @@ export default function DashboardPage() {
         const res = await fetch("/api/dashboard/stats");
         if (!res.ok) throw new Error("Falha na API");
         const data = await res.json();
+
+        const mappedCategories = data.assetsByCategory || data.assetsByArea || {};
+
         setStats({
           ...data,
-          recentMovements: data.recentMovements || data.recentActives.slice().reverse() 
+          assetsByCategory: mappedCategories,
+          recentMovements: data.recentMovements || (data.recentActives ? data.recentActives.slice().reverse() : [])
         });
       } catch (err) {
         console.error("Erro:", err);
@@ -74,14 +86,6 @@ export default function DashboardPage() {
     fetchStats();
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const areaConfig: Record<string, { icon: any, color: string, bg: string }> = {
-    ENERGETICA: { icon: <Zap size={20}/>, color: "text-amber-500", bg: "bg-amber-500/10" },
-    REDES: { icon: <Cpu size={20}/>, color: "text-blue-500", bg: "bg-blue-500/10" },
-    SERVIDOR: { icon: <Server size={20}/>, color: "text-purple-500", bg: "bg-purple-500/10" },
-    MANUTENCAO: { icon: <Settings2 size={20}/>, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  };
-  
   const sortedCreations = useMemo(() => {
     const list = stats?.recentActives || [];
     if (!list.length) return [];
@@ -124,6 +128,10 @@ export default function DashboardPage() {
 
   const percentSub = stats.totalSpaces > 0 ? (stats.PhysicalSpaces / stats.totalSpaces) * 100 : 0;
 
+  // Variáveis úteis para o Modal
+  const selectedCategoryObj = selectedCategory ? stats.categories?.find(c => c.name === selectedCategory) : null;
+  const selectedAssetsList = selectedCategory ? (stats.assetsByCategory[selectedCategory] || []) : [];
+
   return (
     <Layout title="Dashboard">
       <div className="max-w-[1600px] mx-auto space-y-8 pb-10 transition-colors">
@@ -153,7 +161,7 @@ export default function DashboardPage() {
                 <div className="p-3 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl w-fit mb-6"><DollarSign size={24} /></div>
                 <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Patrimônio</p>
                 <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalValue)}
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalValue || 0)}
                 </h2>
             </div>
           </div>
@@ -162,38 +170,62 @@ export default function DashboardPage() {
             <div className="relative z-10">
               <div className="p-3 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl w-fit mb-6"><Package size={24} /></div>
               <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Total de Ativos</p>
-              {
-                stats.totalActives >= 1 ?
-                <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">{ stats.totalActives } <span className="text-sm opacity-50 italic font-medium">{ stats.totalActives === 1 ? "unidade" : "unidades" }</span></h2>
-                :
-                <h2 className="text-lg font-black text-blue-950 dark:text-white tracking-tighter">Nenhum ativo registrado</h2>
-              }
+              <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
+                {stats.totalActives || 0} <span className="text-sm opacity-50 italic font-medium">{(stats.totalActives === 1) ? "unidade" : "unidades"}</span>
+              </h2>
             </div>
           </div>
         </div>
 
-        {/* ÁREAS DE FOCO */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.keys(areaConfig).map((area) => (
-            <button 
-              key={area} 
-              onClick={() => setSelectedArea(area)}
-              className="bg-white dark:bg-zinc-900 p-5 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm hover:border-blue-500/30 transition-all flex flex-col items-center group"
-            >
-              <div className={`p-3 rounded-xl mb-3 ${areaConfig[area].bg} ${areaConfig[area].color} group-hover:scale-110 transition-transform`}>
-                {areaConfig[area].icon}
+        {/* NOVO CARD ÚNICO DE CATEGORIAS DINÂMICAS */}
+        <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Tag size={20} /></div>
+            <div>
+              <h3 className="text-xl font-black text-blue-950 dark:text-white italic uppercase leading-none">Categorias</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Classificação de Ativos</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {stats.categories && stats.categories.length > 0 ? (
+              // Agora iteramos sobre a lista real de categorias que vem da API
+              stats.categories.sort((a, b) => a.name.localeCompare(b.name)).map((cat) => {
+                // Pegamos os ativos da categoria, se não houver, cai no array vazio []
+                const assets = stats.assetsByCategory[cat.name] || [];
+
+                return (
+                  <button 
+                    key={cat.id} 
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className="flex flex-col items-center p-5 bg-gray-50 dark:bg-white/5 rounded-[2rem] border border-transparent hover:border-blue-500/30 transition-all group active:scale-95"
+                  >
+                    <div 
+                      className="w-12 h-12 rounded-2xl mb-3 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform"
+                      style={{ backgroundColor: cat.color || "#3b82f6" }}
+                    >
+                      <Tag size={20} />
+                    </div>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 text-center truncate w-full">
+                      {cat.name}
+                    </span>
+                    <span className="text-xl font-black text-blue-950 dark:text-white">
+                      {assets.length}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="col-span-full py-10">
+                <p className="text-center text-[10px] font-black text-gray-400 uppercase italic">Nenhuma categoria cadastrada</p>
               </div>
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{area === "ENERGETICA" ? "Energética" : area === "MANUTENCAO" ? "MANUTENÇÃO" : area}</span>
-              <span className="text-xl font-black text-blue-950 dark:text-white">
-                {stats.assetsByArea[area]?.length || 0}
-              </span>
-            </button>
-          ))}
+            )}
+          </div>
         </div>
 
         {/* SEÇÕES DE LISTAGEM E ESTRUTURA */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* CRIAÇÕES COM EMPTY STATE */}
+          {/* CRIAÇÕES */}
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-white/5 flex flex-col h-full">
             <h3 className="text-lg font-black text-blue-950 dark:text-white flex items-center gap-3 italic mb-6"><Activity className="text-blue-600" size={20}/> Novas Criações</h3>
             <div className="space-y-3 flex-1">
@@ -220,7 +252,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* MOVIMENTAÇÕES COM EMPTY STATE */}
+          {/* MOVIMENTAÇÕES */}
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-white/5 flex flex-col h-full">
             <h3 className="text-lg font-black text-blue-950 dark:text-white flex items-center gap-3 italic mb-6"><ArrowLeftRight className="text-amber-500" size={20}/> Movimentações</h3>
             <div className="space-y-3 flex-1">
@@ -268,12 +300,7 @@ export default function DashboardPage() {
             <div className="mt-8 pt-4 border-t border-white/10">
               <div className="flex justify-between items-end mb-3">
                 <p className="text-[10px] font-black text-gray-400 uppercase">Volume Total</p>
-                {
-                  stats.totalSpaces >= 1 ?
-                  <h2 className="text-3xl font-black text-white tracking-tight">{stats.totalSpaces} <span className="text-xs opacity-50 italic">{stats.totalSpaces === 1 ? "espaço" : "espaços"}</span></h2>
-                  :
-                  <span className="text-xs opacity-50 italic">Nenhum espaço criado.</span>
-                }
+                <h2 className="text-3xl font-black text-white tracking-tight">{stats.totalSpaces} <span className="text-xs opacity-50 italic">{stats.totalSpaces === 1 ? "espaço" : "espaços"}</span></h2>
               </div>
               <div className={`h-2 w-full ${stats.totalSpaces > 0 ? "bg-blue-500" : "bg-blue-900/50"} rounded-full overflow-hidden`}>
                 <div className="h-full bg-indigo-500 rounded-r-full" style={{ width: `${percentSub}%` }} />
@@ -283,33 +310,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* POP-UP / MODAL DE ATIVOS POR ÁREA */}
-      {selectedArea && (
+      {/* POP-UP / MODAL DE ATIVOS POR CATEGORIA */}
+      {selectedCategory && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-blue-950/60 backdrop-blur-md">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-[3rem] shadow-2xl flex flex-col max-h-[85vh] border dark:border-white/10">
             <div className="p-8 border-b dark:border-white/5 flex justify-between items-center">
               <div className="flex items-center gap-4">
-                <div className={`p-4 rounded-2xl ${areaConfig[selectedArea].bg} ${areaConfig[selectedArea].color}`}>
-                  {areaConfig[selectedArea].icon}
+                <div 
+                  className="p-4 rounded-2xl text-white shadow-lg"
+                  style={{ backgroundColor: selectedCategoryObj?.color || "#3b82f6" }}
+                >
+                  <Tag size={24} />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic">{selectedArea === "ENERGETICA" ? "ENERGÉTICA" : selectedArea === "MANUTENCAO" ? "MANUTENÇÃO" : selectedArea}</h3>
-                  {
-                    selectedArea?.length >= 1 ?
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Total: {stats.assetsByArea[selectedArea]?.length} {stats.assetsByArea[selectedArea]?.length === 1 ? "Ativo" : "Ativos"}</p>
-                    :
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Nenhum ativo desta área</p>
-                  }
+                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic leading-none">{selectedCategory}</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mt-2">Total: {selectedAssetsList.length} Ativos</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedArea(null)} className="p-4 bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-red-500 rounded-2xl transition-all">
+              <button onClick={() => setSelectedCategory(null)} className="p-4 bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-red-500 rounded-2xl transition-all">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-8 overflow-y-auto space-y-3">
-              {stats.assetsByArea[selectedArea]?.length > 0 ? (
-                stats.assetsByArea[selectedArea].map((asset) => (
+              {selectedAssetsList.length > 0 ? (
+                selectedAssetsList.map((asset) => (
                   <div key={asset.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-blue-500/20 group transition-all">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl shadow-sm text-blue-600"><Box size={18}/></div>
@@ -319,14 +344,14 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-3 py-1 rounded-full italic">
-                        Qtd: {asset.quantity || 1}
+                      <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter">
+                         Ver Item
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <EmptyState message="Nenhum ativo registrado nesta área" />
+                <EmptyState message="Nenhum ativo registrado nesta categoria" />
               )}
             </div>
           </div>
