@@ -67,8 +67,8 @@ export interface Active {
   id: string;
   name: string;
 
-  areaId?: string | null;
-  area?: Area | null;
+  categoryId?: string | null;
+  category?: Area | null;
 
   sku?: string | null;
   manufacturer?: string | null;
@@ -98,5 +98,5 @@ export interface Active {
 }
 
 // --- TIPOS AUXILIARES (Para formulários e APIs) ---
-export type CreateActiveInput = Omit<Active, 'id' | 'createdAt' | 'updatedAt' | 'area' | 'parent' | 'children' | 'fatherSpace' | 'createdBy'>;
+export type CreateActiveInput = Omit<Active, 'id' | 'createdAt' | 'updatedAt' | 'category' | 'parent' | 'children' | 'fatherSpace' | 'createdBy'>;
 export type UpdateActiveInput = Partial<CreateActiveInput> & { id: string };
