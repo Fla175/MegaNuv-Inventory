@@ -1,4 +1,4 @@
-// pages/api/areas/list.ts
+// pages/api/categories/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
 import * as jwt from "jsonwebtoken";
@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     jwt.verify(token, JWT_SECRET!);
 
     // Busca todas as áreas ordenadas por nome
-    const areas = await prisma.area.findMany({
+    const categories = await prisma.category.findMany({
       orderBy: { name: "asc" },
       include: {
         _count: {
@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    return res.status(200).json(areas);
+    return res.status(200).json(categories);
 
   } catch (error) {
     console.error("API_AREA_LIST_ERROR:", error);

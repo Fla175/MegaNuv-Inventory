@@ -1,4 +1,4 @@
-// pages/api/areas/create.ts
+// pages/api/categories/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
 import * as jwt from "jsonwebtoken";
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!name) return res.status(400).json({ error: "O nome da área é obrigatório." });
 
     // 3. EXECUÇÃO
-    const newArea = await prisma.area.create({
+    const newArea = await prisma.category.create({
       data: { name, color }
     });
 
@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       req, 
       decoded.userId, 
       "CREATE_AREA", 
-      `Criou a área de foco: ${name} (${color || 'sem cor definida'})`
+      `Criou a Categoria: ${name} (${color || 'sem cor definida'})`
     );
 
     return res.status(201).json(newArea);

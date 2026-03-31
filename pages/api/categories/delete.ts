@@ -1,4 +1,4 @@
-// pages/api/areas/delete.ts
+// pages/api/categories/delete.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
 import * as jwt from "jsonwebtoken";
@@ -34,18 +34,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Buscamos o nome antes de apagar para o log ficar informativo
-    const areaToDelete = await prisma.area.findUnique({ where: { id } });
-    if (!areaToDelete) return res.status(404).json({ error: "Área não encontrada." });
+    const categoryToDelete = await prisma.category.findUnique({ where: { id } });
+    if (!categoryToDelete) return res.status(404).json({ error: "Área não encontrada." });
 
     // 1. Elimina a Área
-    await prisma.area.delete({ where: { id } });
+    await prisma.category.delete({ where: { id } });
 
     // 2. Regista a Auditoria
     await createLog(
       req,
       decoded.userId,
       "DELETE_AREA",
-      `Removeu permanentemente a área: ${areaToDelete.name}`
+      `Removeu permanentemente a área: ${categoryToDelete.name}`
     );
 
     return res.status(200).json({ message: "Área removida com sucesso." });

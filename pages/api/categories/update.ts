@@ -1,4 +1,4 @@
-// pages/api/areas/update.ts
+// pages/api/categories/update.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
 import * as jwt from "jsonwebtoken";
@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return res.status(400).json({ error: "O ID da área é obrigatório." });
 
     // 1. Executa o Update
-    const updatedArea = await prisma.area.update({
+    const updatedArea = await prisma.category.update({
       where: { id },
       data: { name, color },
     });
@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === 'P2025') {
-      return res.status(404).json({ error: "Área de foco não encontrada." });
+      return res.status(404).json({ error: "Categoria não encontrada." });
     }
 
     return res.status(500).json({ error: "Erro interno ao atualizar área." });
