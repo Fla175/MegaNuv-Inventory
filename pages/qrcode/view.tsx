@@ -20,7 +20,7 @@ interface AssetItem {
   image?: string;
   tag: string;
   fileUrl?: string;
-  area?: string;
+  category?: string;
   createdBy?: any;
   createdAt?: string;
   isPhysicalSpace?: boolean | number;
@@ -37,7 +37,7 @@ interface ViewData {
   root: {
     id: string;
     name: string;
-    area?: string;
+    category?: string;
     imageUrl?: string;
     image?: string;
     fixedValue?: number;
@@ -226,7 +226,7 @@ export default function SpacePublicView() {
           )}
           <div className="relative z-20">
             <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-widest mb-3 inline-block">
-              {active.area || 'Infraestrutura'}
+              {active.category || 'Infraestrutura'}
             </span>
             <h1 className="text-4xl font-black text-white leading-none mb-6 tracking-tighter uppercase italic">
               {active.name}

@@ -9,14 +9,14 @@ import FileUpload from "@/components/FileUpload";
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const router = useRouter();
   const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [areas, setAreas] = useState<any[]>([]);
-  const [loadingAreas, setLoadingAreas] = useState(true);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
     isPhysicalSpace: false,
     name: "",
-    areaId: "" as string,
+    categoryId: "" as string,
     sku: "",
     manufacturer: "",
     model: "",
@@ -33,35 +33,43 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
   const tags = ["IN-STOCK", "IN-USE"];
 
-  // Busca as Áreas do Banco
+  // Busca as Áreas do Banco (Corrigida a dependência para não causar loop)
   useEffect(() => {
-    async function fetchAreas() {
+    let isMounted = true;
+    async function fetchCategories() {
       try {
-        const res = await fetch('/api/areas/list');
+        const res = await fetch('/api/categories/list');
         const data = await res.json();
-        if (res.ok) {
-          setAreas(data);
-          if (mode === 'create' && data.length > 0 && !formData.areaId) {
-            setFormData(prev => ({ ...prev, areaId: data[0].id }));
-          }
+        if (res.ok && isMounted) {
+          setCategories(data);
+          // Atualiza via callback (prev) para não perder outros dados que o usuário já mexeu
+          setFormData(prev => {
+            if (mode === 'create' && data.length > 0 && !prev.categoryId) {
+              return { ...prev, categoryId: data[0].id };
+            }
+            return prev;
+          });
         }
       } catch (err) {
         console.error("Erro ao carregar áreas:", err);
       } finally {
-        setLoadingAreas(false);
+        if (isMounted) setLoadingCategories(false);
       }
     }
-    fetchAreas();
-  }, [mode, formData.areaId]);
+    fetchCategories();
+    return () => { isMounted = false; };
+  }, [mode]);
 
+  // Carrega os dados iniciais com segurança
   useEffect(() => {
-    if (initialData) {
+    if (initialData && Object.keys(initialData).length > 0) {
       const locId = initialData.fatherSpaceId || initialData.parentId || "";
       const locType = initialData.fatherSpaceId ? "space" : (initialData.parentId ? "active" : "");
 
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         ...initialData,
-        areaId: initialData.areaId || "",
+        categoryId: initialData.categoryId || prev.categoryId,
         isPhysicalSpace: initialData.isPhysicalSpace ?? false,
         locationId: locId,
         locationType: locType,
@@ -69,17 +77,16 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         serialNumbers: mode === "clone" 
           ? Array(initialData.quantity || 1).fill("") 
           : [initialData.serialNumber || ""],
-      });
+      }));
     }
   }, [initialData, mode]);
 
-  // Lógica de Grid Adaptável
   const gridConfig = useMemo(() => {
-    const len = areas.length;
-    if (len === 0) return "grid-cols-1";
+    const len = categories.length;
     if (len <= 4) return `grid-cols-${len}`;
+    if (len > 4) return "grid-cols-4";
     return "grid-cols-2 sm:grid-cols-4 justify-center"; 
-  }, [areas]);
+  }, [categories]);
 
   function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const [isOpen, setIsOpen] = useState(false);
@@ -137,9 +144,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   };
 
   const handleSerialUpdate = (index: number, value: string) => {
-    const updatedSerials = [...formData.serialNumbers];
-    updatedSerials[index] = value;
-    setFormData({ ...formData, serialNumbers: updatedSerials });
+    setFormData(prev => {
+      const updatedSerials = [...prev.serialNumbers];
+      updatedSerials[index] = value;
+      return { ...prev, serialNumbers: updatedSerials };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,7 +156,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     const payload = { 
       ...formData, 
       serialNumbers: formData.serialNumbers, 
-      isPhysicalSpace: !!formData.isPhysicalSpace,
+      isPhysicalSpace: !!formData.isPhysicalSpace, // Garantia final do valor real
       fatherSpaceId: formData.locationType === "space" ? formData.locationId : null,
       parentId: formData.locationType === "active" ? formData.locationId : null
     };
@@ -195,29 +204,29 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           {/* AREA DE FOCO */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Área de Foco</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Categoria</label>
               <button 
                 type="button" 
-                onClick={() => router.push("/settings?tab=areas")}
+                onClick={() => router.push("/settings?tab=categories")}
                 className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
               >
                 <Pencil size={12} />
               </button>
             </div>
 
-            {loadingAreas ? (
+            {loadingCategories ? (
                <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando áreas...</div>
             ) : (
               <div className={`grid gap-2 ${gridConfig}`}>
-                {areas.map((area) => {
-                  const isSelected = formData.areaId === area.id;
-                  const color = area.color || '#2563eb';
+                {categories.map((category) => {
+                  const isSelected = formData.categoryId === category.id;
+                  const color = category.color || '#2563eb';
                   
                   return (
                     <button 
-                      key={area.id} 
+                      key={category.id} 
                       type="button" 
-                      onClick={() => setFormData({ ...formData, areaId: area.id })} 
+                      onClick={() => setFormData(prev => ({ ...prev, categoryId: category.id }))} 
                       style={isSelected ? { 
                         borderColor: color, 
                         backgroundColor: `${color}15`, 
@@ -225,7 +234,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                       } : {}}
                       className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
                     >
-                      {area.name}
+                      {category.name}
                     </button>
                   );
                 })}
@@ -236,7 +245,8 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Nome do Registro</label>
-              <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              {/* CORREÇÃO DO STALE STATE ABAIXO (Usando prev => ...) */}
+              <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData(prev => ({...prev, name: e.target.value}))} />
             </div>
 
             <div className="relative">
@@ -253,7 +263,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                   <div className="absolute z-[600] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-1">
                       {tags.map((tag) => (
-                        <button key={tag} type="button" onClick={() => { setFormData({ ...formData, tag: tag }); setIsStatusOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 mb-1 last:mb-0 ${formData.tag === tag ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400" : "hover:bg-gray-50 dark:hover:bg-white/5 dark:text-zinc-200"}`}>
+                        <button key={tag} type="button" onClick={() => { setFormData(prev => ({ ...prev, tag: tag })); setIsStatusOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 mb-1 last:mb-0 ${formData.tag === tag ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400" : "hover:bg-gray-50 dark:hover:bg-white/5 dark:text-zinc-200"}`}>
                           <div className={`w-2 h-2 rounded-full ${tag === 'IN-STOCK' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                           <span className="text-sm font-bold">{tag === "IN-STOCK" ? "Em Estoque" : "Em Uso"}</span>
                         </button>
@@ -275,14 +285,15 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                   ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active" }))
                 ]}
                 value={formData.locationId}
-                onChange={(id: string, type: any) => setFormData({ ...formData, locationId: id, locationType: type })}
+                onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
                 placeholder="Selecione local..."
+                required
               />
             </div>
             <div className={`grid ${mode === 'edit' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Vlr. Unitário</label>
-                <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData({...formData, fixedValue: parseFloat(e.target.value) || 0})} />
+                <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData(prev => ({...prev, fixedValue: parseFloat(e.target.value) || 0}))} />
               </div>
               {mode !== "edit" && (
                 <div>
@@ -297,11 +308,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Fabricante</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} />
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.manufacturer} onChange={e => setFormData(prev => ({...prev, manufacturer: e.target.value}))} />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Modelo</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} />
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.model} onChange={e => setFormData(prev => ({...prev, model: e.target.value}))} />
                 </div>
               </div>
 
@@ -321,13 +332,13 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData({...formData, imageUrl: url})} label="Foto do Ativo" />
-            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData({...formData, fileUrl: url})} label="Documento" />
+            <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData(prev => ({...prev, imageUrl: url}))} label="Foto do Ativo" />
+            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Documento" />
           </div>
 
           <div>
             <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Observações Adicionais</label>
-            <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+            <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData(prev => ({...prev, notes: e.target.value}))} />
           </div>
         </form>
 

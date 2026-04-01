@@ -45,7 +45,7 @@ interface Log {
   user: { name: string | null; email: string };
 }
 
-type TabType = 'users' | 'spaces' | 'areas' | 'logs' | 'system';
+type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'system';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -57,7 +57,7 @@ export default function SettingsPage() {
   // Estados de Listagem
   const [usersList, setUsersList] = useState<User[]>([]);
   const [spacesList, setSpacesList] = useState<FatherSpace[]>([]);
-  const [areasList, setAreasList] = useState<Area[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Area[]>([]);
   const [logsList, setLogsList] = useState<Log[]>([]);
 
   // Estados de Modais
@@ -86,7 +86,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (activeTab === 'users') fetchData('/api/users', setUsersList);
     if (activeTab === 'spaces' && isAdmin) fetchData('/api/father-spaces/list', setSpacesList);
-    if (activeTab === 'areas' && isAdmin) fetchData('/api/areas/list', setAreasList);
+    if (activeTab === 'categories' && isAdmin) fetchData('/api/categories/list', setCategoriesList);
     if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
     if (tab) {
       setActiveTab(tab as TabType);
@@ -143,25 +143,25 @@ export default function SettingsPage() {
     if (selectedArea) payload.id = selectedArea.id;
 
     try {
-      const res = await fetch(selectedArea ? '/api/areas/update' : '/api/areas/create', {
+      const res = await fetch(selectedArea ? '/api/categories/update' : '/api/categories/create', {
         method: selectedArea ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         setIsAreaModalOpen(false);
-        fetchData('/api/areas/list', setAreasList);
+        fetchData('/api/categories/list', setCategoriesList);
       }
     } finally { setSaving(false); }
   };
 
-  const handleDelete = async (type: 'user' | 'space' | 'area' | 'logs', id?: string) => {
+  const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
     if (!confirm(`Confirmar exclusão permanente? Esta ação será registrada.`)) return;
     try {
       let endpoint = "";
       if (type === 'user') endpoint = `/api/users/${id}`;
       else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
-      else if (type === 'area') endpoint = `/api/areas/delete?id=${id}`;
+      else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
       else if (type === 'logs') endpoint = `/api/logs/clear`;
 
       const res = await fetch(endpoint, { method: 'DELETE' });
@@ -169,7 +169,7 @@ export default function SettingsPage() {
         if (type === 'user' && id === user?.id) window.location.href = '/login';
         else if (activeTab === 'users') fetchData('/api/users', setUsersList);
         else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
-        else if (activeTab === 'areas') fetchData('/api/areas/list', setAreasList);
+        else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
         else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
       }
     } catch (err) { console.error(err); }
@@ -201,7 +201,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
     { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: isAdmin },
-    { id: 'areas', label: 'Áreas de Foco', icon: Group, show: isAdmin },
+    { id: 'categories', label: 'Categorias', icon: Group, show: canManageUsers },
     { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
     { id: 'system', label: 'Preferências', icon: Monitor, show: true },
   ];
@@ -332,22 +332,22 @@ export default function SettingsPage() {
             )}
 
             {/* TAB: AREAS */}
-            {activeTab === 'areas' && isAdmin && (
+            {activeTab === 'categories' && isAdmin && (
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Áreas de Foco</h3>
+                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
                   <button onClick={() => { setSelectedArea(null); setIsAreaModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {areasList.map((area) => (
-                    <div key={area.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
-                      <div className="w-12 h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: area.color || '#2563eb' }}>
+                  {categoriesList.map((category) => (
+                    <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
+                      <div className="w-12 h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: category.color || '#2563eb' }}>
                         <Group size={24} />
                       </div>
-                      <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{area.name}</h4>
+                      <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
                       <div className="flex gap-2 mt-4">
-                        <button onClick={() => { setSelectedArea(area); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
-                        <button onClick={() => handleDelete('area', area.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
+                        <button onClick={() => { setSelectedArea(category); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
+                        <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
                       </div>
                     </div>
                   ))}

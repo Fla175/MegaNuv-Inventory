@@ -16,37 +16,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
     const decoded = jwt.verify(token, JWT_SECRET!) as any;
-    const userId = decoded.id || decoded.userId || decoded.sub;
+    const userId = decoded.id || decoded.userId;
 
     const data = req.body;
     
-    // Validações básicas para Ativo
-    if (!data.name || !data.areaId) {
-      return res.status(400).json({ error: "Nome e Área de Foco são obrigatórios." });
+    // Validação de integridade do Schema
+    if (!data.name || !data.categoryId || !data.fatherSpaceId) {
+      return res.status(400).json({ error: "Nome, Categoria e Espaço Pai são obrigatórios." });
     }
 
     const quantity = Math.max(1, parseInt(data.quantity) || 1);
     const createdActives = [];
 
-    // Loop para suportar a criação de múltiplos ativos (Quantidade)
     for (let i = 0; i < quantity; i++) {
-      // Gerador de ID Único de 4 caracteres (padrão Hex) para o Ativo
       let finalId = "";
       let isUnique = false;
+      
+      // Garantia de ID manual único (4 hex chars)
       while (!isUnique) {
-        finalId = randomBytes(2).toString('hex').toUpperCase();
+        finalId = randomBytes(2).toString('hex').toLowerCase();
         const exists = await db.active.findUnique({ where: { id: finalId } });
         if (!exists) isUnique = true;
       }
 
-      // Pega o serial correspondente ao índice ou deixa vazio
-      const serialNumber = data.serialNumbers && data.serialNumbers[i] ? data.serialNumbers[i] : "";
+      const serialNumber = data.serialNumbers?.[i] || "";
 
       const newActive = await db.active.create({
         data: {
           id: finalId,
           name: data.name.trim(),
-          areaId: data.areaId,
+          categoryId: data.categoryId,
           tag: data.tag || "IN-STOCK",
           manufacturer: data.manufacturer || null,
           model: data.model || null,
@@ -55,9 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           notes: data.notes || null,
           imageUrl: data.imageUrl || null,
           fileUrl: data.fileUrl || null,
-          // Hierarquia: Pode estar dentro de um Espaço Pai ou de outro Ativo
-          fatherSpaceId: data.fatherSpaceId || null,
-          parentId: data.parentId || null,
+          fatherSpaceId: data.fatherSpaceId, // Obrigatório
+          parentId: data.parentId || null,   // Opcional (Hierarquia)
           isPhysicalSpace: !!data.isPhysicalSpace,
           createdById: userId,
         },
@@ -65,18 +63,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       createdActives.push(newActive);
     }
 
-    // Auditoria (Registra o primeiro ou um resumo)
-    await createLog(
-      req,
-      userId,
-      "CREATE_ACTIVE",
-      `Criou ${quantity} ativo(s): ${data.name} (Início ID: ${createdActives[0].id})`
-    );
+    await createLog(req, userId, "CREATE_ACTIVE", `Criou ${quantity} ativo(s): ${data.name}`);
 
     return res.status(201).json(createdActives);
-
   } catch (error: any) {
     console.error("ERRO actives/create:", error.message);
-    return res.status(500).json({ error: "Erro interno ao criar ativo.", details: error.message });
+    return res.status(500).json({ error: "Erro interno ao criar ativo." });
   }
 }
