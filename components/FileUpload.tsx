@@ -8,13 +8,24 @@ interface FileUploadProps {
   label?: string;
 }
 
-export default function FileUpload({ value, onChange, label = "Datasheet / PDF" }: FileUploadProps) {
+export default function FileUpload({ value, onChange, label = "Documento" }: FileUploadProps) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', 'image/png', 'image/jpeg', 'application/pdf'];
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    const isAllowed = allowedTypes.some(type => 
+      fileExtension === type.toLowerCase() || file.type === type
+    );
+
+    if (!isAllowed) {
+      alert("Tipo de arquivo não permitido. Use PDF, DOC, DOCX, PNG, JPG ou JPEG.");
+      return;
+    }
 
     // Validação simples de tamanho (ex: 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -68,7 +79,7 @@ export default function FileUpload({ value, onChange, label = "Datasheet / PDF" 
         className={`relative w-full h-16 rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center gap-2
           ${value ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10' : 'border-gray-200 bg-gray-50 dark:bg-zinc-900 hover:border-indigo-400'}`}
       >
-        <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.doc,.docx" className="hidden" />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" />
         
         {loading ? (
            <><Loader2 className="animate-spin text-indigo-600" size={16}/> <span className="text-[10px] font-bold text-indigo-600">Enviando...</span></>
