@@ -22,15 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
 
-    // Apenas ADMIN e MANAGER podem ver logs de auditoria
     if (decoded.role === "VIEWER") {
       return res.status(403).json({ error: "Acesso negado." });
     }
 
-    // Busca os últimos 200 logs para não sobrecarregar o frontend
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { defaultSort: true }
+    });
+
+    const sortOrder = user?.defaultSort === "name" ? "asc" : "desc";
+
     const logs = await prisma.log.findMany({
       take: 200,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: sortOrder },
       include: {
         user: {
           select: {
