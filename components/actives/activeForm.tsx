@@ -193,13 +193,10 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          
-          {mode === "create" && (
-            <div className="flex bg-gray-100 dark:bg-zinc-950 p-1.5 rounded-2xl border dark:border-white/5 shadow-inner">
-              <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: false }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${!formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><Briefcase size={14} /> Ativo</button>
-              <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: true }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><MapPin size={14} /> Espaço Físico</button>
-            </div>
-          )}
+          <div className="flex bg-gray-100 dark:bg-zinc-950 p-1.5 rounded-2xl border dark:border-white/5 shadow-inner">
+            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: false }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${!formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><Briefcase size={14} /> Ativo</button>
+            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: true }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><MapPin size={14} /> Espaço Físico</button>
+          </div>
 
           {/* AREA DE FOCO */}
           <div className="space-y-3">
