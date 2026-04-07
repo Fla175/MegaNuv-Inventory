@@ -14,6 +14,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useUser } from "../lib/context/UserContext";
+import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,6 +30,8 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
     if (isSidebarOpen) setIsSidebarOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.asPath]);
+
+  useEscapeKey(() => setIsSidebarOpen(false), isSidebarOpen);
 
   const isActive = (pathname: string) => {
     if (pathname === "/") return router.pathname === pathname;
@@ -71,11 +74,11 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
 
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 w-64 bg-gray-800 text-white p-4 flex flex-col z-30 transform ${
+          className={`fixed lg:sticky top-0 left-0 w-64 h-screen bg-gray-800 text-white p-4 flex flex-col z-30 transform ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out lg:shadow-xl lg:rounded-r-lg`}
+          } lg:translate-x-0 transition-transform duration-300 ease-in-out lg:shadow-xl`}
         >
-          <div className="flex justify-center items-center py-4 px-2 mb-8 border-b border-gray-700">
+          <div className="flex justify-center items-center py-4 px-2 mb-6 border-b border-gray-700 shrink-0">
             <Image
               src="/logo-inventory.svg"
               alt="MegaNuv Logo"
@@ -85,17 +88,17 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             />
           </div>
 
-          <nav className="flex-grow">
+          <nav className="flex-1 overflow-y-auto py-2">
             <ul>
               {[
                 { href: "/dashboard", label: "Dashboard", icon: LineChart },
                 { href: "/", label: "Gestão de Ativos", icon: Box },
                 { href: "/settings", label: "Configurações", icon: Settings },
               ].map((item) => (
-                <li key={item.href} className="mb-2">
+                <li key={item.href} className="mb-1">
                   <Link
                     href={item.href}
-                    className={`flex items-center py-2 px-4 rounded-md transition duration-200 ${
+                    className={`flex items-center py-3 px-4 rounded-lg transition duration-200 ${
                       isActive(item.href)
                         ? "bg-blue-600 text-white shadow-md"
                         : "hover:bg-gray-700 text-gray-300"
@@ -109,10 +112,10 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          <div className="mt-auto pt-4 border-t border-gray-700 flex flex-col items-center">
-            <div className="flex items-center text-gray-300 text-base mb-3">
-              <UserCircle size={22} className="mr-2" />
-              <span className="truncate max-w-[150px]">{user?.name || "Usuário"}</span>
+          <div className="shrink-0 pt-4 border-t border-gray-700 bg-gray-800">
+            <div className="flex items-center text-gray-300 text-sm mb-3">
+              <UserCircle size={20} className="mr-2 shrink-0" />
+              <span className="truncate">{user?.name || "Usuário"}</span>
             </div>
             <button
               onClick={async () => {
@@ -120,14 +123,14 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
                   await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
                   localStorage.removeItem("user");
                   window.location.href = "/login";
-                } catch (err) {
-                  console.error("Erro ao fazer logout", err);
+                } catch {
+                  console.error("Erro ao fazer logout");
                 }
               }}
-              className="w-full flex items-center justify-center py-2 px-4 rounded-md text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
+              className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
             >
-              <LogOut size={18} className="mr-2" />
-              Sair
+              <LogOut size={18} className="mr-2 shrink-0" />
+              <span className="font-medium">Sair</span>
             </button>
           </div>
         </aside>
@@ -139,7 +142,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
           ></div>
         )}
 
-        <main className="flex-1 p-6 md:p-10 mt-[64px] lg:mt-0 h-[calc(100vh-64px)] lg:h-screen overflow-y-auto bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 lg:p-10 mt-16 lg:mt-0 min-h-screen lg:min-h-0 bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
