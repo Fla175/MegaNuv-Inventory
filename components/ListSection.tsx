@@ -7,6 +7,8 @@ import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
   MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon
 } from "lucide-react";
+import { useEscapeKey } from "../lib/hooks/useEscapeKey";
+import { getActiveColors, getPhysicalSpaceColors, getParentSpaceColors } from "../lib/constants/colors";
 
 interface ListSectionProps {
   filters: any;
@@ -33,6 +35,12 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Fechar modais com Esc
+  useEscapeKey(() => setSelectedViewItem(null), !!selectedViewItem);
+  useEscapeKey(() => setSelectedPrintItem(null), !!selectedPrintItem);
+  useEscapeKey(() => setMovingItem(null), !!movingItem);
+  useEscapeKey(() => setContextMenu(null), !!contextMenu);
+
   // --- BUSCA DE ÁREAS PARA MAPEAMENTO ---
   useEffect(() => {
     let isMounted = true;
@@ -53,18 +61,32 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
 
   // --- FECHAMENTO E POSICIONAMENTO DO MENU ---
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null);
-    window.addEventListener('click', closeMenu);
-    window.addEventListener('scroll', closeMenu);
-    return () => {
-      window.removeEventListener('click', closeMenu);
-      window.removeEventListener('scroll', closeMenu);
+    if (!contextMenu) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
     };
-  }, []);
+    
+    const closeMenu = () => setContextMenu(null);
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', closeMenu);
+    window.addEventListener('resize', closeMenu);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', closeMenu);
+      window.removeEventListener('resize', closeMenu);
+    };
+  }, [contextMenu]);
 
   const handleContextMenu = (e: React.MouseEvent, item: any, isPhysicalSpace: boolean) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isBaseCompletelyEmpty || hasNoResultsFromFilter) return;
 
     const menuWidth = 256; 
     const menuHeight = 280; 
@@ -219,20 +241,22 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                         setExpandedNodes(p => ({ ...p, [active.id]: !p[active.id] }));
                       }
                     }}
-                    className={`relative w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 transition-transform ${hasSubItems || active.isPhysicalSpace ? "cursor-pointer hover:scale-105 active:scale-95 border-2 border-blue-500/30" : "border dark:border-white/10"} ${active.isPhysicalSpace ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : hasSubItems ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-400'}`}
+                    className={`relative w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 transition-transform ${hasSubItems || active.isPhysicalSpace ? "cursor-pointer hover:scale-105 active:scale-95 border-2 border-blue-500/30" : "border dark:border-white/10"} ${
+                      active.isPhysicalSpace 
+                        ? `${getPhysicalSpaceColors(!hasSubItems).bg} ${getPhysicalSpaceColors(!hasSubItems).text}`
+                        : hasSubItems 
+                          ? `${getParentSpaceColors(true).bgDark} text-white`
+                          : `${getActiveColors(true).bg} ${getActiveColors(true).text}`
+                    }`}
                   >
-                    {active.imageUrl ? (
-                      <img src={active.imageUrl} alt={active.name} className="w-full h-full object-cover" />
-                    ) : (
-                      active.isPhysicalSpace ? <Layers size={20} /> : <Box size={20} />
-                    )}
+                    {active.isPhysicalSpace ? <Layers size={20} /> : <Box size={20} />}
                   </div>
 
                   <div>
                     <h4 className="text-sm font-black text-gray-800 dark:text-zinc-200 uppercase tracking-tight line-clamp-1">{active.name}</h4>
                     <div className="flex items-center mt-0.5">
                       {active.isPhysicalSpace &&
-                        <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mr-2">Espaço Físico</p>
+                        <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getPhysicalSpaceColors(!hasSubItems).text}`}>Espaço Físico</p>
                       }
                       
                       {a && (
@@ -301,11 +325,14 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             </div>
           ) : (
             <>
-              {filteredData.spaces.map((space) => (
+              {filteredData.spaces.map((space) => {
+                const hasActives = filteredData.actives.some(a => a.fatherSpaceId === space.id);
+                const spaceColors = getParentSpaceColors(hasActives);
+                return (
                 <div key={space.id} className="group bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   <div className="p-6 flex items-center justify-between bg-gray-50/50 dark:bg-white/[0.02] border-b dark:border-white/5">
                     <div className="flex items-center gap-4">
-                      <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
+                      <div className={`p-2 rounded-lg ${spaceColors.bg} ${spaceColors.text}`}>
                         <MapPin size={20} />
                       </div>
                       <h2 className="text-xl font-black italic text-gray-500 dark:text-white uppercase">{space.name}</h2>
@@ -315,7 +342,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                     {renderActiveTree(null, space.id)}
                   </div>
                 </div>
-              ))}
+              )})}
             </>
           )}
         </div>
@@ -329,7 +356,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             {/* Cabeçalho */}
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-white/[0.02] shrink-0">
                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-2xl ${selectedViewItem.isPhysicalSpace ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                  <div className={`p-3 rounded-2xl ${selectedViewItem.isPhysicalSpace ? getPhysicalSpaceColors(true).bg + ' ' + getPhysicalSpaceColors(true).text : getActiveColors(true).bg + ' ' + getActiveColors(true).text}`}>
                     {selectedViewItem.isPhysicalSpace ? <MapPin size={24}/> : <Box size={24}/>}
                   </div>
                   <div>
@@ -411,7 +438,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       {/* --- MODAL DE IMPRESSÃO --- */}
       {selectedPrintItem && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md print:absolute print:inset-0 print:bg-white print:z-[9999] print:p-0 print:backdrop-blur-none">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl p-6 print:w-auto print:max-w-none print:border-none print:shadow-none print:rounded-none print:p-8">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl p-6 print:w-auto print:max-w-none print:border-none print:shadow-none print:rounded-none print:p-0" id="qrcode-print-container">
               
               {/* CABEÇALHO - Escondido na impressão */}
               <div className="flex justify-between items-center mb-6 print:hidden">
@@ -422,24 +449,27 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
               </div>
               
               {/* ÁREA DA ETIQUETA - O que realmente será impresso */}
-              <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-none print:m-0 print:p-0 text-black">
+              <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-area">
                 
-                {/* Fundo branco forçado para garantir a leitura do QR Code independente do tema dark */}
-                <div className="bg-white p-2 rounded-xl">
+                {/* Fundo branco forçado para garantir a leitura do QR Code */}
+                <div className="bg-white p-3 rounded-xl border-2 border-zinc-100 shadow-sm">
                   <QRCode
-                    value={`https://inventory.meganuv.com/qrcode/view?id=${selectedPrintItem.id}`}
-                    size={160}
-                    level="M" // Nível de correção de erro (L, M, Q, H)
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qrcode/view?id=${selectedPrintItem.id}`}
+                    size={180}
+                    level="H"
+                    bgColor="#FFFFFF"
+                    fgColor="#000000"
                   />
                 </div>
                 
-                <div className="mt-4 text-center print:mt-6">
-                  <h4 className="font-black text-xl uppercase tracking-tight">{selectedPrintItem.name}</h4>
-                  <p className="text-sm font-mono text-zinc-500 mt-1">ID: {selectedPrintItem.id}</p>
-                  
-                  {/* Opcional: Mostra SKU ou Tag se existir */}
+                <div className="mt-4 text-center">
+                  <h4 className="font-black text-lg uppercase tracking-tight leading-tight max-w-[200px]">{selectedPrintItem.name}</h4>
+                  <p className="text-[10px] font-mono text-zinc-400 mt-2 uppercase tracking-widest">ID: {selectedPrintItem.id.slice(0, 8).toUpperCase()}</p>
+                  {selectedPrintItem.serialNumber && (
+                    <p className="text-[10px] font-mono text-zinc-500 mt-1">SN: {selectedPrintItem.serialNumber}</p>
+                  )}
                   {selectedPrintItem.sku && (
-                    <p className="text-xs font-mono text-zinc-400 mt-1">SKU: {selectedPrintItem.sku}</p>
+                    <p className="text-[10px] font-mono text-zinc-400 mt-1">SKU: {selectedPrintItem.sku}</p>
                   )}
                 </div>
               </div>
@@ -447,10 +477,10 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
               {/* BOTÃO DE AÇÃO - Escondido na impressão */}
               <button 
                 onClick={() => window.print()} 
-                className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white p-3 rounded-xl font-bold uppercase text-xs flex justify-center items-center print:hidden"
+                className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white p-3 rounded-xl font-bold uppercase text-xs flex justify-center items-center gap-2 print:hidden"
               >
-                <Printer size={20} className="mr-2" /> 
-                Imprimir
+                <Printer size={20} /> 
+                Imprimir Etiqueta
               </button>
           </div>
         </div>
@@ -561,9 +591,38 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
 
       <style jsx global>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-category, #printable-category * { visibility: visible; }
-          #printable-category { position: fixed; left: 0; top: 0; width: 100% !important; background: white !important; color: black !important; padding: 0 !important; border: none !important; }
+          body * { visibility: hidden !important; }
+          #qrcode-print-area,
+          #qrcode-print-area * {
+            visibility: visible !important;
+          }
+          #qrcode-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: white !important;
+            color: black !important;
+            border: 2px solid black !important;
+            border-radius: 8px !important;
+            margin: 0 !important;
+            padding: 16px !important;
+            box-shadow: none !important;
+          }
+          #qrcode-print-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: white !important;
+            z-index: 9999 !important;
+          }
+          @page {
+            size: auto;
+            margin: 0;
+          }
         }
       `}</style>
     </>
