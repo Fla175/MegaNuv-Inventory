@@ -2,15 +2,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo } from "react";
 import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2 } from "lucide-react";
-import { useRouter } from "next/router";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
+import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
-  const router = useRouter();
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState('#4F46E5');
+  const [savingCategory, setSavingCategory] = useState(false);
+  
+  useEscapeKey(onClose);
   
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
@@ -91,8 +96,28 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
     const selectedOption = options.find((opt: any) => opt.id === value);
-    const filteredOptions = options.filter((opt: any) => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const parentSpaces = options.filter((opt: any) => opt.type === 'space');
+    const physicalSpaces = options.filter((opt: any) => opt.type === 'active');
+    
+    const filteredParents = parentSpaces.filter((opt: any) => 
+      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const filteredPhysical = physicalSpaces.filter((opt: any) => 
+      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const getChildrenOfSpace = (spaceId: string) => {
+      return physicalSpaces.filter((opt: any) => opt.parentId === spaceId);
+    };
+
+    const toggleExpand = (id: string) => {
+      setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     return (
       <div className="relative">
         <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm h-[52px] dark:text-white border-2 border-transparent focus:border-blue-600/30 flex items-center justify-between transition-all">
@@ -112,16 +137,88 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <Search size={14} className="text-gray-400 ml-2" />
               <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            <div className="max-h-60 overflow-y-auto custom-scrollbar">
-              {filteredOptions.length > 0 ? filteredOptions.map((opt: any) => (
-                <button key={opt.id} type="button" onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }} className="w-full text-left px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors flex items-center gap-3 border-b last:border-none dark:border-white/5">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${opt.type === 'space' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
-                    <span className="text-[8px] uppercase font-black text-gray-400">{opt.type === 'space' ? 'Espaço Pai' : 'Espaço Físico'}</span>
+            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+              {/* Espaços Pai com hierarquia */}
+              {filteredParents.length > 0 && filteredParents.map((space: any) => {
+                const children = getChildrenOfSpace(space.id);
+                const hasChildren = children.length > 0;
+                const isExpanded = expandedSpaces[space.id];
+                
+                return (
+                  <div key={space.id}>
+                    <div className="flex items-center">
+                      {hasChildren && (
+                        <button 
+                          type="button"
+                          onClick={() => toggleExpand(space.id)}
+                          className="px-3 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                        >
+                          <ChevronDown size={14} className={`text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                      {!hasChildren && <div className="w-8" />}
+                      <button 
+                        type="button" 
+                        onClick={() => { onChange(space.id, 'space'); setIsOpen(false); setSearchTerm(""); }} 
+                        className="flex-1 text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors border-b dark:border-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold dark:text-zinc-200">{space.name}</span>
+                            <span className="text-[8px] uppercase font-black text-gray-400">Espaço Pai</span>
+                          </div>
+                          {hasChildren && (
+                            <span className="ml-auto text-[8px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{children.length}</span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                    {/* Filhos do Espaço Pai */}
+                    {hasChildren && isExpanded && children.map((child: any) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => { onChange(child.id, 'active'); setIsOpen(false); setSearchTerm(""); }}
+                        className="w-full text-left pl-12 pr-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors border-b dark:border-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold dark:text-zinc-200">{child.name}</span>
+                            <span className="text-[8px] uppercase font-black text-gray-400">Espaço Físico</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              )) : <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>}
+                );
+              })}
+              
+              {/* Espaços Físicos sem pai (nível root) */}
+              {filteredPhysical.filter((p: any) => !p.parentId).length > 0 && (
+                <>
+                  {filteredParents.length > 0 && <div className="border-t dark:border-white/5 my-1" />}
+                  <div className="p-2 bg-zinc-50 dark:bg-zinc-800/50">
+                    <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest px-2">Espaços Físicos Avulsos</p>
+                  </div>
+                  {filteredPhysical.filter((p: any) => !p.parentId).map((opt: any) => (
+                    <button key={opt.id} type="button" onClick={() => { onChange(opt.id, 'active'); setIsOpen(false); setSearchTerm(""); }} className="w-full text-left px-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors border-b last:border-none dark:border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
+                          <span className="text-[8px] uppercase font-black text-gray-400">Espaço Físico (sem pai)</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+              
+              {filteredParents.length === 0 && filteredPhysical.filter((p: any) => !p.parentId).length === 0 && (
+                <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+              )}
             </div>
           </div>
         )}
@@ -173,6 +270,30 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     } catch (error: any) { alert("ERRO: " + error.message); }
   };
 
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    try {
+      const res = await fetch('/api/categories/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName, color: newCategoryColor })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsCategoryModalOpen(false);
+        setNewCategoryName("");
+        setCategories(prev => [...prev, data]);
+        setFormData(prev => ({ ...prev, categoryId: data.id }));
+      }
+    } catch {
+      alert("Erro ao criar categoria");
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[500] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border dark:border-white/10">
@@ -202,13 +323,19 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Categoria</label>
-              <button 
-                type="button" 
-                onClick={() => router.push("/settings?tab=categories")}
-                className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
-              >
-                <Pencil size={12} />
-              </button>
+              {categories.length < 18 && (
+                <button 
+                  type="button" 
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
+                  title="Criar nova categoria"
+                >
+                  <CirclePlus size={14} />
+                </button>
+              )}
+              {categories.length >= 18 && (
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Limite: 18</span>
+              )}
             </div>
 
             {loadingCategories ? (
@@ -278,8 +405,8 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
               <SearchableSelect 
                 options={[
-                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space" })),
-                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active" }))
+                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
+                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.fatherSpaceId || null }))
                 ]}
                 value={formData.locationId}
                 onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
@@ -346,6 +473,56 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           </button>
         </div>
       </div>
+
+      {/* MODAL CRIAR CATEGORIA */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-[600] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border dark:border-white/10">
+            <div className="p-6 border-b dark:border-white/5 flex items-center justify-between">
+              <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase italic">Nova Categoria</h3>
+              <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Nome</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30"
+                  placeholder="Nome da categoria..."
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Cor</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {['#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF', '#60A5FA', '#93C5FD', '#BFDBFE', '#FCD34D', '#FDE68A', '#FEF3C7', '#FCA5A5', '#FECACA', '#FEE2E2', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#C4B5FD', '#DDD6FE'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewCategoryColor(color)}
+                      className={`w-8 h-8 rounded-lg transition-all hover:scale-110 ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={savingCategory || !newCategoryName.trim()}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-colors"
+              >
+                {savingCategory ? <Loader2 size={16} className="animate-spin" /> : <CirclePlus size={16} />}
+                Criar Categoria
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
