@@ -10,6 +10,7 @@ import {
   Activity, ClipboardList, Group
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
+import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import InteractiveFace from "@/components/svg/sad-face";
 
 // --- INTERFACES ---
@@ -67,12 +68,18 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  const [selectedColor, setSelectedColor] = useState('#4F46E5');
 
   // Permissões
   const isAdmin = user?.role === 'ADMIN';
   const isManager = user?.role === 'MANAGER';
   const canManageUsers = isAdmin || isManager;
   const canSeeLogs = isAdmin || isManager;
+
+  // Fechar modais com Esc
+  useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
+  useEscapeKey(() => setIsSpaceModalOpen(false), isSpaceModalOpen);
+  useEscapeKey(() => setIsAreaModalOpen(false), isAreaModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -336,7 +343,7 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  <button onClick={() => { setSelectedArea(null); setIsAreaModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  <button onClick={() => { setSelectedArea(null); setSelectedColor('#4F46E5'); setIsAreaModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categoriesList.map((category) => (
@@ -346,7 +353,7 @@ export default function SettingsPage() {
                       </div>
                       <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
                       <div className="flex gap-2 mt-4">
-                        <button onClick={() => { setSelectedArea(category); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
+                        <button onClick={() => { setSelectedArea(category); setSelectedColor(category.color || '#4F46E5'); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
                         <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
                       </div>
                     </div>
@@ -479,23 +486,91 @@ export default function SettingsPage() {
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Área" defaultValue={selectedArea?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
 
-              <div className="space-y-1">
+              <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-2">
                   Cor de Identificação
                 </label>
 
-                {/* Container com overflow-hidden para garantir as bordas arredondadas e hover */}
-                <div className="relative w-full h-14 rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-white/10 group hover:border-blue-500/50 transition-colors shadow-sm cursor-pointer">
-                  <input
-                    name="color"
-                    type="color"
-                    defaultValue={selectedArea?.color || '#2563eb'}
-                    className="absolute inset-0 w-full h-full cursor-pointer bg-transparent border-none p-0 outline-none
-                              [&::-webkit-color-swatch-wrapper]:p-0 
-                              [&::-webkit-color-swatch]:border-none 
-                              [&::-moz-color-swatch]:border-none"
-                  />
+                <div className="grid grid-cols-6 gap-2">
+                  {/* Pastel varied palette - Indigo */}
+                  {['#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Blue */}
+                  {['#60A5FA', '#93C5FD', '#BFDBFE'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Amber */}
+                  {['#FCD34D', '#FDE68A', '#FEF3C7'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Red/Pink */}
+                  {['#FCA5A5', '#FECACA', '#FEE2E2'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Green/Emerald */}
+                  {['#6EE7B7', '#A7F3D0', '#D1FAE5'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Purple/Violet */}
+                  {['#C4B5FD', '#DDD6FE', '#EDE9FE'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  {/* Teal/Cyan */}
+                  {['#5EEAD4', '#99F6E4', '#CCFBF1'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
                 </div>
+                <input type="hidden" name="color" value={selectedColor} />
               </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
