@@ -42,3 +42,26 @@ export function getPhysicalSpaceColors(hasContent: boolean = true) {
 export function getParentSpaceColors(hasContent: boolean = true) {
   return hasContent ? TYPE_COLORS.PARENT_SPACE : TYPE_COLORS.EMPTY;
 }
+
+export function getItemColors(isPhysicalSpace: boolean, hasSubItems: boolean) {
+  if (isPhysicalSpace) {
+    return hasSubItems ? TYPE_COLORS.PHYSICAL_SPACE : TYPE_COLORS.EMPTY;
+  }
+  return TYPE_COLORS.ACTIVE;
+}
+
+export const CATEGORY_PALETTE = [
+  '#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF',
+  '#60A5FA', '#93C5FD', '#BFDBFE',
+  '#FCD34D', '#FDE68A', '#FEF3C7',
+  '#FCA5A5', '#FECACA', '#FEE2E2',
+  '#6EE7B7', '#A7F3D0', '#D1FAE5',
+  '#C4B5FD', '#DDD6FE', '#EDE9FE',
+  '#5EEAD4', '#99F6E4', '#CCFBF1',
+];
+
+export function getCategoryColor(categoryId: string, categories: { id: string }[]) {
+  const index = categories.findIndex(c => c.id === categoryId);
+  if (index === -1) return '#94a3b8';
+  return CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+}
