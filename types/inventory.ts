@@ -6,7 +6,7 @@ export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type Theme = 'DARK' | 'LIGHT' | 'SISTEM';
 
 // --- INTERFACES DE MODELO (Refletindo o Prisma) ---
-export interface Area {
+export interface Category {
   id: string;
   name: string;
   color?: string | null;
@@ -16,6 +16,9 @@ export interface Area {
   // Relacionamento inverso
   actives?: Active[];
 }
+
+// Alias para retrocompatibilidade
+export type Area = Category;
 
 export interface Log {
   id: string;
