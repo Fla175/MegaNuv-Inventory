@@ -41,7 +41,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   useEscapeKey(() => setMovingItem(null), !!movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
 
-  // --- BUSCA DE ÁREAS PARA MAPEAMENTO ---
+  // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
@@ -223,7 +223,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
           
-          // SOLUÇÃO: Pega a área diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
+          // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
           const a = active.category || categories.find(ar => ar.id === active.categoryId);
 
           return (
