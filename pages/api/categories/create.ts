@@ -24,21 +24,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
 
-    // 2. AUTORIZAÇÃO (Apenas ADMIN cria áreas)
+    // 2. AUTORIZAÇÃO (Apenas ADMIN cria categorias)
     if (decoded.role !== "ADMIN") {
-      return res.status(403).json({ error: "Apenas administradores podem criar áreas." });
+      return res.status(403).json({ error: "Apenas administradores podem criar categorias." });
+    }
+
+    // 3. LIMITE DE CATEGORIAS (máximo 18)
+    const categoryCount = await prisma.category.count();
+    if (categoryCount >= 18) {
+      return res.status(400).json({ error: "Limite máximo de 18 categorias atingido." });
     }
 
     const { name, color } = req.body;
 
-    if (!name) return res.status(400).json({ error: "O nome da área é obrigatório." });
+    if (!name) return res.status(400).json({ error: "O nome da categoria é obrigatório." });
 
-    // 3. EXECUÇÃO
-    const newArea = await prisma.category.create({
+    // 4. EXECUÇÃO
+    const newCategory = await prisma.category.create({
       data: { name, color }
     });
 
-    // 4. REGISTRO DE AUDITORIA
+    // 5. REGISTRO DE AUDITORIA
     await createLog(
       req, 
       decoded.userId, 
@@ -46,19 +52,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `Criou a Categoria: ${name} (${color || 'sem cor definida'})`
     );
 
-    return res.status(201).json(newArea);
+    return res.status(201).json(newCategory);
 
   } catch (error) {
-    console.error("API_AREA_CREATE_ERROR:", error);
+    console.error("API_CATEGORY_CREATE_ERROR:", error);
     if (error instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: "Token inválido." });
     
     // Trata nome duplicado (Unique constraint no Prisma)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === 'P2002') {
-      return res.status(400).json({ error: "Já existe uma área com este nome." });
+      return res.status(400).json({ error: "Já existe uma categoria com este nome." });
     }
 
-    return res.status(500).json({ error: "Erro interno ao criar área." });
+    return res.status(500).json({ error: "Erro interno ao criar categoria." });
   } finally {
     await prisma.$disconnect();
   }
