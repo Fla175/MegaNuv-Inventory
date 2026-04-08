@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await createLog(
       req, 
       decoded.userId, 
-      "CREATE_AREA", 
+      "CRIAÇÃO DE CATEGORIA",
       `Criou a Categoria: ${name} (${color || 'sem cor definida'})`
     );
 

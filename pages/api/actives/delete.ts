@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await createLog(
       req,
       userId,
-      "DELETE_ACTIVE",
+      "DELEÇÃO DE ATIVO",
       `Excluiu o ativo: ${active.name} (ID: ${id})`
     );
 

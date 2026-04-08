@@ -47,7 +47,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    await createLog(req, userId, "CREATE_SPACE", `Criou o espaço pai: ${name} (ID: ${finalId})`);
+    await createLog(
+      req,
+      userId,
+      "CRIAÇÃO DE ESPAÇO PAI",
+      `Criou o espaço pai: ${name} (ID: ${finalId})`
+    );
 
     return res.status(201).json(newSpace);
 

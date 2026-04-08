@@ -37,7 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    await createLog(req, decoded.id, "UPDATE_ACTIVE", `Editou ativo ${id}`);
+    await createLog(
+      req,
+      decoded.id,
+      "EDIÇÃO DE ATIVO",
+      `Editou o Ativo ${id}`
+    );
     return res.status(200).json(updated);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

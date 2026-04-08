@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await createLog(
       req,
       decoded.userId,
-      "CLEAR_LOGS",
+      "LIMPEZA DE LOGS",
       `O histórico de logs foi limpo (Filtro: ${range === 'old' ? 'Mais de 30 dias' : 'Tudo'}).`
     );
 

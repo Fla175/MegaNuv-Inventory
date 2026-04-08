@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id, name, notes, parentId } = req.body;
     if (!id) return res.status(400).json({ error: "ID obrigatório." });
 
-    const updatedSpace = await db.fatherSpace.update({
+    const updatedFatherSpace = await db.fatherSpace.update({
       where: { id },
       data: {
         name,
@@ -35,9 +35,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    await createLog(req, userId, "UPDATE_SPACE", `Editou o espaço pai: ${updatedSpace.name} (ID: ${id})`);
+    await createLog(
+      req,
+      userId,
+      "EDIÇÃO DE ESPAÇO PAI",
+      `Editou o espaço pai: ${updatedFatherSpace.name} (ID: ${id})`
+    );
 
-    return res.status(200).json(updatedSpace);
+    return res.status(200).json(updatedFatherSpace);
 
   } catch (error: any) {
     console.error("ERRO father-spaces/update:", error);

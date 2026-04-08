@@ -63,7 +63,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       createdActives.push(newActive);
     }
 
-    await createLog(req, userId, "CREATE_ACTIVE", `Criou ${quantity} ativo(s): ${data.name}`);
+    await createLog(
+      req,
+      userId,
+      "CRIAÇÃO DE ATIVO",
+      `Criou ${quantity} ativo(s): ${data.name}`
+    );
 
     return res.status(201).json(createdActives);
   } catch (error: any) {
