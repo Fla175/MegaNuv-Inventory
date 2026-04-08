@@ -1,9 +1,9 @@
 // components/imageUpload.tsx
 /* eslint-disable @next/next/no-img-element */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
+import { useToast } from '@/lib/context/ToastContext';
 
 interface ImageUploadProps {
   value: string | null;
@@ -14,6 +14,7 @@ interface ImageUploadProps {
 export default function ImageUpload({ value, onChange, label = "Imagem" }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,13 +36,14 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
         const data = JSON.parse(text);
         if (!res.ok) throw new Error(data.error || "Erro no upload");
         onChange(data.publicUrl);
-      } catch (any) {
+        toast.showSuccess('Imagem enviada com sucesso.');
+      } catch {
         console.error("Conteúdo recebido do servidor:", text);
-        alert("O SERVIDOR ENVIOU HTML EM VEZ DE JSON. INÍCIO DO ERRO:\n\n" + text.substring(0, 500));
+        toast.showError('Erro no servidor. Verifique a conexão e tente novamente.');
         return;
       }
     } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+      toast.showError(err.message || 'Erro ao enviar imagem.');
     } finally {
       setLoading(false);
     }

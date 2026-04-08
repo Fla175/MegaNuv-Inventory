@@ -5,6 +5,7 @@ import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Sear
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
+import { useToast } from "@/lib/context/ToastContext";
 import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
@@ -13,6 +14,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const toast = useToast();
   const [newCategoryColor, setNewCategoryColor] = useState('#4F46E5');
   const [savingCategory, setSavingCategory] = useState(false);
   
@@ -57,7 +59,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           });
         }
       } catch (err) {
-        console.error("Erro ao carregar áreas:", err);
+        console.error("Erro ao carregar categorias:", err);
       } finally {
         if (isMounted) setLoadingCategories(false);
       }
@@ -283,8 +285,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Erro na operação");
+      toast.showSuccess(mode === 'edit' ? 'Item atualizado com sucesso.' : 'Item criado com sucesso.');
       onClose();
-    } catch (error: any) { alert("ERRO: " + error.message); }
+    } catch (error: any) { 
+      toast.showError(error.message || 'Erro ao processar a operação.');
+    }
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -297,15 +302,18 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newCategoryName, color: newCategoryColor })
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setIsCategoryModalOpen(false);
         setNewCategoryName("");
         setCategories(prev => [...prev, data]);
         setFormData(prev => ({ ...prev, categoryId: data.id }));
+        toast.showSuccess('Categoria criada com sucesso.');
+      } else {
+        toast.showError(data.error || 'Erro ao criar categoria.');
       }
     } catch {
-      alert("Erro ao criar categoria");
+      toast.showError('Erro ao criar categoria.');
     } finally {
       setSavingCategory(false);
     }
