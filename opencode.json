@@ -1,13 +1,11 @@
 {
-  "agents": {
-    "default": {
-      "instructions": "Responder em português brasileiro (pt-BR) por padrão."
-    }
-  },
-  "skills": [
-    {
-      "name": "gear7",
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "Responder em português brasileiro (pt-BR) por padrão."
+  ],
+  "skills": {
+    "gear7": {
       "path": ".git/opencode/skills/gear7.md"
     }
-  ]
+  }
 }
