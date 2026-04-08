@@ -30,7 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await db.fatherSpace.delete({ where: { id } });
 
-    await createLog(req, userId, "DELETE_SPACE", `Removeu o espaço pai: ${space.name} (ID: ${id})`);
+    await createLog(
+      req,
+      userId,
+      "DELEÇÃO DE ESPAÇO PAI",
+      `Removeu o espaço pai: ${space.name} (ID: ${id})`
+    );
 
     return res.status(200).json({ message: "Espaço excluído com sucesso." });
 

@@ -8,7 +8,7 @@ import {
   MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
-import { getActiveColors, getPhysicalSpaceColors, getParentSpaceColors } from "../lib/constants/colors";
+import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 
 interface ListSectionProps {
   filters: any;
@@ -230,7 +230,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             <div key={active.id} className="animate-in slide-in-from-left-2 duration-300">
               <div 
                 onContextMenu={(e) => handleContextMenu(e, active, active.isPhysicalSpace)}
-                onClick={() => setSelectedViewItem(active)} 
+                onClick={() => setSelectedViewItem({ ...active, hasSubItems })} 
                 className="group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer border-b last:border-0 dark:border-white/5 transition-colors"
               >
                 <div className="flex items-center gap-4">
@@ -242,11 +242,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                       }
                     }}
                     className={`relative w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 transition-transform ${hasSubItems || active.isPhysicalSpace ? "cursor-pointer hover:scale-105 active:scale-95 border-2 border-blue-500/30" : "border dark:border-white/10"} ${
-                      active.isPhysicalSpace 
-                        ? `${getPhysicalSpaceColors(!hasSubItems).bg} ${getPhysicalSpaceColors(!hasSubItems).text}`
-                        : hasSubItems 
-                          ? `${getParentSpaceColors(true).bgDark} text-white`
-                          : `${getActiveColors(true).bg} ${getActiveColors(true).text}`
+                      getItemColors(active.isPhysicalSpace, hasSubItems).bg
+                    } ${
+                      getItemColors(active.isPhysicalSpace, hasSubItems).text
                     }`}
                   >
                     {active.isPhysicalSpace ? <Layers size={20} /> : <Box size={20} />}
@@ -256,16 +254,16 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                     <h4 className="text-sm font-black text-gray-800 dark:text-zinc-200 uppercase tracking-tight line-clamp-1">{active.name}</h4>
                     <div className="flex items-center mt-0.5">
                       {active.isPhysicalSpace &&
-                        <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getPhysicalSpaceColors(!hasSubItems).text}`}>Espaço Físico</p>
+                        <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getItemColors(true, hasSubItems).text}`}>Espaço Físico</p>
                       }
                       
                       {a && (
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-2"
                           style={{ 
-                            color: a.color || "#94a3b8", 
-                            backgroundColor: `${a.color || "#94a3b8"}10`, 
-                            borderColor: `${a.color || "#94a3b8"}30` 
+                            color: getCategoryColor(a.id, categories), 
+                            backgroundColor: `${getCategoryColor(a.id, categories)}15`, 
+                            borderColor: `${getCategoryColor(a.id, categories)}40` 
                           }}
                         >
                           {a.name}
@@ -356,7 +354,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             {/* Cabeçalho */}
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-white/[0.02] shrink-0">
                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-2xl ${selectedViewItem.isPhysicalSpace ? getPhysicalSpaceColors(true).bg + ' ' + getPhysicalSpaceColors(true).text : getActiveColors(true).bg + ' ' + getActiveColors(true).text}`}>
+                  <div className={`p-3 rounded-2xl ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).bg} ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).text}`}>
                     {selectedViewItem.isPhysicalSpace ? <MapPin size={24}/> : <Box size={24}/>}
                   </div>
                   <div>
@@ -574,14 +572,10 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Ações do Item</p>
             <p className="text-[10px] font-black dark:text-white truncate uppercase">{contextMenu.item.name}</p>
           </div>
-          <ContextBtn icon={<Eye size={16}/>} label="Visualizar Detalhes" onClick={() => setSelectedViewItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
+           <ContextBtn icon={<Eye size={16}/>} label="Visualizar Detalhes" onClick={() => setSelectedViewItem({ ...contextMenu.item, hasSubItems: actives.some(a => a.parentId === contextMenu.item.id) })} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Pencil size={16}/>} label="Editar Registro" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
-          {!contextMenu.isPhysicalSpace && (
-            <>
-              <ContextBtn icon={<Move size={16}/>} label="Mover para outro local" onClick={() => setMovingItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
-              <ContextBtn icon={<Copy size={16}/>} label="Clonar Ativo" onClick={() => handleCloneClick(contextMenu.item)} onClose={() => setContextMenu(null)} />
-            </>
-          )}
+          <ContextBtn icon={<Move size={16}/>} label="Mover para outro local" onClick={() => setMovingItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
+          <ContextBtn icon={<Copy size={16}/>} label="Clonar Ativo" onClick={() => handleCloneClick(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Printer size={16}/>} label="Imprimir Etiqueta" onClick={() => setSelectedPrintItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <div className="mt-1 pt-1 border-t dark:border-white/5">
             <ContextBtn icon={<Trash2 size={16}/>} label="Remover Registro" onClick={() => handleDelete(contextMenu.item)} danger onClose={() => setContextMenu(null)} />

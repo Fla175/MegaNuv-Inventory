@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return res.status(400).json({ error: "O ID da área é obrigatório." });
 
     // 1. Executa o Update
-    const updatedArea = await prisma.category.update({
+    const updatedCategory = await prisma.category.update({
       where: { id },
       data: { name, color },
     });
@@ -42,11 +42,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await createLog(
       req,
       decoded.userId,
-      "UPDATE_AREA",
-      `Atualizou a área ID: ${id}. Novo Nome: ${name}, Cor: ${color}`
+      "ATUALIZAÇÃO DA CATEGORIA",
+      `Atualizou a categoria; ID: ${id}. Novo Nome: ${name}, Cor: ${color}`
     );
 
-    return res.status(200).json(updatedArea);
+    return res.status(200).json(updatedCategory);
 
   } catch (error) {
     console.error("API_AREA_UPDATE_ERROR:", error);

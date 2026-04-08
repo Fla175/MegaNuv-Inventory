@@ -51,7 +51,7 @@ model Category {
 model Log {
   id        String   @id @default(uuid())
   action    String   // Ex: "CREATE_ACTIVE", "LOGIN", "MOVE_ACTIVE", "DELETE_USER"
-  details   String   @db.Text // JSON ou string detalhando o que mudou
+  details   String   @db.Text
   ip        String?
   userAgent String?  @db.Text
   

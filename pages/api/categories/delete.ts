@@ -44,8 +44,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await createLog(
       req,
       decoded.userId,
-      "DELETE_AREA",
-      `Removeu permanentemente a área: ${categoryToDelete.name}`
+      "DELEÇÃO DE CATEGORIA",
+      `Removeu a Categoria: ${categoryToDelete.name}`
     );
 
     return res.status(200).json({ message: "Área removida com sucesso." });

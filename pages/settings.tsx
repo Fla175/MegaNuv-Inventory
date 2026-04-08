@@ -384,7 +384,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="flex-grow">
                           <div className="flex justify-between">
-                            <span className="font-black text-blue-950 dark:text-white uppercase italic">{log.action} • {log.resource}</span>
+                            <span className="font-black text-blue-950 dark:text-white uppercase italic">{log.action}</span>
                             <span className="text-zinc-400 font-bold">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
                           <p className="text-zinc-500 mt-1 font-bold">{log.details}</p>
@@ -492,74 +492,7 @@ export default function SettingsPage() {
                 </label>
 
                 <div className="grid grid-cols-6 gap-2">
-                  {/* Pastel varied palette - Indigo */}
-                  {['#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Blue */}
-                  {['#60A5FA', '#93C5FD', '#BFDBFE'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Amber */}
-                  {['#FCD34D', '#FDE68A', '#FEF3C7'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Red/Pink */}
-                  {['#FCA5A5', '#FECACA', '#FEE2E2'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Green/Emerald */}
-                  {['#6EE7B7', '#A7F3D0', '#D1FAE5'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Purple/Violet */}
-                  {['#C4B5FD', '#DDD6FE', '#EDE9FE'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {/* Teal/Cyan */}
-                  {['#5EEAD4', '#99F6E4', '#CCFBF1'].map((color) => (
+                  {['#FFD700', '#FF8C00', '#2ECC71', '#A2D149', '#007BFF', '#004085', '#98A6B0', '#8E44AD', '#17A2B8', '#40E0D0', '#2980B9', '#6F42C1', '#E74C3C', '#800020', '#2C3E50', '#A0522D', '#7AA9BD', '#D81B60'].map((color) => (
                     <button
                       key={color}
                       type="button"
