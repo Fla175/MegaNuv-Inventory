@@ -8,35 +8,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // 1. Verificação de Autenticação (Cookie ou Header)
   const token = req.headers.authorization?.split(' ')[1] || req.cookies['auth_token'];
   if (!token || !verifyAuthToken(token)) {
     return res.status(401).json({ message: 'Não autorizado.' });
   }
 
   try {
-    // Identificador único para a estrutura base no novo modelo
-    const isPhysicalSpace = true;
+    // 1. Garantir Categoria (ESTRUTURA)
+    let sysCategory = await prisma.category.findFirst({
+      where: { name: 'ESTRUTURA' }
+    });
 
-    /**
-     * No novo Schema, não temos mais ItemDefinition.
-     * Vamos usar a tabela Active com a flag isPhysicalSpace para representar
-     * esse "item de localização" genérico.
-     */
+    if (!sysCategory) {
+      sysCategory = await prisma.category.create({
+        data: {
+          name: 'ESTRUTURA',
+          color: '#6366f1',
+        }
+      });
+    }
+
+    // 2. Garantir um FatherSpace Base (Obrigatório pelo Schema)
+    // Usando '0000' como um ID padrão de sistema para a infraestrutura raiz
+    let sysFatherSpace = await prisma.fatherSpace.findFirst({
+      where: { name: 'INFRAESTRUTURA SISTEMA' }
+    });
+
+    if (!sysFatherSpace) {
+      sysFatherSpace = await prisma.fatherSpace.create({
+        data: {
+          id: '0000', 
+          name: 'INFRAESTRUTURA SISTEMA',
+          notes: 'Espaço pai gerado automaticamente para conter ativos de estrutura.'
+        }
+      });
+    }
     
+    // 3. Buscar ou criar o ativo base de localização
+    // Usando 'ffff' como ID para este ativo de sistema
     let locationActive = await prisma.active.findFirst({
-      where: { isPhysicalSpace: isPhysicalSpace },
+      where: { isPhysicalSpace: true },
     });
 
     if (!locationActive) {
       locationActive = await prisma.active.create({
         data: {
+          id: 'ffff', // ID manual hexadecimal
           name: 'Estrutura de Espaço Físico',
-          sku: '',
-          area: 'SERVIDOR',
+          sku: 'SYS-BASE',
+          categoryId: sysCategory.id,
           isPhysicalSpace: true,
+          fatherSpaceId: sysFatherSpace.id, // Agora passamos o ID obrigatório
           tag: 'IN-USE',
-          quantity: 1,
           notes: 'Ativo gerado automaticamente para representar definições de estrutura física no sistema.',
           manufacturer: 'Sistema',
           model: 'Base v2',
@@ -45,12 +68,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Retornamos os IDs conforme o novo mapeamento
     return res.status(200).json({
       message: 'Estrutura base de Ativo Físico garantida!',
       activeId: locationActive.id,
       isPhysical: locationActive.isPhysicalSpace,
-      area: locationActive.area
+      categoryId: locationActive.categoryId,
+      fatherSpaceId: locationActive.fatherSpaceId
     });
 
   } catch (error) {

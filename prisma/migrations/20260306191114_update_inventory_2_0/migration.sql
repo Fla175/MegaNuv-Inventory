@@ -44,7 +44,7 @@ CREATE TABLE `FatherSpace` (
 CREATE TABLE `Active` (
     `id` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
-    `area` ENUM('ENERGETICA', 'REDES', 'SERVIDOR', 'MANUTENCAO') NOT NULL,
+    `category` ENUM('ENERGETICA', 'REDES', 'SERVIDOR', 'MANUTENCAO') NOT NULL,
     `sku` VARCHAR(191) NULL,
     `manufacturer` VARCHAR(191) NULL,
     `model` VARCHAR(191) NULL,

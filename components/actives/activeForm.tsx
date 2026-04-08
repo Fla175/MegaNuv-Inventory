@@ -1,17 +1,27 @@
 // components/actives/activeForm.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
-import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2 } from "lucide-react";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
+import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState('#4F46E5');
+  const [savingCategory, setSavingCategory] = useState(false);
+  
+  useEscapeKey(onClose);
+  
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
     isPhysicalSpace: false,
     name: "",
-    area: "SERVIDOR" as any,
+    categoryId: "" as string,
     sku: "",
     manufacturer: "",
     model: "",
@@ -26,34 +36,88 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     locationType: "" as "space" | "active" | "", 
   });
 
-  const areas = ["ENERGETICA", "REDES", "SERVIDOR", "MANUTENCAO"];
   const tags = ["IN-STOCK", "IN-USE"];
 
+  // Busca as Áreas do Banco (Corrigida a dependência para não causar loop)
   useEffect(() => {
-    if (initialData) {
+    let isMounted = true;
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/categories/list');
+        const data = await res.json();
+        if (res.ok && isMounted) {
+          setCategories(data);
+          // Atualiza via callback (prev) para não perder outros dados que o usuário já mexeu
+          setFormData(prev => {
+            if (mode === 'create' && data.length > 0 && !prev.categoryId) {
+              return { ...prev, categoryId: data[0].id };
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error("Erro ao carregar áreas:", err);
+      } finally {
+        if (isMounted) setLoadingCategories(false);
+      }
+    }
+    fetchCategories();
+    return () => { isMounted = false; };
+  }, [mode]);
+
+  // Carrega os dados iniciais com segurança
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
       const locId = initialData.fatherSpaceId || initialData.parentId || "";
       const locType = initialData.fatherSpaceId ? "space" : (initialData.parentId ? "active" : "");
 
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         ...initialData,
+        categoryId: initialData.categoryId || prev.categoryId,
         isPhysicalSpace: initialData.isPhysicalSpace ?? false,
         locationId: locId,
         locationType: locType,
         id: mode === "clone" ? undefined : initialData.id,
-        // No modo EDIT, garantimos que pegamos o serialNumber único do objeto
         serialNumbers: mode === "clone" 
           ? Array(initialData.quantity || 1).fill("") 
           : [initialData.serialNumber || ""],
-      });
+      }));
     }
   }, [initialData, mode]);
 
-  // ... (SearchableSelect mantido igual)
+  const gridConfig = useMemo(() => {
+    const len = categories.length;
+    if (len <= 4) return `grid-cols-${len}`;
+    if (len > 4) return "grid-cols-4";
+    return "grid-cols-2 sm:grid-cols-4 justify-center"; 
+  }, [categories]);
+
   function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
     const selectedOption = options.find((opt: any) => opt.id === value);
-    const filteredOptions = options.filter((opt: any) => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const parentSpaces = options.filter((opt: any) => opt.type === 'space');
+    const physicalSpaces = options.filter((opt: any) => opt.type === 'active');
+    
+    const filteredParents = parentSpaces.filter((opt: any) => 
+      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const filteredPhysical = physicalSpaces.filter((opt: any) => 
+      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const getChildrenOfSpace = (spaceId: string) => {
+      return physicalSpaces.filter((opt: any) => opt.parentId === spaceId);
+    };
+
+    const toggleExpand = (id: string) => {
+      setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     return (
       <div className="relative">
         <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm h-[52px] dark:text-white border-2 border-transparent focus:border-blue-600/30 flex items-center justify-between transition-all">
@@ -73,16 +137,88 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <Search size={14} className="text-gray-400 ml-2" />
               <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            <div className="max-h-60 overflow-y-auto custom-scrollbar">
-              {filteredOptions.length > 0 ? filteredOptions.map((opt: any) => (
-                <button key={opt.id} type="button" onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }} className="w-full text-left px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors flex items-center gap-3 border-b last:border-none dark:border-white/5">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${opt.type === 'space' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
-                    <span className="text-[8px] uppercase font-black text-gray-400">{opt.type === 'space' ? 'Espaço Pai' : 'Espaço Físico'}</span>
+            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+              {/* Espaços Pai com hierarquia */}
+              {filteredParents.length > 0 && filteredParents.map((space: any) => {
+                const children = getChildrenOfSpace(space.id);
+                const hasChildren = children.length > 0;
+                const isExpanded = expandedSpaces[space.id];
+                
+                return (
+                  <div key={space.id}>
+                    <div className="flex items-center">
+                      {hasChildren && (
+                        <button 
+                          type="button"
+                          onClick={() => toggleExpand(space.id)}
+                          className="px-3 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                        >
+                          <ChevronDown size={14} className={`text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                      {!hasChildren && <div className="w-8" />}
+                      <button 
+                        type="button" 
+                        onClick={() => { onChange(space.id, 'space'); setIsOpen(false); setSearchTerm(""); }} 
+                        className="flex-1 text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors border-b dark:border-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold dark:text-zinc-200">{space.name}</span>
+                            <span className="text-[8px] uppercase font-black text-gray-400">Espaço Pai</span>
+                          </div>
+                          {hasChildren && (
+                            <span className="ml-auto text-[8px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{children.length}</span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                    {/* Filhos do Espaço Pai */}
+                    {hasChildren && isExpanded && children.map((child: any) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => { onChange(child.id, 'active'); setIsOpen(false); setSearchTerm(""); }}
+                        className="w-full text-left pl-12 pr-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors border-b dark:border-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold dark:text-zinc-200">{child.name}</span>
+                            <span className="text-[8px] uppercase font-black text-gray-400">Espaço Físico</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              )) : <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>}
+                );
+              })}
+              
+              {/* Espaços Físicos sem pai (nível root) */}
+              {filteredPhysical.filter((p: any) => !p.parentId).length > 0 && (
+                <>
+                  {filteredParents.length > 0 && <div className="border-t dark:border-white/5 my-1" />}
+                  <div className="p-2 bg-zinc-50 dark:bg-zinc-800/50">
+                    <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest px-2">Espaços Físicos Avulsos</p>
+                  </div>
+                  {filteredPhysical.filter((p: any) => !p.parentId).map((opt: any) => (
+                    <button key={opt.id} type="button" onClick={() => { onChange(opt.id, 'active'); setIsOpen(false); setSearchTerm(""); }} className="w-full text-left px-4 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors border-b last:border-none dark:border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
+                          <span className="text-[8px] uppercase font-black text-gray-400">Espaço Físico (sem pai)</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+              
+              {filteredParents.length === 0 && filteredPhysical.filter((p: any) => !p.parentId).length === 0 && (
+                <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+              )}
             </div>
           </div>
         )}
@@ -105,9 +241,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   };
 
   const handleSerialUpdate = (index: number, value: string) => {
-    const updatedSerials = [...formData.serialNumbers];
-    updatedSerials[index] = value;
-    setFormData({ ...formData, serialNumbers: updatedSerials });
+    setFormData(prev => {
+      const updatedSerials = [...prev.serialNumbers];
+      updatedSerials[index] = value;
+      return { ...prev, serialNumbers: updatedSerials };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,25 +253,45 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     const payload = { 
       ...formData, 
       serialNumbers: formData.serialNumbers, 
-      isPhysicalSpace: !!formData.isPhysicalSpace,
+      isPhysicalSpace: !!formData.isPhysicalSpace, // Garantia final do valor real
       fatherSpaceId: formData.locationType === "space" ? formData.locationId : null,
       parentId: formData.locationType === "active" ? formData.locationId : null
     };
     try {
       const isEdit = mode === "edit";
       const url = isEdit ? `/api/actives/update` : `/api/actives/create`;
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json", ...(token && { "Authorization": `Bearer ${token}` }) },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Erro na operação");
-      alert(mode === 'clone' ? "Clonado com sucesso!" : "Salvo com sucesso!");
+      if (!response.ok) throw new Error("Erro na operação");
       onClose();
     } catch (error: any) { alert("ERRO: " + error.message); }
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    try {
+      const res = await fetch('/api/categories/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName, color: newCategoryColor })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsCategoryModalOpen(false);
+        setNewCategoryName("");
+        setCategories(prev => [...prev, data]);
+        setFormData(prev => ({ ...prev, categoryId: data.id }));
+      }
+    } catch {
+      alert("Erro ao criar categoria");
+    } finally {
+      setSavingCategory(false);
+    }
   };
 
   return (
@@ -156,27 +314,63 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          
-          {mode === "create" && (
-            <div className="flex bg-gray-100 dark:bg-zinc-950 p-1.5 rounded-2xl border dark:border-white/5 shadow-inner">
-              <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: false }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${!formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><Briefcase size={14} /> Ativo</button>
-              <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: true }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><MapPin size={14} /> Espaço Físico</button>
-            </div>
-          )}
+          <div className="flex bg-gray-100 dark:bg-zinc-950 p-1.5 rounded-2xl border dark:border-white/5 shadow-inner">
+            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: false }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${!formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><Briefcase size={14} /> Ativo</button>
+            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: true }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><MapPin size={14} /> Espaço Físico</button>
+          </div>
 
+          {/* AREA DE FOCO */}
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 block tracking-widest">Área de Foco</label>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              {areas.map((area) => (
-                <button key={area} type="button" onClick={() => setFormData({ ...formData, area: area as any })} className={`flex-1 min-w-[120px] py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${formData.area === area ? "border-blue-600 bg-blue-50 text-blue-600 dark:bg-blue-600/20 dark:text-blue-400 dark:border-blue-500/50" : "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800"}`}>{area === "ENERGETICA" ? "Energética" : area === "MANUTENCAO" ? "Manutenção" : area}</button>
-              ))}
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Categoria</label>
+              {categories.length < 18 && (
+                <button 
+                  type="button" 
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
+                  title="Criar nova categoria"
+                >
+                  <CirclePlus size={14} />
+                </button>
+              )}
+              {categories.length >= 18 && (
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Limite: 18</span>
+              )}
             </div>
+
+            {loadingCategories ? (
+               <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando áreas...</div>
+            ) : (
+              <div className={`grid gap-2 ${gridConfig}`}>
+                {categories.map((category) => {
+                  const isSelected = formData.categoryId === category.id;
+                  const color = category.color || '#2563eb';
+                  
+                  return (
+                    <button 
+                      key={category.id} 
+                      type="button" 
+                      onClick={() => setFormData(prev => ({ ...prev, categoryId: category.id }))} 
+                      style={isSelected ? { 
+                        borderColor: color, 
+                        backgroundColor: `${color}15`, 
+                        color: color 
+                      } : {}}
+                      className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
+                    >
+                      {category.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Nome do Registro</label>
-              <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              {/* CORREÇÃO DO STALE STATE ABAIXO (Usando prev => ...) */}
+              <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData(prev => ({...prev, name: e.target.value}))} />
             </div>
 
             <div className="relative">
@@ -193,7 +387,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                   <div className="absolute z-[600] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-1">
                       {tags.map((tag) => (
-                        <button key={tag} type="button" onClick={() => { setFormData({ ...formData, tag: tag }); setIsStatusOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 mb-1 last:mb-0 ${formData.tag === tag ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400" : "hover:bg-gray-50 dark:hover:bg-white/5 dark:text-zinc-200"}`}>
+                        <button key={tag} type="button" onClick={() => { setFormData(prev => ({ ...prev, tag: tag })); setIsStatusOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 mb-1 last:mb-0 ${formData.tag === tag ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400" : "hover:bg-gray-50 dark:hover:bg-white/5 dark:text-zinc-200"}`}>
                           <div className={`w-2 h-2 rounded-full ${tag === 'IN-STOCK' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                           <span className="text-sm font-bold">{tag === "IN-STOCK" ? "Em Estoque" : "Em Uso"}</span>
                         </button>
@@ -208,24 +402,23 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização (Onde está?)</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
               <SearchableSelect 
                 options={[
-                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space" })),
-                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active" }))
+                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
+                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.fatherSpaceId || null }))
                 ]}
                 value={formData.locationId}
-                onChange={(id: string, type: any) => setFormData({ ...formData, locationId: id, locationType: type })}
-                placeholder="Ex: MegaNuv, Prateleira A..."
+                onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
+                placeholder="Selecione local..."
+                required
               />
             </div>
-            {/* GRID DINÂMICA: No modo edit ocupa 1 coluna, senão 2 */}
             <div className={`grid ${mode === 'edit' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Vlr. Unitário</label>
-                <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData({...formData, fixedValue: parseFloat(e.target.value) || 0})} />
+                <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData(prev => ({...prev, fixedValue: parseFloat(e.target.value) || 0}))} />
               </div>
-              {/* QUANTIDADE APENAS SE NÃO FOR MODO EDIÇÃO */}
               {mode !== "edit" && (
                 <div>
                   <label className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block">Quantidade</label>
@@ -239,11 +432,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Fabricante</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} />
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.manufacturer} onChange={e => setFormData(prev => ({...prev, manufacturer: e.target.value}))} />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Modelo</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} />
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.model} onChange={e => setFormData(prev => ({...prev, model: e.target.value}))} />
                 </div>
               </div>
 
@@ -254,9 +447,8 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2">
                   {formData.serialNumbers.map((sn, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      {/* OMITIMOS O INDEX (#1) SE FOR APENAS UM (MODO EDIÇÃO) */}
                       {mode !== "edit" && <span className="text-[9px] font-black text-zinc-400 w-4">#{idx + 1}</span>}
-                      <input className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm" placeholder="Insira o serial..." value={sn} onChange={e => handleSerialUpdate(idx, e.target.value)} />
+                      <input className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono uppercase placeholder:normal-case text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm" placeholder="Insira o serial..." value={sn} onChange={e => handleSerialUpdate(idx, e.target.value)} />
                     </div>
                   ))}
                 </div>
@@ -264,13 +456,13 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData({...formData, imageUrl: url})} label="Foto do Ativo" />
-            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData({...formData, fileUrl: url})} label="Documento" />
+            <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData(prev => ({...prev, imageUrl: url}))} label="Foto do Ativo" />
+            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Documento" />
           </div>
 
           <div>
             <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Observações Adicionais</label>
-            <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+            <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData(prev => ({...prev, notes: e.target.value}))} />
           </div>
         </form>
 
@@ -281,6 +473,56 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           </button>
         </div>
       </div>
+
+      {/* MODAL CRIAR CATEGORIA */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-[600] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border dark:border-white/10">
+            <div className="p-6 border-b dark:border-white/5 flex items-center justify-between">
+              <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase italic">Nova Categoria</h3>
+              <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Nome</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30"
+                  placeholder="Nome da categoria..."
+                  autoFocus
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Cor</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {['#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF', '#60A5FA', '#93C5FD', '#BFDBFE', '#FCD34D', '#FDE68A', '#FEF3C7', '#FCA5A5', '#FECACA', '#FEE2E2', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#C4B5FD', '#DDD6FE'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewCategoryColor(color)}
+                      className={`w-8 h-8 rounded-lg transition-all hover:scale-110 ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={savingCategory || !newCategoryName.trim()}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-colors"
+              >
+                {savingCategory ? <Loader2 size={16} className="animate-spin" /> : <CirclePlus size={16} />}
+                Criar Categoria
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

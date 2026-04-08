@@ -1,61 +1,41 @@
 // pages/api/father-spaces/delete.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
+import db from "@/lib/prisma"; 
+import * as jwt from "jsonwebtoken";
+import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "DELETE") {
-    return res.status(405).json({ error: "Método não permitido. Use DELETE." });
-  }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "DELETE") return res.status(405).json({ error: "Use DELETE." });
 
   try {
+    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    // Mock do usuário temporário
-    const user = {
-      id: "",
-      role: "ADMIN" 
-    };
+    const decoded = jwt.verify(token, JWT_SECRET!) as any;
+    const userId = decoded.id || decoded.userId;
 
-    // Regra de Ouro: MANAGER e VIEWER são barrados aqui
-    if (user.role !== "ADMIN") {
-      return res.status(403).json({ 
-        error: "Acesso negado. Apenas administradores podem excluir espaços pai." 
-      });
+    if (decoded.role !== "ADMIN") {
+      return res.status(403).json({ error: "Acesso negado. Apenas admins excluem espaços." });
     }
 
-    // 2. OBTER O ID DO ESPAÇO
     const { id } = req.query;
+    if (!id || typeof id !== "string") return res.status(400).json({ error: "ID inválido." });
 
-    if (!id || typeof id !== "string") {
-      return res.status(400).json({ error: "O ID do espaço pai é obrigatório." });
-    }
+    // Busca o nome para o log antes de apagar
+    const space = await db.fatherSpace.findUnique({ where: { id } });
+    if (!space) return res.status(404).json({ error: "Espaço não encontrado." });
 
-    // 3. EXCLUSÃO NO BANCO DE DADOS
-    const deletedSpace = await prisma.fatherSpace.delete({
-      where: { id: id },
-    });
+    await db.fatherSpace.delete({ where: { id } });
 
-    return res.status(200).json({ 
-      message: "Espaço pai e suas sub-divisões excluídos com sucesso.",
-      id: deletedSpace.id
-    });
+    await createLog(req, userId, "DELETE_SPACE", `Removeu o espaço pai: ${space.name} (ID: ${id})`);
 
-  } catch (error: unknown) {
+    return res.status(200).json({ message: "Espaço excluído com sucesso." });
+
+  } catch (error: any) {
     console.error("ERRO father-spaces/delete:", error);
-
-    // Tratamento para registro não encontrado
-    if (typeof error === 'object' && error !== null && 'code' in error) {
-        if ((error as { code: string }).code === 'P2025') {
-            return res.status(404).json({ error: "O espaço pai solicitado não existe." });
-        }
-    }
-
-    return res.status(500).json({ error: "Erro interno ao excluir o espaço pai." });
-  } finally {
-    await prisma.$disconnect();
+    return res.status(500).json({ error: "Erro ao excluir. Verifique se há ativos vinculados a este espaço." });
   }
 }

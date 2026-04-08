@@ -38,7 +38,7 @@ model User {
   logs           Log[]         @relation("UserLogs")
 }
 
-model Area {
+model Category {
   id        String   @id @default(uuid())
   name      String   @unique // Ex: "Redes", "Servidor"
   color     String?  // Opcional: para UX no frontend
@@ -66,7 +66,7 @@ model Log {
 }
 
 model FatherSpace {
-  id    String  @id @default(uuid())
+  id    String  @id
   name  String  @unique
   notes String? @db.Text
 
@@ -87,12 +87,12 @@ model FatherSpace {
 }
 
 model Active {
-  id   String @id @default(uuid())
+  id   String  @id
   name String
 
-  // RELAÇÃO COM AREA (Substituindo o Enum)
-  areaId String?
-  area   Area?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  // RELAÇÃO COM CATEGORY (Substituindo o Enum)
+  categoryId String?
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   sku          String?
   manufacturer String?
@@ -108,8 +108,8 @@ model Active {
   tag             String  @default("IN-STOCK")
   notes           String? @db.Text
 
-  fatherSpaceId String?
-  fatherSpace   FatherSpace? @relation(fields: [fatherSpaceId], references: [id], onDelete: SetNull)
+  fatherSpaceId String
+  fatherSpace   FatherSpace @relation(fields: [fatherSpaceId], references: [id])
 
   createdById String?
   createdBy   User?   @relation("UserToActive", fields: [createdById], references: [id])
@@ -123,5 +123,5 @@ model Active {
   @@index([fatherSpaceId])
   @@index([parentId])
   @@index([createdById])
-  @@index([areaId])
+  @@index([categoryId])
 }

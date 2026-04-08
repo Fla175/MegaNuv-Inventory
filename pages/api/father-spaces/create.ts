@@ -1,94 +1,58 @@
 // pages/api/father-spaces/create.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import * as Jwt from "jsonwebtoken";
+import db from "@/lib/prisma"; 
+import * as jwt from "jsonwebtoken";
+import { randomBytes } from "crypto";
+import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-interface CreateFatherSpacePayload {
-  name: string;
-  notes?: string;
-  parentId?: string;
-}
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // 1. Bloqueio de método
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido. Use POST." });
-  }
-
-  // 2. Verificação do Token
-  const token = req.cookies.auth_token;
-
-  if (!token) {
-    return res.status(401).json({ message: "Sessão expirada ou usuário não autenticado." });
-  }
-
-  if (!JWT_SECRET) {
-    console.error("ERRO: JWT_SECRET não definida no ambiente.");
-    return res.status(500).json({ error: "Erro de configuração no servidor." });
-  }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
 
   try {
-    // 3. Validação do JWT e extração de ID e ROLE
-    const decoded = Jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const user = {
-      id: decoded.id,
-      role: decoded.role
-    };
+    const decoded = jwt.verify(token, JWT_SECRET!) as any;
+    const userId = decoded.id || decoded.userId || decoded.sub;
 
-    // 4. Regra de Acesso: Apenas ADMIN
-    if (user.role !== "ADMIN") {
-      return res.status(403).json({ 
-        error: "Permissão insuficiente. Apenas administradores podem criar espaços." 
-      });
+    if (decoded.role !== "ADMIN") {
+      return res.status(403).json({ error: "Acesso negado. Apenas admins criam espaços pai." });
     }
 
-    // 5. Validação dos Dados do Corpo
-    const { name, notes, parentId } = req.body as CreateFatherSpacePayload;
+    const { name, notes, parentId } = req.body;
 
     if (!name || name.trim().length < 2) {
-      return res.status(400).json({ error: "O nome do espaço deve ter pelo menos 2 caracteres." });
+      return res.status(400).json({ error: "Nome muito curto." });
     }
 
-    // 6. Verificação de Duplicidade
-    const existingSpace = await prisma.fatherSpace.findUnique({
-      where: { name: name.trim() }
-    });
-
-    if (existingSpace) {
-      return res.status(409).json({ error: "Já existe um espaço cadastrado com este nome." });
+    // SENSO COMUM: Gerar o ID manualmente para evitar erro de tipagem e garantir unicidade
+    let finalId = "";
+    let isUnique = false;
+    while (!isUnique) {
+      finalId = randomBytes(2).toString('hex').toUpperCase();
+      const exists = await db.fatherSpace.findUnique({ where: { id: finalId } });
+      if (!exists) isUnique = true;
     }
 
-    // 7. Persistência no Banco de Dados
-    const newSpace = await prisma.fatherSpace.create({
+    const newSpace = await db.fatherSpace.create({
       data: {
+        id: finalId, // Enviando o ID explicitamente
         name: name.trim(),
         notes: notes || null,
         parentId: parentId || null,
-        createdById: user.id
+        createdById: userId
       }
     });
 
+    await createLog(req, userId, "CREATE_SPACE", `Criou o espaço pai: ${name} (ID: ${finalId})`);
+
     return res.status(201).json(newSpace);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Sua sessão expirou. Faça login novamente." });
-    }
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ error: "Token inválido ou corrompido." });
-    }
-
-    console.error("ERRO CRÍTICO (father-spaces/create):", error);
-    return res.status(500).json({ error: "Falha interna ao criar o espaço pai." });
-  } finally {
-    await prisma.$disconnect();
+    console.error("ERRO father-spaces/create:", error.message);
+    return res.status(500).json({ error: "Erro interno.", details: error.message });
   }
 }

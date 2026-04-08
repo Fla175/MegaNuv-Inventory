@@ -4,7 +4,7 @@ import { Search, Factory, Cpu, LayoutGrid, ChevronDown, Trash } from "lucide-rea
 
 interface SearchFilters {
   query: string;
-  area: string;
+  searchCategory: string;
   manufacturer: string;
   model: string;
   category: string;
@@ -41,8 +41,8 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           <LayoutGrid className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <select 
             className="w-full bg-gray-50 dark:bg-zinc-950 p-4 pl-12 rounded-2xl outline-none font-bold text-sm appearance-none dark:text-white cursor-pointer border-2 border-transparent focus:border-blue-600/20"
-            value={filters.area}
-            onChange={(e) => handleInputChange("area", e.target.value)}
+            value={filters.category}
+            onChange={(e) => handleInputChange("category", e.target.value)}
           >
             <option value="" disabled>Selecione</option>
             <option value="ENERGETICA">Energética</option>
@@ -78,13 +78,13 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
       </div>
 
       {/* Indicador de Filtros Ativos (Opcional - Visual) */}
-      {(filters.query || filters.area || filters.manufacturer || filters.model) && (
+      {(filters.query || filters.category || filters.manufacturer || filters.model) && (
         <div className="flex items-center gap-2 pt-2">
           <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 dark:bg-blue-600/10 px-3 py-1 rounded-full">
             Filtros Ativos
           </span>
           <button 
-            onClick={() => setFilters({ query: "", area: "", manufacturer: "", model: "", category: "", tag: "" })}
+            onClick={() => setFilters({ query: "", searchCategory: "", manufacturer: "", model: "", category: "", tag: "" })}
             className="text-[9px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors flex"
           >
             <div className="mr-1"><Trash size={10} /></div>

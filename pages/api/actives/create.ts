@@ -1,58 +1,73 @@
 // pages/api/actives/create.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
+import db from "@/lib/prisma"; 
 import * as jwt from "jsonwebtoken";
+import { randomBytes } from "crypto";
+import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
 
   try {
-    // Sincronizado com o nome definido no login.ts (auth_token)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    
-    if (!token) {
-      return res.status(401).json({ error: "Sessão expirada. Token não encontrado." });
-    }
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
     const decoded = jwt.verify(token, JWT_SECRET!) as any;
-
-    if (decoded.role === "VIEWER") {
-      return res.status(403).json({ error: "Acesso negado para nível Viewer." });
-    }
+    const userId = decoded.id || decoded.userId;
 
     const data = req.body;
-    const quantity = Math.max(1, Number(data.quantity) || 1);
-    const createdItems = [];
-
-    for (let i = 0; i < quantity; i++) {
-      const item = await prisma.active.create({
-        data: {
-          name: data.name,
-          area: data.area,
-          isPhysicalSpace: Boolean(data.isPhysicalSpace),
-          sku: data.sku || null,
-          manufacturer: data.manufacturer || null,
-          model: data.model || null,
-          serialNumber: data.serialNumbers?.[i] || null,
-          fixedValue: Number(data.fixedValue) || 0,
-          tag: data.tag || "IN-STOCK",
-          notes: data.notes || null,
-          fatherSpaceId: data.fatherSpaceId || null,
-          parentId: data.parentId || null,
-          createdById: decoded.userId,
-        },
-      });
-      createdItems.push(item);
+    
+    // Validação de integridade do Schema
+    if (!data.name || !data.categoryId || !data.fatherSpaceId) {
+      return res.status(400).json({ error: "Nome, Categoria e Espaço Pai são obrigatórios." });
     }
 
-    return res.status(201).json(createdItems);
+    const quantity = Math.max(1, parseInt(data.quantity) || 1);
+    const createdActives = [];
 
+    for (let i = 0; i < quantity; i++) {
+      let finalId = "";
+      let isUnique = false;
+      
+      // Garantia de ID manual único (4 hex chars)
+      while (!isUnique) {
+        finalId = randomBytes(2).toString('hex').toLowerCase();
+        const exists = await db.active.findUnique({ where: { id: finalId } });
+        if (!exists) isUnique = true;
+      }
+
+      const serialNumber = data.serialNumbers?.[i] || "";
+
+      const newActive = await db.active.create({
+        data: {
+          id: finalId,
+          name: data.name.trim(),
+          categoryId: data.categoryId,
+          tag: data.tag || "IN-STOCK",
+          manufacturer: data.manufacturer || null,
+          model: data.model || null,
+          serialNumber: serialNumber,
+          fixedValue: parseFloat(data.fixedValue) || 0,
+          notes: data.notes || null,
+          imageUrl: data.imageUrl || null,
+          fileUrl: data.fileUrl || null,
+          fatherSpaceId: data.fatherSpaceId, // Obrigatório
+          parentId: data.parentId || null,   // Opcional (Hierarquia)
+          isPhysicalSpace: !!data.isPhysicalSpace,
+          createdById: userId,
+        },
+      });
+      createdActives.push(newActive);
+    }
+
+    await createLog(req, userId, "CREATE_ACTIVE", `Criou ${quantity} ativo(s): ${data.name}`);
+
+    return res.status(201).json(createdActives);
   } catch (error: any) {
-    if (error.name === "JsonWebTokenError") return res.status(401).json({ error: "Token inválido." });
-    return res.status(500).json({ error: "Erro interno." });
+    console.error("ERRO actives/create:", error.message);
+    return res.status(500).json({ error: "Erro interno ao criar ativo." });
   }
 }

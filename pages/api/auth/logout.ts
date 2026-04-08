@@ -4,15 +4,15 @@ import { serialize } from 'cookie';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ message: 'Method not allowed. Use POST.' });
   }
 
-  // Limpa o cookie de autenticação
+  // Limpa o cookie de autenticação settando um valor vazio e maxAge negativo
   res.setHeader('Set-Cookie', serialize('auth_token', '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: -1, // expira imediatamente
+    maxAge: -1, 
     sameSite: 'lax',
   }));
 

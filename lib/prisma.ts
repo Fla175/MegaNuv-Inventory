@@ -1,21 +1,57 @@
 // lib/prisma.ts
 import { PrismaClient } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
-// Adiciona o Prisma Client ao objeto global em desenvolvimento
-// para evitar instanciar muitos clientes durante hot-reloads
-declare global {
-  var prisma: PrismaClient | undefined;
-}
+const basePrisma = new PrismaClient();
 
-let prisma: PrismaClient;
+// Função auxiliar para gerar ID Hex de 4 dígitos único
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function generateUniqueHexId(model: any): Promise<string> {
+  let isUnique = false;
+  let newId = "";
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient();
+  while (!isUnique) {
+    // Gera 2 bytes (4 caracteres hexadecimais)
+    newId = randomBytes(2).toString('hex').toUpperCase();
+    
+    // Verifica se já existe no modelo específico
+    const exists = await model.findUnique({
+      where: { id: newId },
+    });
+
+    if (!exists) isUnique = true;
   }
-  prisma = global.prisma;
+  return newId;
 }
 
-export default prisma;
+// Criando a Extensão
+export const prisma = basePrisma.$extends({
+  query: {
+    active: {
+      async create({ args, query }) {
+        // Se o ID não for passado manualmente, gera o hex de 4 dígitos
+        args.data.id = args.data.id || await generateUniqueHexId(basePrisma.active);
+        return query(args);
+      },
+    },
+    fatherSpace: {
+      async create({ args, query }) {
+        args.data.id = args.data.id || await generateUniqueHexId(basePrisma.fatherSpace);
+        return query(args);
+      },
+    },
+  },
+});
+
+// Configuração para Next.js (Hot Reload)
+declare global {
+  var prismaGlobal: typeof prisma | undefined;
+}
+
+const db = global.prismaGlobal || prisma;
+
+if (process.env.NODE_ENV !== 'production') {
+  global.prismaGlobal = db;
+}
+
+export default db;
