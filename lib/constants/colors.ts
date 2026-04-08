@@ -57,7 +57,6 @@ export const CATEGORY_PALETTE = [
   '#FCA5A5', '#FECACA', '#FEE2E2',
   '#6EE7B7', '#A7F3D0', '#D1FAE5',
   '#C4B5FD', '#DDD6FE', '#EDE9FE',
-  '#5EEAD4', '#99F6E4', '#CCFBF1',
 ];
 
 export function getCategoryColor(categoryId: string, categories: { id: string }[]) {
