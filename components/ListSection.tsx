@@ -8,6 +8,7 @@ import {
   MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
+import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 
 interface ListSectionProps {
@@ -30,7 +31,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
   
-  // ESTADO NOVO: Guardar as áreas para cruzar com o categoryId dos ativos
+  // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);
   
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,6 +41,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   useEscapeKey(() => setSelectedPrintItem(null), !!selectedPrintItem);
   useEscapeKey(() => setMovingItem(null), !!movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
+
+  // Toast notifications
+  const toast = useToast();
 
   // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           setCategories(data);
         }
       } catch (err) {
-        console.error("Erro ao carregar áreas no ListSection:", err);
+        console.error("Erro ao carregar categorias no ListSection:", err);
       }
     }
     fetchCategories();
@@ -194,8 +198,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       if (res.ok) { 
         onRefresh(); 
         if (selectedViewItem) setSelectedViewItem(null);
+        toast.showSuccess('Item excluído com sucesso.');
       }
-    } catch (err) { alert(`Erro ao excluir: ${err}`); }
+    } catch { toast.showError('Erro ao excluir o item.'); }
   };
 
   // --- RENDERIZAÇÃO DA ÁRVORE ---
@@ -447,7 +452,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
               </div>
               
               {/* ÁREA DA ETIQUETA - O que realmente será impresso */}
-              <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-area">
+              <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-label">
                 
                 {/* Fundo branco forçado para garantir a leitura do QR Code */}
                 <div className="bg-white p-3 rounded-xl border-2 border-zinc-100 shadow-sm">
@@ -586,9 +591,31 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       <style jsx global>{`
         @media print {
           body * { visibility: hidden !important; }
-          #qrcode-print-area,
-          #qrcode-print-area * {
+          #qrcode-print-label,
+          #qrcode-print-label * {
             visibility: visible !important;
+          }
+          #qrcode-print-label {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: white !important;
+            border: 2px solid black !important;
+            border-radius: 8px !important;
+            margin: 0 !important;
+            padding: 16px !important;
+            box-shadow: none !important;
+          }
+          #qrcode-print-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: white !important;
+            z-index: 9999 !important;
           }
           #qrcode-print-area {
             position: absolute !important;
