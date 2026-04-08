@@ -31,7 +31,7 @@ interface FatherSpace {
   notes?: string;
 }
 
-interface Area {
+interface Category {
   id: string;
   name: string;
   color?: string;
@@ -40,7 +40,6 @@ interface Area {
 interface Log {
   id: string;
   action: string;
-  resource: string;
   details: string;
   createdAt: string;
   user: { name: string | null; email: string };
@@ -58,16 +57,10 @@ export default function SettingsPage() {
   // Estados de Listagem
   const [usersList, setUsersList] = useState<User[]>([]);
   const [spacesList, setSpacesList] = useState<FatherSpace[]>([]);
-  const [categoriesList, setCategoriesList] = useState<Area[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [logsList, setLogsList] = useState<Log[]>([]);
-
-  // Estados de Modais
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isSpaceModalOpen, setIsSpaceModalOpen] = useState(false);
-  const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
-  const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
-  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedColor, setSelectedColor] = useState('#4F46E5');
 
   // Permissões
@@ -79,7 +72,7 @@ export default function SettingsPage() {
   // Fechar modais com Esc
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
   useEscapeKey(() => setIsSpaceModalOpen(false), isSpaceModalOpen);
-  useEscapeKey(() => setIsAreaModalOpen(false), isAreaModalOpen);
+  useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,20 +136,20 @@ export default function SettingsPage() {
     } finally { setSaving(false); }
   };
 
-  const handleAreaSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCategorySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     const payload = Object.fromEntries(new FormData(e.currentTarget));
-    if (selectedArea) payload.id = selectedArea.id;
+    if (selectedCategory) payload.id = selectedCategory.id;
 
     try {
-      const res = await fetch(selectedArea ? '/api/categories/update' : '/api/categories/create', {
-        method: selectedArea ? 'PATCH' : 'POST',
+      const res = await fetch(selectedCategory ? '/api/categories/update' : '/api/categories/create', {
+        method: selectedCategory ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        setIsAreaModalOpen(false);
+        setIsCategoryModalOpen(false);
         fetchData('/api/categories/list', setCategoriesList);
       }
     } finally { setSaving(false); }
@@ -343,7 +336,7 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  <button onClick={() => { setSelectedArea(null); setSelectedColor('#4F46E5'); setIsAreaModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categoriesList.map((category) => (
@@ -353,7 +346,7 @@ export default function SettingsPage() {
                       </div>
                       <h4 className="text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
                       <div className="flex gap-2 mt-4">
-                        <button onClick={() => { setSelectedArea(category); setSelectedColor(category.color || '#4F46E5'); setIsAreaModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
+                        <button onClick={() => { setSelectedCategory(category); setSelectedColor(category.color || '#4F46E5'); setIsCategoryModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
                         <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
                       </div>
                     </div>
@@ -475,16 +468,16 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* MODAL ÁREA */}
-      {isAreaModalOpen && (
+      {/* MODAL CATEGORIA */}
+      {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <form onSubmit={handleAreaSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
+          <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedArea ? 'Editar Área' : 'Nova Área'}</h3>
-              <button type="button" onClick={() => setIsAreaModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
+              <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
-              <input name="name" placeholder="Nome da Área" defaultValue={selectedArea?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
+              <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-2">
@@ -503,11 +496,11 @@ export default function SettingsPage() {
                     />
                   ))}
                 </div>
-                <input type="hidden" name="color" value={selectedColor} />
+                <input type="hidden" name="color" value={selectedColor} disabled />
               </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
-              {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Salvar Área
+              {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Salvar Categoria
             </button>
           </form>
         </div>
