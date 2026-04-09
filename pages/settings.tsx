@@ -386,7 +386,7 @@ export default function SettingsPage() {
                             <span className="text-zinc-400 font-bold">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
                           <p className="text-zinc-500 mt-1 font-bold">{log.details}</p>
-                          <p className="text-[9px] font-black text-blue-600 uppercase mt-2">Por: {log.user.name || log.user.email}</p>
+                          <p className="text-[9px] font-black text-blue-600 uppercase mt-2">Por: {log.user?.name || log.user?.email || 'Usuário deletado'}</p>
                         </div>
                       </div>
                     ))
