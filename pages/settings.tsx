@@ -59,7 +59,11 @@ export default function SettingsPage() {
   const [spacesList, setSpacesList] = useState<FatherSpace[]>([]);
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [logsList, setLogsList] = useState<Log[]>([]);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isSpaceModalOpen, setIsSpaceModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedColor, setSelectedColor] = useState('#4F46E5');
 
