@@ -1,6 +1,6 @@
 {
   "name": "inventory-meganuv",
-  "version": "2.6.8",
+  "version": "2.7.5",
   "private": true,
   "scripts": {
     "dev": "rm -rf .next && next dev -H 0.0.0.0 -p 3000",

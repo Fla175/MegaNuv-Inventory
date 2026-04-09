@@ -40,8 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // SISTEMA DE LOGS: Registro de novo cadastro
     await prisma.log.create({
       data: {
-        action: "USER_REGISTERED",
-        details: `Novo usuário registrado: ${email} com nível ${userRole}.`,
+        action: "REGISTRO DE USUÁRIO",
+        details: `Novo usuário registrado: ${name} com nível ${userRole}.`,
         userId: newUser.id, // Quem sofreu a ação / Quem fez
         ip: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || "Desconhecido",
         userAgent: req.headers['user-agent'] || "Desconhecido"

@@ -5,6 +5,8 @@ import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Sear
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
+import { useToast } from "@/lib/context/ToastContext";
+import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
@@ -12,6 +14,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const toast = useToast();
   const [newCategoryColor, setNewCategoryColor] = useState('#4F46E5');
   const [savingCategory, setSavingCategory] = useState(false);
   
@@ -38,7 +41,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
   const tags = ["IN-STOCK", "IN-USE"];
 
-  // Busca as Áreas do Banco (Corrigida a dependência para não causar loop)
+  // Busca as Categorias do Banco (Corrigida a dependência para não causar loop)
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
@@ -56,7 +59,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           });
         }
       } catch (err) {
-        console.error("Erro ao carregar áreas:", err);
+        console.error("Erro ao carregar categorias:", err);
       } finally {
         if (isMounted) setLoadingCategories(false);
       }
@@ -282,8 +285,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Erro na operação");
+      toast.showSuccess(mode === 'edit' ? 'Item atualizado com sucesso.' : 'Item criado com sucesso.');
       onClose();
-    } catch (error: any) { alert("ERRO: " + error.message); }
+    } catch (error: any) { 
+      toast.showError(error.message || 'Erro ao processar a operação.');
+    }
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -296,15 +302,18 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newCategoryName, color: newCategoryColor })
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setIsCategoryModalOpen(false);
         setNewCategoryName("");
         setCategories(prev => [...prev, data]);
         setFormData(prev => ({ ...prev, categoryId: data.id }));
+        toast.showSuccess('Categoria criada com sucesso.');
+      } else {
+        toast.showError(data.error || 'Erro ao criar categoria.');
       }
     } catch {
-      alert("Erro ao criar categoria");
+      toast.showError('Erro ao criar categoria.');
     } finally {
       setSavingCategory(false);
     }
@@ -355,7 +364,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             </div>
 
             {loadingCategories ? (
-               <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando áreas...</div>
+                <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando categorias...</div>
             ) : (
               <div className={`grid gap-2 ${gridConfig}`}>
                 {categories.map((category) => {
@@ -516,7 +525,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <div>
                 <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Cor</label>
                 <div className="grid grid-cols-6 gap-2">
-                  {['#FFD700', '#FF8C00', '#2ECC71', '#A2D149', '#007BFF', '#004085', '#98A6B0', '#8E44AD', '#17A2B8', '#40E0D0', '#2980B9', '#6F42C1', '#E74C3C', '#800020', '#2C3E50', '#A0522D', '#7AA9BD', '#D81B60'].map((color) => (
+                  {CATEGORY_PALETTE.map((color) => (
                     <button
                       key={color}
                       type="button"

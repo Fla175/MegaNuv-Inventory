@@ -25,7 +25,7 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
   return (
     <div className="w-full bg-white dark:bg-zinc-900 p-5 sm:p-7 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
       
-      {/* Linha Principal: Busca Global e Área */}
+      {/* Linha Principal: Busca Global e Categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={18} />

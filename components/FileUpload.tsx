@@ -1,6 +1,7 @@
 // components/FileUpload.tsx
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2, FileText, Link as LinkIcon } from 'lucide-react';
+import { useToast } from '@/lib/context/ToastContext';
 
 interface FileUploadProps {
   value: string | null;
@@ -11,6 +12,7 @@ interface FileUploadProps {
 export default function FileUpload({ value, onChange, label = "Documento" }: FileUploadProps) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,13 +25,13 @@ export default function FileUpload({ value, onChange, label = "Documento" }: Fil
     );
 
     if (!isAllowed) {
-      alert("Tipo de arquivo não permitido. Use PDF, DOC, DOCX, PNG, JPG ou JPEG.");
+      toast.showWarning("Tipo de arquivo não permitido. Use PDF, DOC, DOCX, PNG, JPG ou JPEG.");
       return;
     }
 
     // Validação simples de tamanho (ex: 5MB)
     if (file.size > 5 * 1024 * 1024) {
-        alert("Arquivo muito grande. Máximo 5MB.");
+        toast.showWarning("Arquivo muito grande. Máximo 5MB.");
         return;
     }
 
@@ -47,9 +49,10 @@ export default function FileUpload({ value, onChange, label = "Documento" }: Fil
       if (!res.ok) throw new Error(data.error || "Erro no upload");
       
       onChange(data.publicUrl);
+      toast.showSuccess('Arquivo enviado com sucesso.');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+      toast.showError(err.message || 'Erro ao enviar arquivo.');
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export default function FileUpload({ value, onChange, label = "Documento" }: Fil
     <div className="mb-4">
       <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block">{label}</label>
       
-      {/* Área de Input Manual do Link */}
+      {/* Campo de Link Manual */}
       <div className="flex gap-2 mb-2">
          <div className="relative flex-1">
             <LinkIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
@@ -73,7 +76,7 @@ export default function FileUpload({ value, onChange, label = "Documento" }: Fil
          </div>
       </div>
 
-      {/* Área de Upload */}
+      {/* Área de Upload de Arquivo */}
       <div 
         onClick={() => !loading && fileInputRef.current?.click()}
         className={`relative w-full h-16 rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center gap-2

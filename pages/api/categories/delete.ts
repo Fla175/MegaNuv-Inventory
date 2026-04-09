@@ -51,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ message: "Área removida com sucesso." });
 
   } catch (error) {
-    console.error("API_AREA_DELETE_ERROR:", error);
+    console.error("API_CATEGORY_DELETE_ERROR:", error);
     return res.status(500).json({ error: "Erro ao remover área. Verifique se existem ativos vinculados a ela." });
   } finally {
     await prisma.$disconnect();

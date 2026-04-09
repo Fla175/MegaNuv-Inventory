@@ -43,4 +43,4 @@ JWT_SECRET="sua_chave_secreta"
 
 ## Referências
 
-- `gear7.md` na raiz — Skill principal com convenções de código
+- `gear7` no global — Skill principal com convenções de código

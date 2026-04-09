@@ -51,13 +51,9 @@ export function getItemColors(isPhysicalSpace: boolean, hasSubItems: boolean) {
 }
 
 export const CATEGORY_PALETTE = [
-  '#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF',
-  '#60A5FA', '#93C5FD', '#BFDBFE',
-  '#FCD34D', '#FDE68A', '#FEF3C7',
-  '#FCA5A5', '#FECACA', '#FEE2E2',
-  '#6EE7B7', '#A7F3D0', '#D1FAE5',
-  '#C4B5FD', '#DDD6FE', '#EDE9FE',
-  '#5EEAD4', '#99F6E4', '#CCFBF1',
+  '#FFD700', '#FF8C00', '#2ECC71', '#A2D149', '#007BFF', '#004085', 
+  '#98A6B0', '#8E44AD', '#17A2B8', '#40E0D0', '#2980B9', '#6F42C1', 
+  '#E74C3C', '#800020', '#2C3E50', '#A0522D', '#7AA9BD', '#D81B60',
 ];
 
 export function getCategoryColor(categoryId: string, categories: { id: string }[]) {

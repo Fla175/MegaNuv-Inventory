@@ -60,8 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // SISTEMA DE LOGS: Registra o Login
     await prisma.log.create({
       data: {
-        action: "USER_LOGIN",
-        details: `Login realizado com sucesso pelo email: ${user.email}`,
+        action: "LOGIN DE USUÁRIO",
+        details: `Login realizado com sucesso pela conta: ${user.name}`,
         userId: user.id,
         ip: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || "Desconhecido",
         userAgent: req.headers['user-agent'] || "Desconhecido"
