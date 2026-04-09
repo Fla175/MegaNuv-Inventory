@@ -43,7 +43,7 @@ interface Log {
   action: string;
   details: string;
   createdAt: string;
-  user: { name: string | null; email: string };
+  user: { name: string; email: string };
 }
 
 type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'system';
