@@ -41,7 +41,7 @@ export default function GestaoAtivosPage() {
 
   const [filters, setFilters] = useState({
     query: "",
-    category: "",
+    searchCategory: "",
     manufacturer: "",
     model: "",
     category: "",
