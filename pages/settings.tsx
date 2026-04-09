@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
+import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 import InteractiveFace from "@/components/svg/sad-face";
 
 // --- INTERFACES ---
@@ -489,7 +490,7 @@ export default function SettingsPage() {
                 </label>
 
                 <div className="grid grid-cols-6 gap-2">
-                  {['#FFD700', '#FF8C00', '#2ECC71', '#A2D149', '#007BFF', '#004085', '#98A6B0', '#8E44AD', '#17A2B8', '#40E0D0', '#2980B9', '#6F42C1', '#E74C3C', '#800020', '#2C3E50', '#A0522D', '#7AA9BD', '#D81B60'].map((color) => (
+                  {CATEGORY_PALETTE.map((color) => (
                     <button
                       key={color}
                       type="button"
@@ -500,7 +501,7 @@ export default function SettingsPage() {
                     />
                   ))}
                 </div>
-                <input type="hidden" name="color" value={selectedColor} disabled />
+                <input type="hidden" name="color" value={selectedColor} readOnly />
               </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
