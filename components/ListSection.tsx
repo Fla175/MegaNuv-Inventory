@@ -212,8 +212,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     });
 
     if (children.length === 0 && level >= 0) {
+      const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5` : "";
       return (
-        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${level > 0 ? "ml-6 border-l-2 dark:border-white/5" : ""}`}>
+        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${indentClass}`}>
           <Ghost size={24} className="mb-2 text-zinc-400" />
           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
             {level === 0 ? "Nenhum ativo neste local" : "Este espaço físico está vazio"}
@@ -222,8 +223,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       );
     }
 
+    const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5 pl-2` : "";
     return (
-      <div className={`${level > 0 ? "ml-6 border-l-2 dark:border-white/5 pl-2" : ""}`}>
+      <div className={indentClass}>
         {children.map((active) => {
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
