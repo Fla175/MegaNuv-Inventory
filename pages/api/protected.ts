@@ -8,7 +8,6 @@ import { authMiddleware, AuthenticatedNextApiRequest } from '../../lib/middlewar
 async function protectedHandler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   // A partir daqui, req.user estará disponível com o payload do token
   // se o usuário estiver autenticado e autorizado.
-  console.log('Acesso concedido para o usuário:', req.user?.email, 'com papel:', req.user?.role);
 
   // Exemplo de como usar as informações do usuário autenticado:
   if (req.method === 'GET') {

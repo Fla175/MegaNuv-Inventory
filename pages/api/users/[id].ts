@@ -57,8 +57,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(updated);
     }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    return res.status(500).json({ message: "Erro interno", error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Erro interno";
+    return res.status(500).json({ message: "Erro interno", error: message });
   }
 }

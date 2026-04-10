@@ -71,8 +71,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(201).json(createdActives);
-  } catch (error: any) {
-    console.error("ERRO actives/create:", error.message);
+  } catch (error: unknown) {
+    console.error("ERRO actives/create:", error instanceof Error ? error.message : error);
     return res.status(500).json({ error: "Erro interno ao criar ativo." });
   }
 }

@@ -37,8 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: "Ativo removido com sucesso." });
 
-  } catch (error: any) {
-    console.error("ERRO DELETE ACTIVE:", error.message);
+  } catch (error: unknown) {
+    console.error("ERRO DELETE ACTIVE:", error instanceof Error ? error.message : error);
     return res.status(500).json({ error: "Erro ao excluir ativo." });
   }
 }

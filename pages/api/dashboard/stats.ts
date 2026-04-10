@@ -40,8 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Agrupa os ativos pelo nome da categoria
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const assetsByCategory = allActives.reduce((acc: any, active) => {
+    const assetsByCategory = allActives.reduce<Record<string, typeof allActives>>((acc, active) => {
       const categoryName = active.category?.name || 'OUTROS';
       if (!acc[categoryName]) acc[categoryName] = [];
       acc[categoryName].push(active);
