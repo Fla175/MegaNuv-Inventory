@@ -6,7 +6,6 @@ import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { useToast } from "@/lib/context/ToastContext";
-import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
@@ -15,7 +14,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const toast = useToast();
-  const [newCategoryColor, setNewCategoryColor] = useState('#4F46E5');
   const [savingCategory, setSavingCategory] = useState(false);
   
   useEscapeKey(onClose);
@@ -135,13 +133,15 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
 
+      const indentClass = depth > 0 ? `ml-${depth * 4}` : "";
+
       return children.map((child: any) => {
         const grandChildren = getDirectChildren(child.id);
         const hasGrandChildren = grandChildren.length > 0;
         const isExpanded = expandedSpaces[child.id];
 
         return (
-          <div key={child.id}>
+          <div key={child.id} className={indentClass}>
             <div className={`flex items-center border-b dark:border-white/5`}>
               <button 
                 type="button" 
@@ -300,7 +300,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       const res = await fetch('/api/categories/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCategoryName, color: newCategoryColor })
+        body: JSON.stringify({ name: newCategoryName })
       });
       const data = await res.json();
       if (res.ok) {
@@ -521,20 +521,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                   autoFocus
                   required
                 />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Cor</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {CATEGORY_PALETTE.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewCategoryColor(color)}
-                      className={`w-8 h-8 rounded-lg transition-all hover:scale-110 ${newCategoryColor === color ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
               </div>
               <button
                 type="submit"

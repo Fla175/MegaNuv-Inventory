@@ -2,7 +2,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
 import * as jwt from "jsonwebtoken";
-import { createLog } from "@/lib/logger"; // Importando o logger que acabamos de criar
+import { createLog } from "@/lib/logger";
+import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -35,13 +36,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Limite máximo de 18 categorias atingido." });
     }
 
-    const { name, color } = req.body;
+    const { name } = req.body;
 
     if (!name) return res.status(400).json({ error: "O nome da categoria é obrigatório." });
 
-    // 4. EXECUÇÃO
+    // 4. COR AUTOMÁTICA (primeira cor disponível)
+    const existingColors = await prisma.category.findMany({
+      select: { color: true },
+      where: { color: { not: null } }
+    });
+    const usedColors = existingColors.map(c => c.color).filter(Boolean) as string[];
+    
+    let assignedColor: string | undefined;
+    for (let i = 0; i < CATEGORY_PALETTE.length; i++) {
+      if (!usedColors.includes(CATEGORY_PALETTE[i])) {
+        assignedColor = CATEGORY_PALETTE[i];
+        break;
+      }
+    }
+
+    // 5. EXECUÇÃO
     const newCategory = await prisma.category.create({
-      data: { name, color }
+      data: { name, color: assignedColor }
     });
 
     // 5. REGISTRO DE AUDITORIA

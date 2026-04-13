@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
-import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 import InteractiveFace from "@/components/svg/sad-face";
 
 // --- INTERFACES ---
@@ -66,7 +65,6 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedColor, setSelectedColor] = useState('#4F46E5');
 
   // Permissões
   const isAdmin = user?.role === 'ADMIN';
@@ -144,7 +142,10 @@ export default function SettingsPage() {
   const handleCategorySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
-    const payload = Object.fromEntries(new FormData(e.currentTarget));
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    
+    const payload = { name };
     if (selectedCategory) payload.id = selectedCategory.id;
 
     try {
@@ -483,26 +484,6 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-2">
-                  Cor de Identificação
-                </label>
-
-                <div className="grid grid-cols-6 gap-2">
-                  {CATEGORY_PALETTE.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-xl shadow-sm transition-all hover:scale-110 hover:shadow-md ${selectedColor.toLowerCase() === color.toLowerCase() ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-                <input type="hidden" name="color" value={selectedColor} readOnly />
-              </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Salvar Categoria

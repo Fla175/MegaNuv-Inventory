@@ -41,7 +41,7 @@ model User {
 model Category {
   id        String   @id @default(uuid())
   name      String   @unique // Ex: "Redes", "Servidor"
-  color     String?  // Opcional: para UX no frontend
+  color     String?  @unique // Cor única para cada categoria
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

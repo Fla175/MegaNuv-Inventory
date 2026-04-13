@@ -539,7 +539,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                             </div>
 
                             {isExpanded && subActives.length > 0 && (
-                                <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900">
+                                <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900 pl-4">
                                     {subActives.map(sub => (
                                         <button 
                                           key={sub.id} 
