@@ -133,7 +133,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
 
-      const indentClass = depth > 0 ? `ml-${depth * 4}` : "";
+      const indentClass = depth > 0 ? `ml-${depth * 4} pl-2 border-l-2 dark:border-white/5` : "";
 
       return children.map((child: any) => {
         const grandChildren = getDirectChildren(child.id);
@@ -269,12 +269,25 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let finalFatherSpaceId = formData.locationId;
+    let finalParentId: string | null = null;
+    
+    if (formData.locationType === "space") {
+      finalFatherSpaceId = formData.locationId;
+      finalParentId = null;
+    } else if (formData.locationType === "active") {
+      const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
+      finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
+      finalParentId = formData.locationId;
+    }
+    
     const payload = { 
       ...formData, 
       serialNumbers: formData.serialNumbers, 
-      isPhysicalSpace: !!formData.isPhysicalSpace, // Garantia final do valor real
-      fatherSpaceId: formData.locationType === "space" ? formData.locationId : null,
-      parentId: formData.locationType === "active" ? formData.locationId : null
+      isPhysicalSpace: !!formData.isPhysicalSpace,
+      fatherSpaceId: finalFatherSpaceId,
+      parentId: finalParentId
     };
     try {
       const isEdit = mode === "edit";

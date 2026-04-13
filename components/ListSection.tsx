@@ -30,6 +30,16 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const [movingItem, setMovingItem] = useState<any | null>(null);
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  const toggleItemSelection = (id: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   
   // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);
@@ -233,14 +243,23 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
           const a = active.category || categories.find(ar => ar.id === active.categoryId);
 
+          const isSelected = selectedItems.has(active.id);
+          
           return (
-            <div key={active.id} className="animate-in slide-in-from-left-2 duration-300">
+            <div key={active.id} className={`animate-in slide-in-from-left-2 duration-300 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
               <div 
                 onContextMenu={(e) => handleContextMenu(e, active, active.isPhysicalSpace)}
                 onClick={() => setSelectedViewItem({ ...active, hasSubItems })} 
-                className="group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer border-b last:border-0 dark:border-white/5 transition-colors"
+                className={`group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer border-b last:border-0 dark:border-white/5 transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    checked={isSelected}
+                    onChange={(e) => { e.stopPropagation(); toggleItemSelection(active.id); }}
+                    className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                    onClick={(e) => e.stopPropagation()}
+                  />
                   <div 
                     onClick={(e) => {
                       e.stopPropagation(); 
