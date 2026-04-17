@@ -61,3 +61,12 @@ export function getCategoryColor(categoryId: string, categories: { id: string }[
   if (index === -1) return '#94a3b8';
   return CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
 }
+
+export function getNextCategoryColor(usedColors: string[]): string {
+  for (let i = 0; i < CATEGORY_PALETTE.length; i++) {
+    if (!usedColors.includes(CATEGORY_PALETTE[i])) {
+      return CATEGORY_PALETTE[i];
+    }
+  }
+  return CATEGORY_PALETTE[0];
+}

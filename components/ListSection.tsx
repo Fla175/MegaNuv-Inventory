@@ -5,9 +5,10 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
-  MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon
+  MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon, Boxes
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
+import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 
@@ -22,14 +23,42 @@ interface ListSectionProps {
 }
 
 export default function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
+  const isMobile = useIsMobile();
+  
+  // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [longPressItem, setLongPressItem] = useState<string | null>(null);
+  
   // --- ESTADOS ---
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, item: any, isPhysicalSpace: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, item: any, isPhysicalSpace: boolean, selectedCount?: number } | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedPrintItem, setSelectedPrintItem] = useState<any | null>(null);
   const [selectedViewItem, setSelectedViewItem] = useState<any | null>(null);
   const [movingItem, setMovingItem] = useState<any | null>(null);
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  const toggleItemSelection = (id: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  
+  const activateSelectionMode = (itemId: string) => {
+    setIsSelectionMode(true);
+    setSelectedItems(new Set([itemId]));
+  };
+  
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedItems(new Set());
+    setSelectedViewItem(null);
+  };
   
   // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);
@@ -41,6 +70,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   useEscapeKey(() => setSelectedPrintItem(null), !!selectedPrintItem);
   useEscapeKey(() => setMovingItem(null), !!movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
+  useEscapeKey(exitSelectionMode, isSelectionMode);
 
   // Toast notifications
   const toast = useToast();
@@ -164,20 +194,23 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     setIsMovingLoading(true);
 
     try {
+      const isBatch = movingItem.isBatch;
+      const payload = isBatch 
+        ? { ids: Array.from(selectedItems), newFatherSpaceId: targetSpaceId, newParentId: targetParentId || null }
+        : { id: movingItem.id, newFatherSpaceId: targetSpaceId, newParentId: targetParentId || null };
+      
       const res = await fetch('/api/actives/move', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: movingItem.id,
-          newFatherSpaceId: targetSpaceId,
-          newParentId: targetParentId || null, 
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         onRefresh();
         setMovingItem(null);
-        if (selectedViewItem) setSelectedViewItem(null); 
+        if (selectedViewItem) setSelectedViewItem(null);
+        if (isBatch) exitSelectionMode();
+        toast.showSuccess(isBatch ? `${selectedItems.size} ativo${selectedItems.size > 1 ? 's' : ''} movido${selectedItems.size > 1 ? 's' : ''} com sucesso.` : 'Ativo movido com sucesso.');
       }
     } catch (err) {
       console.error(err);
@@ -194,13 +227,34 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const handleDelete = async (item: any) => {
     if (!confirm(`Deseja remover "${item.name}" permanentemente?`)) return;
     try {
-      const res = await fetch(`/api/actives/delete?id=${item.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/actives/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [item.id] })
+      });
       if (res.ok) { 
         onRefresh(); 
         if (selectedViewItem) setSelectedViewItem(null);
         toast.showSuccess('Item excluído com sucesso.');
       }
     } catch { toast.showError('Erro ao excluir o item.'); }
+  };
+  
+  const handleBatchDelete = async () => {
+    const count = selectedItems.size;
+    if (!confirm(`Deseja remover ${count} ativo${count > 1 ? 's' : ''} permanentemente?`)) return;
+    try {
+      const res = await fetch(`/api/actives/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedItems) })
+      });
+      if (res.ok) { 
+        onRefresh(); 
+        exitSelectionMode();
+        toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+      }
+    } catch { toast.showError('Erro ao excluir os itens.'); }
   };
 
   // --- RENDERIZAÇÃO DA ÁRVORE ---
@@ -212,8 +266,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
     });
 
     if (children.length === 0 && level >= 0) {
+      const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5` : "";
       return (
-        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${level > 0 ? "ml-6 border-l-2 dark:border-white/5" : ""}`}>
+        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${indentClass}`}>
           <Ghost size={24} className="mb-2 text-zinc-400" />
           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
             {level === 0 ? "Nenhum ativo neste local" : "Este espaço físico está vazio"}
@@ -222,8 +277,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       );
     }
 
+    const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5 pl-2` : "";
     return (
-      <div className={`${level > 0 ? "ml-6 border-l-2 dark:border-white/5 pl-2" : ""}`}>
+      <div className={indentClass}>
         {children.map((active) => {
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
@@ -231,19 +287,138 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
           const a = active.category || categories.find(ar => ar.id === active.categoryId);
 
+          const isSelected = selectedItems.has(active.id);
+          
+          const handleLongPressStart = (e: React.MouseEvent | React.TouchEvent) => {
+            if (isSelectionMode) return;
+            e.preventDefault();
+            const timer = setTimeout(() => {
+              activateSelectionMode(active.id);
+              if (active.isPhysicalSpace) {
+                const childIds = getAllChildIds(active.id);
+                setSelectedItems(new Set([active.id, ...childIds]));
+              }
+              setLongPressItem(null);
+            }, 1000);
+            setLongPressTimer(timer);
+            setLongPressItem(active.id);
+          };
+          
+          const handleLongPressEnd = (_e?: React.MouseEvent | React.TouchEvent) => {
+            void _e;
+            if (longPressTimer) {
+              clearTimeout(longPressTimer);
+              setLongPressTimer(null);
+            }
+            setLongPressItem(null);
+          };
+          
+          const getAllChildIds = (parentId: string): string[] => {
+            const children = actives.filter(a => a.parentId === parentId);
+            let ids: string[] = [];
+            children.forEach(child => {
+              ids.push(child.id);
+              if (child.isPhysicalSpace) {
+                ids = [...ids, ...getAllChildIds(child.id)];
+              }
+            });
+            return ids;
+          };
+          
+          const handleCheckboxChange = async (checked: boolean) => {
+            if (checked) {
+              if (active.isPhysicalSpace) {
+                const childIds = getAllChildIds(active.id);
+                setSelectedItems(prev => {
+                  const next = new Set(prev);
+                  next.add(active.id);
+                  childIds.forEach(id => next.add(id));
+                  return next;
+                });
+              } else {
+                setSelectedItems(prev => {
+                  const next = new Set(prev);
+                  next.add(active.id);
+                  return next;
+                });
+              }
+            } else if (!checked && active.isPhysicalSpace) {
+              const childIds = getAllChildIds(active.id);
+              setSelectedItems(prev => {
+                const next = new Set(prev);
+                next.delete(active.id);
+                childIds.forEach(id => next.delete(id));
+                return next;
+              });
+            } else if (!checked && active.parentId) {
+              if (!active.isPhysicalSpace && active.parentId) {
+                const parent = actives.find(a => a.id === active.parentId);
+                if (parent && parent.parentId) {
+                  try {
+                    await fetch('/api/actives/move', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        id: active.id,
+                        newFatherSpaceId: active.fatherSpaceId,
+                        newParentId: parent.parentId
+                      }),
+                    });
+                    onRefresh();
+                  } catch (err) {
+                    console.error('Erro ao mover para nível do pai:', err);
+                  }
+                }
+              }
+              setSelectedItems(prev => {
+                const next = new Set(prev);
+                next.delete(active.id);
+                return next;
+              });
+            } else {
+              toggleItemSelection(active.id);
+            }
+          };
+          
           return (
-            <div key={active.id} className="animate-in slide-in-from-left-2 duration-300">
+            <div key={active.id} className={`animate-in slide-in-from-left-2 duration-300 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
               <div 
                 onContextMenu={(e) => handleContextMenu(e, active, active.isPhysicalSpace)}
-                onClick={() => setSelectedViewItem({ ...active, hasSubItems })} 
-                className="group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer border-b last:border-0 dark:border-white/5 transition-colors"
+                onClick={() => {
+                  const childCount = actives.filter(a => a.parentId === active.id && !a.isPhysicalSpace).length;
+                  const subSpaceCount = actives.filter(a => a.parentId === active.id && a.isPhysicalSpace).length;
+                  if (isSelectionMode) {
+                    handleCheckboxChange(!isSelected);
+                  } else {
+                    setSelectedViewItem({ ...active, hasSubItems, childCount, subSpaceCount });
+                  }
+                }}
+                onMouseDown={handleLongPressStart}
+                onMouseUp={handleLongPressEnd}
+                onMouseLeave={handleLongPressEnd}
+                onTouchStart={handleLongPressStart}
+                onTouchEnd={handleLongPressEnd}
+                className={`group flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer border-b last:border-0 dark:border-white/5 transition-all duration-300 ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''} ${longPressItem === active.id ? 'bg-blue-100 dark:bg-blue-900/30 scale-[0.99]' : ''}`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  {isSelectionMode && (
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={(e) => { e.stopPropagation(); handleCheckboxChange(e.target.checked); }}
+                      className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                   <div 
                     onClick={(e) => {
                       e.stopPropagation(); 
                       if (hasSubItems || active.isPhysicalSpace) {
                         setExpandedNodes(p => ({ ...p, [active.id]: !p[active.id] }));
+                      } else if (!hasSubItems || !active.isPhysicalSpace) {
+                        const childCount = actives.filter(a => a.parentId === active.id && !a.isPhysicalSpace).length;
+                        const subSpaceCount = actives.filter(a => a.parentId === active.id && a.isPhysicalSpace).length;
+                        setSelectedViewItem({ ...active, hasSubItems, childCount, subSpaceCount});
                       }
                     }}
                     className={`relative w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shrink-0 transition-transform ${hasSubItems || active.isPhysicalSpace ? "cursor-pointer hover:scale-105 active:scale-95 border-2 border-blue-500/30" : "border dark:border-white/10"} ${
@@ -360,7 +535,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-white/[0.02] shrink-0">
                <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-2xl ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).bg} ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).text}`}>
-                    {selectedViewItem.isPhysicalSpace ? <MapPin size={24}/> : <Box size={24}/>}
+                    {selectedViewItem.isPhysicalSpace ? <Layers size={24}/> : <Box size={24}/>}
                   </div>
                   <div>
                     <h3 className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
@@ -391,6 +566,12 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                     <InfoItem icon={<Hash size={16}/>} label="Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
                     <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Não definido"} />
                     <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
+                    {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
+                      <>
+                        <InfoItem icon={<Boxes size={16}/>} label="Ativos" Class="truncate" value={`${selectedViewItem.childCount || 0}`} />
+                        <InfoItem icon={<Layers size={16}/>} label="Espaços Filhos" Class="truncate" value={`${selectedViewItem.subSpaceCount || 0}`} />
+                      </>
+                    )}
                   </div>
                </div>
 
@@ -537,7 +718,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                             </div>
 
                             {isExpanded && subActives.length > 0 && (
-                                <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900">
+                                <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900 pl-4">
                                     {subActives.map(sub => (
                                         <button 
                                           key={sub.id} 
@@ -577,7 +758,11 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
             <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Ações do Item</p>
             <p className="text-[10px] font-black dark:text-white truncate uppercase">{contextMenu.item.name}</p>
           </div>
-           <ContextBtn icon={<Eye size={16}/>} label="Visualizar Detalhes" onClick={() => setSelectedViewItem({ ...contextMenu.item, hasSubItems: actives.some(a => a.parentId === contextMenu.item.id) })} onClose={() => setContextMenu(null)} />
+           <ContextBtn icon={<Eye size={16}/>} label="Visualizar Detalhes" onClick={() => {
+                const childCount = actives.filter(a => a.parentId === contextMenu.item.id && !a.isPhysicalSpace).length;
+                const subSpaceCount = actives.filter(a => a.parentId === contextMenu.item.id && a.isPhysicalSpace).length;
+                setSelectedViewItem({ ...contextMenu.item, hasSubItems: actives.some(a => a.parentId === contextMenu.item.id), childCount, subSpaceCount });
+              }} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Pencil size={16}/>} label="Editar Registro" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Move size={16}/>} label="Mover para outro local" onClick={() => setMovingItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Copy size={16}/>} label="Clonar Ativo" onClick={() => handleCloneClick(contextMenu.item)} onClose={() => setContextMenu(null)} />
@@ -646,6 +831,77 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           }
         }
       `}</style>
+
+      {/* --- BARRA INFERIOR (DESKTOP) / CONTEXTMENU SELETOR MÚLTIPLO (MOBILE) --- */}
+      {isSelectionMode && selectedItems.size > 0 && (
+        isMobile ? (
+          <div 
+            className="fixed z-[600] bg-white/90 dark:bg-zinc-900/95 backdrop-blur-xl border dark:border-white/10 shadow-2xl rounded-[1.5rem] py-2 w-64 overflow-hidden animate-in fade-in zoom-in-95 duration-100 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          >
+            <div className="px-4 py-2 border-b dark:border-white/5">
+              <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Seleção Múltipla</p>
+              <p className="text-[10px] font-black dark:text-white">{selectedItems.size} ativo{selectedItems.size > 1 ? 's' : ''} selecionado{selectedItems.size > 1 ? 's' : ''}</p>
+            </div>
+            <button 
+              onClick={() => {
+                setMovingItem({ 
+                  id: Array.from(selectedItems)[0], 
+                  name: `${selectedItems.size} ativos`,
+                  isBatch: true 
+                });
+                setContextMenu(null);
+              }} 
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-gray-600 dark:text-zinc-400 hover:bg-blue-50 dark:hover:bg-white/5 hover:text-blue-600 dark:hover:text-white"
+            >
+              <Move size={16} /> Mover Ativos
+            </button>
+            <div className="mt-1 pt-1 border-t dark:border-white/5">
+              <button 
+                onClick={() => handleBatchDelete()} 
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+              >
+                <Trash2 size={16} /> Deletar Ativos
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="fixed bottom-0 left-0 right-0 z-[500] bg-white/90 dark:bg-zinc-900/95 backdrop-blur-xl border-t dark:border-white/10 shadow-2xl p-4 animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between max-w-4xl mx-auto">
+              <div className="flex items-center gap-4">
+                <p className="text-sm font-black text-gray-600 dark:text-zinc-400">
+                  <span className="text-blue-600 dark:text-blue-400">{selectedItems.size}</span> ativo{selectedItems.size > 1 ? 's' : ''} selecionado{selectedItems.size > 1 ? 's' : ''}
+                </p>
+                <button 
+                  onClick={exitSelectionMode}
+                  className="text-[10px] font-black uppercase text-zinc-400 hover:text-zinc-600 dark:hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => {
+                    setMovingItem({ 
+                      id: Array.from(selectedItems)[0], 
+                      name: `${selectedItems.size} ativos`,
+                      isBatch: true 
+                    });
+                  }}
+                  className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center gap-2"
+                >
+                  <Move size={16} /> Mover Ativos
+                </button>
+                <button 
+                  onClick={() => handleBatchDelete()}
+                  className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center gap-2"
+                >
+                  <Trash2 size={16} /> Deletar Ativos
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      )}
     </>
   );
 }

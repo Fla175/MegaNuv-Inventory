@@ -71,7 +71,6 @@ export default function SpacePublicView() {
         return res.json();
       })
       .then((json: ViewData) => {
-        console.log("DADOS RECEBIDOS:", json); // LOG PARA DEBUG
         setData(json);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Erro de conexão"))

@@ -44,8 +44,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(updatedFatherSpace);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("ERRO father-spaces/update:", error);
-    return res.status(500).json({ error: "Erro ao atualizar o espaço pai." });
+    const message = error instanceof Error ? error.message : "Erro interno";
+    return res.status(500).json({ error: message || "Erro ao atualizar o espaço pai." });
   }
 }

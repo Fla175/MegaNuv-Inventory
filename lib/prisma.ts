@@ -5,8 +5,7 @@ import { randomBytes } from 'crypto';
 const basePrisma = new PrismaClient();
 
 // Função auxiliar para gerar ID Hex de 4 dígitos único
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function generateUniqueHexId(model: any): Promise<string> {
+async function generateUniqueHexId(model: { findUnique: (args: { where: { id: string } }) => Promise<unknown> }): Promise<string> {
   let isUnique = false;
   let newId = "";
 

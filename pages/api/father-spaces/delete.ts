@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: "Espaço excluído com sucesso." });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("ERRO father-spaces/delete:", error);
     return res.status(500).json({ error: "Erro ao excluir. Verifique se há ativos vinculados a este espaço." });
   }

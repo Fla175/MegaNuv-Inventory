@@ -1,6 +1,12 @@
 // components/SearchSection.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Factory, Cpu, LayoutGrid, ChevronDown, Trash } from "lucide-react";
+
+interface Category {
+  id: string;
+  name: string;
+  color?: string;
+}
 
 interface SearchFilters {
   query: string;
@@ -17,6 +23,22 @@ interface SearchSectionProps {
 }
 
 export default function SearchSection({ filters, setFilters }: SearchSectionProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/categories/list');
+        if (res.ok) {
+          const data = await res.json();
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar categorias:", err);
+      }
+    }
+    fetchCategories();
+  }, []);
   
   const handleInputChange = (field: keyof SearchFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -44,11 +66,10 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
             value={filters.category}
             onChange={(e) => handleInputChange("category", e.target.value)}
           >
-            <option value="" disabled>Selecione</option>
-            <option value="ENERGETICA">Energética</option>
-            <option value="REDES">Redes</option>
-            <option value="SERVIDOR">Servidor</option>
-            <option value="MANUTENCAO">Manutenção</option>
+            <option value="">Todas as Categorias</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.name}>{cat.name}</option>
+            ))}
           </select>
           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>

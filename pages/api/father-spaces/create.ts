@@ -56,8 +56,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(201).json(newSpace);
 
-  } catch (error: any) {
-    console.error("ERRO father-spaces/create:", error.message);
-    return res.status(500).json({ error: "Erro interno.", details: error.message });
+  } catch (error: unknown) {
+    console.error("ERRO father-spaces/create:", error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : "Erro interno";
+    return res.status(500).json({ error: "Erro interno.", details: message });
   }
 }

@@ -1,7 +1,19 @@
 // pages/api/qrcode/public-get.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+
+interface SectionItem {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  createdBy?: { name: string | null } | null;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  items: SectionItem[];
+}
 
 // Função auxiliar para buscar filhos recursivamente e montar as seções
 async function buildHierarchy(id: string, name: string, isFirstLevel = false) {
@@ -17,7 +29,7 @@ async function buildHierarchy(id: string, name: string, isFirstLevel = false) {
 
   if (!active) return [];
 
-  let sections: any[] = [];
+  let sections: Section[] = [];
   
   // Itens que NÃO são espaços (ativos puros) nesta seção
   const assetsOnly = active.children.filter(c => !c.isPhysicalSpace);
@@ -58,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (rootActive) {
-      const isSpace = rootActive.isPhysicalSpace === true || (rootActive.isPhysicalSpace as any) === 1;
+      const isSpace = rootActive.isPhysicalSpace === true;
 
       if (isSpace) {
         const allSections = await buildHierarchy(id, rootActive.name, true);
