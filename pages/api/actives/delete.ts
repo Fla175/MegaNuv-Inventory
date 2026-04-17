@@ -19,23 +19,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
 
-    const { id } = req.query;
-    if (!id || typeof id !== "string") return res.status(400).json({ error: "ID obrigatório." });
+    const isBatch = Array.isArray(req.body.ids);
+    const id = req.body.id;
+    let ids: string[] | undefined = req.body.ids;
+    
+    if (isBatch) {
+      ids = req.body.ids;
+    } else {
+      if (!id && !ids) return res.status(400).json({ error: "ID ou IDs obrigatório." });
+      if (typeof id === "string") ids = [id];
+    }
 
-    // Busca dados antes de deletar para um log informativo
-    const active = await db.active.findUnique({ where: { id } });
-    if (!active) return res.status(404).json({ error: "Ativo não encontrado." });
+    if (!ids || (Array.isArray(ids) && ids.length === 0)) {
+      return res.status(400).json({ error: "ID ou IDs obrigatório." });
+    }
 
-    await db.active.delete({ where: { id } });
+    const actives = await db.active.findMany({ 
+      where: { id: { in: ids } },
+      select: { id: true, name: true }
+    });
+    
+    if (actives.length === 0) return res.status(404).json({ error: "Ativo(s) não encontrado(s)." });
 
+    await db.active.deleteMany({ where: { id: { in: ids } } });
+
+    const count = actives.length;
     await createLog(
       req,
       userId,
       "DELEÇÃO DE ATIVO",
-      `Excluiu o ativo: ${active.name} (ID: ${id})`
+      `Excluiu ${count} ativo${count > 1 ? 's' : ''}: ${actives.map(a => a.name).join(', ')}`
     );
 
-    return res.status(200).json({ message: "Ativo removido com sucesso." });
+    return res.status(200).json({ message: `${count} ativo${count > 1 ? 's' : ''} removido${count > 1 ? 's' : ''} com sucesso.` });
 
   } catch (error: unknown) {
     console.error("ERRO DELETE ACTIVE:", error instanceof Error ? error.message : error);
