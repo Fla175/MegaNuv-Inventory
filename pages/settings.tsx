@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
+import { useToast } from "@/lib/context/ToastContext";
 import InteractiveFace from "@/components/svg/sad-face";
 import ImageUpload from "@/components/imageUpload";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // --- INTERFACES ---
 interface User {
@@ -57,6 +59,7 @@ export default function SettingsPage() {
   const { tab } = router.query;
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
 
   // Estados de Listagem
@@ -71,6 +74,15 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
+  
+  // Estado do Dialog de Confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
 
   // Permissões
   const isAdmin = user?.role === 'ADMIN';
@@ -176,29 +188,57 @@ export default function SettingsPage() {
   };
 
   const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
-    const messages: Record<string, string> = {
-      user: "Este usuário será excluído permanentemente. Continuar? Y/n",
-      space: "Este espaço pai e todos os seus ativos associados serão excluídos permanentemente. Continuar? Y/n",
-      category: "Esta categoria será excluída permanentemente. Continuar? Y/n",
-      logs: "Todos os logs serão excluídos permanentemente. Continuar? Y/n"
+    const dialogConfig: Record<string, { title: string; message: string; variant: 'danger' }> = {
+      user: { 
+        title: 'Confirmar Exclusão de Usuário', 
+        message: 'Tem certeza que deseja excluir este usuário? Esta ação é irreversível e o acesso será removido permanentemente.',
+        variant: 'danger' 
+      },
+      space: { 
+        title: 'Confirmar Exclusão de Espaço', 
+        message: 'Tem certeza que deseja excluir este espaço pai? Todos os ativos associados serão excluídos permanentemente.',
+        variant: 'danger' 
+      },
+      category: { 
+        title: 'Confirmar Exclusão de Categoria', 
+        message: 'Tem certeza que deseja excluir esta categoria? Esta ação é irreversível.',
+        variant: 'danger' 
+      },
+      logs: { 
+        title: 'Confirmar Limpeza de Logs', 
+        message: 'Tem certeza que deseja limpar todos os logs do sistema? Esta ação é irreversível.',
+        variant: 'danger' 
+      },
     };
-    if (!confirm(messages[type] || "Confirmar exclusão permanente? Y/n")) return;
-    try {
-      let endpoint = "";
-      if (type === 'user') endpoint = `/api/users/${id}`;
-      else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
-      else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
-      else if (type === 'logs') endpoint = `/api/logs/clear`;
+    
+    const config = dialogConfig[type];
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      variant: config.variant,
+      onConfirm: async () => {
+        try {
+          let endpoint = "";
+          if (type === 'user') endpoint = `/api/users/${id}`;
+          else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
+          else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
+          else if (type === 'logs') endpoint = `/api/logs/clear`;
 
-      const res = await fetch(endpoint, { method: 'DELETE' });
-      if (res.ok) {
-        if (type === 'user' && id === user?.id) window.location.href = '/login';
-        else if (activeTab === 'users') fetchData('/api/users', setUsersList);
-        else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
-        else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
-        else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
+          const res = await fetch(endpoint, { method: 'DELETE' });
+          if (res.ok) {
+            if (type === 'user' && id === user?.id) window.location.href = '/login';
+            else if (activeTab === 'users') fetchData('/api/users', setUsersList);
+            else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
+            else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
+            else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
+            toast.showSuccess('Exclusão realizada com sucesso.');
+          }
+        } catch (err) { console.error(err); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch (err) { console.error(err); }
+    });
   };
 
   const updateConfig = async (body: Record<string, string>, endpoint: string) => {
@@ -547,6 +587,18 @@ export default function SettingsPage() {
           </form>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmLabel="Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </Layout>
   );
 }

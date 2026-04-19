@@ -11,6 +11,7 @@ import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
 
 interface ListSectionProps {
   filters: any;
@@ -39,6 +40,15 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // Estado do Dialog de Confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
   
   const toggleItemSelection = (id: string) => {
     setSelectedItems(prev => {
@@ -234,36 +244,52 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   };
 
   const handleDelete = async (item: any) => {
-    if (!confirm(`Deseja remover "${item.name}" permanentemente?`)) return;
-    try {
-      const res = await fetch(`/api/actives/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [item.id] })
-      });
-      if (res.ok) { 
-        onRefresh(); 
-        if (selectedViewItem) setSelectedViewItem(null);
-        toast.showSuccess('Item excluído com sucesso.');
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirmar Exclusão',
+      message: `Tem certeza que deseja excluir "${item.name}"? Esta ação é irreversível e o item será removido permanentemente do sistema.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/actives/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [item.id] })
+          });
+          if (res.ok) { 
+            onRefresh(); 
+            if (selectedViewItem) setSelectedViewItem(null);
+            toast.showSuccess('Item excluído com sucesso.');
+          }
+        } catch { toast.showError('Erro ao excluir o item.'); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch { toast.showError('Erro ao excluir o item.'); }
+    });
   };
   
   const handleBatchDelete = async () => {
     const count = selectedItems.size;
-    if (!confirm(`Deseja remover ${count} ativo${count > 1 ? 's' : ''} permanentemente?`)) return;
-    try {
-      const res = await fetch(`/api/actives/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedItems) })
-      });
-      if (res.ok) { 
-        onRefresh(); 
-        exitSelectionMode();
-        toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirmar Exclusão em Massa',
+      message: `Tem certeza que deseja excluir ${count} ativo${count > 1 ? 's' : ''}? Esta ação é irreversível e todos os itens selecionados serão removidos permanentemente do sistema.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/actives/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: Array.from(selectedItems) })
+          });
+          if (res.ok) { 
+            onRefresh(); 
+            exitSelectionMode();
+            toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+          }
+        } catch { toast.showError('Erro ao excluir os itens.'); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch { toast.showError('Erro ao excluir os itens.'); }
+    });
   };
 
   // --- RENDERIZAÇÃO DA ÁRVORE ---
@@ -940,5 +966,23 @@ function ContextBtn({ icon, label, onClick, danger, onClose }: { icon: any, labe
     >
       {icon} {label}
     </button>
+  );
+
+  return (
+    <>
+      {/* ... rest of component ... */}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmLabel="Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
+    </>
   );
 }
