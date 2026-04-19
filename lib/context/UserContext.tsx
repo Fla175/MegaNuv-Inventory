@@ -66,6 +66,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
+  // Quando usuário faz login, força refresh imediato
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const justLoggedIn = localStorage.getItem("justLoggedIn");
+    if (justLoggedIn) {
+      localStorage.removeItem("justLoggedIn");
+      fetchUser(); // força refresh após login
+    }
+  }, [fetchUser]);
+
   // Lógica de aplicação de Tema (Dark/Light)
   useEffect(() => {
     if (typeof window === "undefined") return;

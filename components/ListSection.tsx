@@ -220,7 +220,16 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   };
 
   const handleCloneClick = (item: any) => {
-    onClone({ ...item, id: undefined, serialNumber: "", quantity: 1 });
+    // Preserva o caminho original do ativo para o formulário de clone
+    onClone({ 
+      ...item, 
+      id: undefined, 
+      serialNumber: "", 
+      quantity: 1,
+      // Preservar localização original
+      fatherSpaceId: item.fatherSpaceId,
+      parentId: item.parentId 
+    });
     if (selectedViewItem) setSelectedViewItem(null);
   };
 

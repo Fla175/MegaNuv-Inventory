@@ -41,6 +41,51 @@ JWT_SECRET="sua_chave_secreta"
 3. `npx prisma generate` após migração
 4. `yarn lint` antes de finalizar
 
+## Agentes OpenCode
+
+### Agentes Primários
+
+| Agente | Descrição | Uso |
+|--------|----------|-----|
+| **core** | Agente principal que coordena workflow completo | `opencode --agent core` |
+| **reviewer** | Revisão de código (read-only, ZERO alterações) | `opencode --agent reviewer` |
+
+### Subagentes
+
+| Agente | Descrição | Depende de |
+|--------|----------|------------|
+| **task-manager** | Análise de tasks, quebra em subtarefas | core |
+| **architect** | Decisões técnicas, fase de PERGUNTAS | task-manager |
+| **coder** | Codificação, implementation | architect |
+| **designer** | UI/UX design | coder |
+| **qa** | Testes e validação | designer |
+
+### Workflow Core
+
+```
+Task → Task-manager → Architect (PERGUNTAS) → Coder → Designer → QA → (loop 3x) → Report
+```
+
+### Workflow Reviewer
+
+```
+Task → Ler código → Analisar → Reportar issues (NUNCA alterar)
+```
+
+## Skills
+
+| Skill | Descrição |
+|-------|-----------|
+| `@coder` | Codificação: implementation, refatoração, bugs |
+| `@ui-ux` | Design: UI, UX, wireframes, layouts |
+| `@auditor-yard` | Análise: código estático + dinâmica |
+| `@inventory` | Commit, versionamento |
+
+## Hermes (CEO)
+
+O *Hermes Agent* é o **"CEO"** que delega tasks para o *OpenCode* **(operário)**. Configuração em `~/.hermes/config.yaml`.
+
 ## Referências
 
-- `gear7` no global — Skill principal com convenções de código
+- Agentes: `~/.config/opencode/agents/`
+- Skills: `~/.config/opencode/skills/`

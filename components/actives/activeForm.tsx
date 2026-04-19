@@ -478,6 +478,13 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">SKU</label>
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.sku} onChange={e => setFormData(prev => ({...prev, sku: e.target.value}))} placeholder="Código SKU" />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2">
                   <Hash size={12} /> {mode === "edit" ? "Número de Série" : `Números de Série (${formData.quantity})`}
@@ -495,7 +502,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
           <div className="grid grid-cols-2 gap-4">
             <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData(prev => ({...prev, imageUrl: url}))} label="Foto do Ativo" />
-            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Documento" />
+            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Enviar Documento" />
           </div>
 
           <div>

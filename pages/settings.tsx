@@ -12,6 +12,7 @@ import {
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import InteractiveFace from "@/components/svg/sad-face";
+import ImageUpload from "@/components/imageUpload";
 
 // --- INTERFACES ---
 interface User {
@@ -29,6 +30,10 @@ interface FatherSpace {
   id: string;
   name: string;
   notes?: string;
+  imageUrl?: string;
+  address?: string;
+  responsible?: string;
+  phone?: string;
 }
 
 interface Category {
@@ -65,6 +70,7 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
 
   // Permissões
   const isAdmin = user?.role === 'ADMIN';
@@ -123,7 +129,14 @@ export default function SettingsPage() {
   const handleSpaceSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
-    const payload = Object.fromEntries(new FormData(e.currentTarget));
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData);
+    
+    // Adicionar imagem se foi carregada
+    if (spaceImageUrl) {
+      payload.imageUrl = spaceImageUrl;
+    }
+    
     if (selectedSpace) payload.id = selectedSpace.id;
 
     try {
@@ -134,6 +147,7 @@ export default function SettingsPage() {
       });
       if (res.ok) {
         setIsSpaceModalOpen(false);
+        setSpaceImageUrl(null);
         fetchData('/api/father-spaces/list', setSpacesList);
       }
     } finally { setSaving(false); }
@@ -162,7 +176,13 @@ export default function SettingsPage() {
   };
 
   const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
-    if (!confirm(`Confirmar exclusão permanente? Esta ação será registrada.`)) return;
+    const messages: Record<string, string> = {
+      user: "Este usuário será excluído permanentemente. Continuar? Y/n",
+      space: "Este espaço pai e todos os seus ativos associados serão excluídos permanentemente. Continuar? Y/n",
+      category: "Esta categoria será excluída permanentemente. Continuar? Y/n",
+      logs: "Todos os logs serão excluídos permanentemente. Continuar? Y/n"
+    };
+    if (!confirm(messages[type] || "Confirmar exclusão permanente? Y/n")) return;
     try {
       let endpoint = "";
       if (type === 'user') endpoint = `/api/users/${id}`;
@@ -318,7 +338,7 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
-                  <button onClick={() => { setSelectedSpace(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {spacesList.map((space) => (
@@ -328,7 +348,7 @@ export default function SettingsPage() {
                         <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
                       </div>
                       <div className="flex gap-3 mt-6">
-                        <button onClick={() => { setSelectedSpace(space); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                        <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
                         <button onClick={() => handleDelete('space', space.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
                       </div>
                     </div>
@@ -342,7 +362,12 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  {categoriesList.length < 18 && (
+                    <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  )}
+                  {categoriesList.length >= 18 && (
+                    <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categoriesList.map((category) => (
@@ -503,6 +528,18 @@ export default function SettingsPage() {
             <div className="space-y-6 mb-10">
               <input name="name" placeholder="Nome do Local" defaultValue={selectedSpace?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
               <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Observações..."></textarea>
+              <ImageUpload 
+                value={spaceImageUrl || selectedSpace?.imageUrl || null} 
+                onChange={(url) => setSpaceImageUrl(url)} 
+                label="Imagem do Espaço" 
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <input name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+                <input name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input name="phone" placeholder="Telefone" defaultValue={selectedSpace?.phone || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+              </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço

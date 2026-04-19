@@ -46,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: finalId,
           name: data.name.trim(),
           categoryId: data.categoryId,
+          sku: data.sku || null,
           tag: data.tag || "IN-STOCK",
           manufacturer: data.manufacturer || null,
           model: data.model || null,

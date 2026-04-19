@@ -3,6 +3,7 @@ import React, { ReactNode, useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import {version} from "@/package.json";
 import Image from "next/image";
 import {
   LineChart,
@@ -25,6 +26,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
   const { user } = useUser();
+  const projectVersion = version;
 
   useEffect(() => {
     if (isSidebarOpen) setIsSidebarOpen(false);
@@ -57,7 +59,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="text-2xl font-bold text-blue-400 text-center items-center flex w-auto">
-            <span className="pr-2.5">Inventory&trade;</span>
+            <span className="pr-2.5">MegaNuv Inventory&trade;</span>
             <Image
               src="/logo-inventory.svg"
               alt="Inventory™ Logo"
@@ -81,7 +83,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
           <div className="flex justify-center items-center py-4 px-2 mb-6 border-b border-gray-700 shrink-0">
             <Image
               src="/logo-inventory.svg"
-              alt="MegaNuv Logo"
+              alt="Inventory™ Logo"
               width={160}
               height={50}
               priority
@@ -112,8 +114,8 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          <div className="shrink-0 pt-4 border-t border-gray-700 bg-gray-800">
-            <div className="flex items-center text-gray-300 text-sm mb-3">
+          <div className="shrink-0 pt-4 border-t border-gray-700 bg-gray-800 font-medium">
+            <div className="flex items-center justify-center text-gray-300 text-sm mb-3">
               <UserCircle size={20} className="mr-2 shrink-0" />
               <span className="truncate">{user?.name || "Usuário"}</span>
             </div>
@@ -127,11 +129,15 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
                   console.error("Erro ao fazer logout");
                 }
               }}
-              className="w-full flex items-center justify-center py-2.5 px-4 rounded-lg text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
+              className="w-full flex items-center justify-center py-2.5 px-4 mb-1.5 rounded-lg text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
             >
               <LogOut size={18} className="mr-2 shrink-0" />
               <span className="font-medium">Sair</span>
             </button>
+            <div className="flex justify-center items-baseline text-blue-400 text-[15px] font-bold">
+              <p className="pr-0.5">MegaNuv Inventory™</p> <span className="pr-1 text-gray-400 text-[12px] font-medium">v{projectVersion}</span>
+              <span><div className="h-2 w-2 bg-green-500 rounded-full shadow-lg"></div></span>
+            </div>
           </div>
         </aside>
 
