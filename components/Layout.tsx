@@ -116,29 +116,33 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          <div className="shrink-0 pt-4 border-t border-gray-700 bg-gray-800 font-medium">
-            <div className="flex items-center justify-center text-gray-300 text-sm mb-3">
-              <UserCircle size={20} className="mr-2 shrink-0" />
-              <span className="truncate">{user?.name || "Usuário"}</span>
+          <div className="shrink-0 pt-4 border-t border-gray-700 bg-gray-800">
+            {/* Usuário + Logout - sempre visível */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <UserCircle size={18} className="shrink-0 text-gray-400" />
+                <span className="truncate text-sm text-gray-300 font-medium">{user?.name || "Usuário"}</span>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                    localStorage.removeItem("user");
+                    window.location.href = "/login";
+                  } catch {
+                    console.error("Erro ao fazer logout");
+                  }
+                }}
+                className="shrink-0 p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
+                title="Sair"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
-            <button
-              onClick={async () => {
-                try {
-                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                  localStorage.removeItem("user");
-                  window.location.href = "/login";
-                } catch {
-                  console.error("Erro ao fazer logout");
-                }
-              }}
-              className="w-full flex items-center justify-center py-2.5 px-4 mb-1.5 rounded-lg text-red-300 bg-gray-700 hover:bg-red-500 hover:text-white transition duration-200 shadow-sm"
-            >
-              <LogOut size={18} className="mr-2 shrink-0" />
-              <span className="font-medium">Sair</span>
-            </button>
-            <div className="flex justify-center items-baseline text-blue-400 text-[15px] font-bold">
-              <p className="pr-0.5">MegaNuv Inventory™</p> <span className="pr-1 text-gray-400 text-[12px] font-medium">v{projectVersion}</span>
-              <span><div className="h-2 w-2 bg-green-500 rounded-full shadow-lg"></div></span>
+            {/* Versão */}
+            <div className="flex items-center justify-between text-blue-400 text-xs font-bold">
+              <span>MegaNuv Inventory™</span>
+              <span className="text-gray-500">v{projectVersion}</span>
             </div>
           </div>
         </aside>

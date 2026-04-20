@@ -270,16 +270,27 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let finalFatherSpaceId = formData.locationId;
-    let finalParentId: string | null = null;
+    // Na edição, preservar localização original se não foi alterada
+    let finalFatherSpaceId: string;
+    let finalParentId: string | null;
     
-    if (formData.locationType === "space") {
+    if (mode === "edit" && initialData) {
+      // Preservar caminho original
+      finalFatherSpaceId = initialData.fatherSpaceId;
+      finalParentId = initialData.parentId || null;
+    } else {
+      // Para criação ou clone, calcular normalmente
       finalFatherSpaceId = formData.locationId;
       finalParentId = null;
-    } else if (formData.locationType === "active") {
-      const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
-      finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
-      finalParentId = formData.locationId;
+      
+      if (formData.locationType === "space") {
+        finalFatherSpaceId = formData.locationId;
+        finalParentId = null;
+      } else if (formData.locationType === "active") {
+        const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
+        finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
+        finalParentId = formData.locationId;
+      }
     }
     
     const payload = { 
