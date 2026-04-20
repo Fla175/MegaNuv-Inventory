@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string>('#4F46E5');
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   
   // Estado do Dialog de Confirmação
@@ -171,7 +172,7 @@ export default function SettingsPage() {
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
     
-    const payload = { name };
+    const payload: { name: string; id?: string } = { name };
     if (selectedCategory) payload.id = selectedCategory.id;
 
     try {
@@ -545,7 +546,7 @@ export default function SettingsPage() {
           <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
+              <button type="button" onClick={() => { setIsCategoryModalOpen(false); setSelectedColor('#4F46E5'); }} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />

@@ -937,6 +937,18 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           </div>
         )
       )}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmLabel="Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </>
   );
 }
@@ -966,23 +978,5 @@ function ContextBtn({ icon, label, onClick, danger, onClose }: { icon: any, labe
     >
       {icon} {label}
     </button>
-  );
-
-  return (
-    <>
-      {/* ... rest of component ... */}
-      
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-        confirmLabel="Excluir"
-        cancelLabel="Manter"
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-      />
-    </>
   );
 }
