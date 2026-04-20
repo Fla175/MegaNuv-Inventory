@@ -3,7 +3,10 @@ import React, { ReactNode, useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import {version} from "@/package.json";
+
+//Versão Fixa - avoid import issues
+const APP_VERSION = "2.10.0";
+
 import Image from "next/image";
 import {
   LineChart,
@@ -26,7 +29,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
   const { user } = useUser();
-  const projectVersion = version;
+  const projectVersion = APP_VERSION;
 
   useEffect(() => {
     if (isSidebarOpen) setIsSidebarOpen(false);

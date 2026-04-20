@@ -65,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       req, 
       decoded.userId, 
       "CRIAÇÃO DE CATEGORIA",
-      `Criou a Categoria: ${name} (${color || 'sem cor definida'})`
+      `Criou a Categoria: ${name} (${assignedColor || 'sem cor definida'})`
     );
 
     return res.status(201).json(newCategory);
