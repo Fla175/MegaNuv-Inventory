@@ -66,17 +66,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
-  // Auto-redirect para login se não há usuário e não está carregando
-  useEffect(() => {
-    if (!loading && !user && typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
-      // Não redirecionar se já estiver na página de login
-      if (!currentPath.includes('/login') && !currentPath.includes('/initial-setup')) {
-        window.location.href = '/login';
-      }
-    }
-  }, [loading, user]);
-
   // Quando usuário faz login, força refresh imediato
   useEffect(() => {
     if (typeof window === "undefined") return;

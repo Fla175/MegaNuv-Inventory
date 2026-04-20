@@ -1,6 +1,14 @@
 ---
 name: inventory 2.0
+description: Objetivo de aprimorar a aplicação com correções de bugs, melhorias de UX, novas funcionalidades e refinamento de componentes, mantendo a estabilidade e desempenho.
+for: Flávio Freires Pomin
+tags: Ação necessária
+date-mode: DD-MM-YY
+created-at: 20-02-26
+modificated-at: 07-04-26
 ---
+
+# Quadro KanBan Inventory 2.0
 
 ## Objetivo da Release:
 
