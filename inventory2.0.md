@@ -44,6 +44,9 @@ Aprimorar a aplicação com correções de bugs, melhorias de UX, novas funciona
 - [x] ATUALIZADO Responsividade e Acessibilidade: Botão sair sempre visível, fechar modais com tecla Esc, contexto limpo em telas menores.
 - [x] ATUALIZADO Feedback Visual: Sistema de Toast Notifications substituindo alerts nativos com cores por tipo (success/error/warning/info).
 - [x] ATUALIZADO Cores por Tipo: Paleta definida para usuários (emerald), espaços com conteúdo (emerald), espaços vazios (cinza), ativos comuns (amber), e 18 cores pastel para categorias.
+- [x] NOVO Footer Sticky no Sidebar: Adicionado mt-auto no footer do sidebar para manter usuário, logout e versão sempre visíveis no bottom-left mesmo com pouco conteúdo.
+- [x] NOVO Correção Página de Erro no Settings: Removida página de erro "Usuário não encontrado" com InteractiveFace, substituída por tela de "Carregando..." quando user ainda não foi carregado.
+- [x] NOVO Campo Localização no Edit Form: Corrigido para exibir o local atual do ativo ao editar, agora suporta tanto campos simples (fatherSpaceId/parentId) quanto objetos aninhados (fatherSpace.id/parent.id).
 
 ## 4. Back-end e Persistência
 
