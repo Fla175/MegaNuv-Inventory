@@ -12,7 +12,6 @@ import {
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { useToast } from "@/lib/context/ToastContext";
-import InteractiveFace from "@/components/svg/sad-face";
 import ImageUpload from "@/components/imageUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -74,6 +73,8 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>('#4F46E5');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _color = selectedColor;
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   
   // Estado do Dialog de Confirmação
@@ -256,14 +257,8 @@ export default function SettingsPage() {
 
   if (loading) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Sincronizando...</div></Layout>;
 
-  if (!user) return (
-    <Layout title="Configurações">
-      <div className="h-96 flex flex-col items-center justify-center font-black text-blue-900 italic gap-4">
-        <div className="w-16 h-16 text-blue-600"><InteractiveFace /></div>
-        <p>Usuário não encontrado. <span className="text-blue-500 underline cursor-pointer" onClick={refreshUser}>Recarregue.</span></p>
-      </div>
-    </Layout>
-  );
+  // Se ainda não carregou, mostra tela vazia
+  if (!user) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Carregando...</div></Layout>;
 
   const tabs = [
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
@@ -320,17 +315,17 @@ export default function SettingsPage() {
                     </div>
                     <div className="text-center md:text-left">
                       <div className="flex items-center gap-3 justify-center md:justify-start">
-                        <h2 className="text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user.name || 'Usuário'}</h2>
-                        <span className={`px-3 py-1 ${user.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                          {user.role}
+                        <h2 className="text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user?.name || 'Usuário'}</h2>
+                        <span className={`px-3 py-1 ${user?.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user?.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                          {user?.role}
                         </span>
                       </div>
-                      <p className="text-gray-400 font-bold text-sm mt-1">{user.email}</p>
+                      <p className="text-gray-400 font-bold text-sm mt-1">{user?.email}</p>
                       <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 mt-4">
                         <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
-                          <CalendarFold size={12}/> Desde {new Date(user.createdAt).toLocaleDateString()}
+                          <CalendarFold size={12}/> Desde {new Date(user?.createdAt).toLocaleDateString()}
                         </div>
-                        {user.lastLogin && (
+                        {user?.lastLogin && (
                           <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
                             <Clock size={12}/> Login em {new Date(user.lastLogin).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                           </div>

@@ -6,7 +6,7 @@ interface SectionItem {
   id: string;
   name: string;
   imageUrl?: string | null;
-  createdBy?: { name: string | null } | null;
+  createdBy?: { name: string | null } | string | null;
 }
 
 interface Section {

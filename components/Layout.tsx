@@ -123,15 +123,14 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          {/* Footer compacto - sempre visível sem scroll */}
-          <div className="shrink-0 pt-2 border-t border-gray-700 bg-gray-800">
+          {/* Footer compacto - sticky no bottom-left */}
+          <div className="shrink-0 pt-2 border-t border-gray-700 bg-gray-800 mt-auto">
             {/* Usuário + Logout */}
             <div className="flex items-center justify-between gap-1.5 py-1.5">
               <div className="flex items-center gap-2 min-w-0">
                 <UserCircle size={16} className="shrink-0 text-gray-400" />
                 <span className="truncate text-xs text-gray-300 font-medium">{user?.name || "Usuário"}</span>
-              </div>
-              <button
+                <button
                 onClick={async () => {
                   try {
                     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -146,6 +145,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
               >
                 <LogOut size={14} />
               </button>
+              </div>
             </div>
             {/* Versão */}
             <div className="flex items-center justify-between text-blue-400 text-[10px] font-bold py-0.5">

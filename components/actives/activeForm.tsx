@@ -69,8 +69,9 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   // Carrega os dados iniciais com segurança
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      const locId = initialData.fatherSpaceId || initialData.parentId || "";
-      const locType = initialData.fatherSpaceId ? "space" : (initialData.parentId ? "active" : "");
+      // Suporta tanto campos simples (fatherSpaceId/parentId) quanto objetos aninhados (fatherSpace.id/parent.id)
+      const locId = initialData.fatherSpaceId || initialData.parentId || initialData.fatherSpace?.id || initialData.parent?.id || "";
+      const locType = initialData.fatherSpaceId || initialData.fatherSpace?.id ? "space" : (initialData.parentId || initialData.parent?.id ? "active" : "");
 
       setFormData(prev => ({
         ...prev,

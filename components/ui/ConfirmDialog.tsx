@@ -1,5 +1,5 @@
 // components/ui/ConfirmDialog.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { AlertTriangle, X, Loader2 } from 'lucide-react';
 
 interface ConfirmDialogProps {
