@@ -474,7 +474,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                       
                       {a && (
                         <p 
-                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-2"
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{ 
                             color: getCategoryColor(a.id, categories), 
                             backgroundColor: `${getCategoryColor(a.id, categories)}15`, 
@@ -485,9 +485,8 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                         </p>
                       )}
 
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
-                        <Hash size={10}/> {active.serialNumber || 'SEM SN'}
-                        {active.sku && <span className="ml-2 text-blue-400">• SKU: {active.sku}</span>}
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center">
+                        { active.sku && <span className="ml-1 flex"><Hash size={10}/> SKU: {active.sku}</span> } { active.serialNumber && <span className="ml-1 text-blue-400 flex">{active.sku ? "•" : <Hash size={10}/> } SN: {active.serialNumber}</span> }
                       </p>
                     </div>
                   </div>
@@ -599,9 +598,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    {selectedViewItem.sku && <InfoItem icon={<Barcode size={16}/>} label="SKU" Class="truncate" value={selectedViewItem.sku} />}
-                    <InfoItem icon={<Hash size={16}/>} label="Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
-                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name || "Raiz" : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Raiz"} />
+                    <InfoItem icon={<Barcode size={16}/>} label="SKU" Class="truncate" value={selectedViewItem.sku || "N/A"} />
+                    <InfoItem icon={<Hash size={16}/>} label="Nº Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
+                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
                     <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
@@ -648,7 +647,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
 
                <div className="hidden sm:block flex-1"></div>
 
-               <button onClick={() => handleDelete(selectedViewItem)} className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
+               <button onClick={() => {handleDelete(selectedViewItem); setSelectedViewItem(false);}} className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
                  <Trash2 size={16}/> <span className="hidden sm:inline">Excluir</span>
                </button>
             </div>
