@@ -123,37 +123,37 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
             </ul>
           </nav>
 
-          {/* Footer compacto - sticky no bottom-left */}
+          {/* Footer compacto - sticky no bottom-left do sidebar (interno se scroll) */}
           <div className="shrink-0 pt-2 border-t border-gray-700 bg-gray-800 mt-auto">
-            {/* Usuário + Logout */}
-            <div className="flex items-center justify-between gap-1.5 py-1.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <UserCircle size={16} className="shrink-0 text-gray-400" />
-                <span className="truncate text-xs text-gray-300 font-medium">{user?.name || "Usuário"}</span>
-                <button
-                onClick={async () => {
-                  try {
-                    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                    localStorage.removeItem("user");
-                    window.location.href = "/login";
-                  } catch {
-                    console.error("Erro ao fazer logout");
-                  }
-                }}
-                className="shrink-0 p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
-                title="Sair"
-              >
-                <LogOut size={14} />
-              </button>
-              </div>
-            </div>
-            {/* Versão */}
             <div className="flex items-center justify-between text-blue-400 text-[10px] font-bold py-0.5">
               <span>MegaNuv Inventory™</span>
               <span className="text-gray-500">v{projectVersion}</span>
             </div>
           </div>
         </aside>
+
+        {/* Footer fixo na tela - bottom-left (sobre sidebar em desktop) */}
+        <div className="hidden lg:flex fixed bottom-4 left-4 z-40">
+          <div className="flex items-center gap-2 bg-gray-800/95 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-700 shadow-xl">
+            <UserCircle size={18} className="shrink-0 text-gray-400" />
+            <span className="text-xs text-gray-200 font-medium min-w-[100px]">{user?.name || "Usuário"}</span>
+            <button
+              onClick={async () => {
+                try {
+                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                  localStorage.removeItem("user");
+                  window.location.href = "/login";
+                } catch {
+                  console.error("Erro ao fazer logout");
+                }
+              }}
+              className="shrink-0 p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
+              title="Sair"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
 
         {isSidebarOpen && (
           <div
@@ -162,7 +162,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
           ></div>
         )}
 
-        <main className="flex-1 p-3 sm:p-6 md:p-8 lg:p-10 mt-14 lg:mt-0 min-h-screen lg:min-h-0 bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 lg:p-10 mt-14 lg:mt-0 min-h-screen lg:min-h-0 pb-24 lg:pb-10 bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
