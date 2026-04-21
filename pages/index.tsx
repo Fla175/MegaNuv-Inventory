@@ -1,11 +1,12 @@
 // pages/index.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react"; // Adicionado useEffect
-import Layout from "../components/Layout";
-import HeaderSection from "../components/HeaderSection";
-import SearchSection from "../components/SearchSection";
-import ListSection from "../components/ListSection";
-import ActiveForm from "../components/actives/activeForm";
+import { useState, useEffect } from "react";
+import Layout from "@/components/Layout";
+import HeaderSection from "@/components/HeaderSection";
+import SearchSection from "@/components/SearchSection";
+import ListSection from "@/components/ListSection";
+import ActiveForm from "@/components/actives/activeForm";
+import { useUser } from "@/lib/context/UserContext";
 
 export default function GestaoAtivosPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -13,6 +14,7 @@ export default function GestaoAtivosPage() {
   const [selectedActive, setSelectedActive] = useState<any>(null);
   const [fatherSpaces, setFatherSpaces] = useState([]);
   const [actives, setActives] = useState([]);
+  const { refreshUser } = useUser();
 
   const loadData = async () => {
     try {
@@ -37,7 +39,8 @@ export default function GestaoAtivosPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    refreshUser();
+  }, [refreshUser]);
 
   const [filters, setFilters] = useState({
     query: "",
