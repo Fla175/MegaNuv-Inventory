@@ -20,18 +20,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id, ...data } = req.body;
     if (!id) return res.status(400).json({ error: "ID obrigatório" });
 
+    // Handle serialNumbers array (single or multiple)
+    const serialNumberValue = Array.isArray(data.serialNumbers) 
+      ? data.serialNumbers.filter((s: string) => s && s.trim()).join(', ')  // Join multiple serials
+      : data.serialNumber || data.serialNumbers?.[0] || null;
+
     const updated = await db.active.update({
       where: { id },
       data: {
         name: data.name,
-        categoryId: data.categoryId, // Uso direto de ID para FK
+        categoryId: data.categoryId,
         sku: data.sku,
         manufacturer: data.manufacturer,
         model: data.model,
-        serialNumber: data.serialNumber,
+        serialNumber: serialNumberValue,
         fixedValue: data.fixedValue !== undefined ? Number(data.fixedValue) : undefined,
         tag: data.tag,
         notes: data.notes,
+        imageUrl: data.imageUrl,
+        isPhysicalSpace: data.isPhysicalSpace,
         fatherSpaceId: data.fatherSpaceId,
         parentId: data.parentId || null,
       },

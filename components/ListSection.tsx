@@ -486,7 +486,8 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                       )}
 
                       <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
-                        <Hash size={10}/> SN: {active.serialNumber || 'SEM SN'}
+                        <Hash size={10}/> {active.serialNumber || 'SEM SN'}
+                        {active.sku && <span className="ml-2 text-blue-400">• SKU: {active.sku}</span>}
                       </p>
                     </div>
                   </div>
@@ -598,8 +599,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
+                    {selectedViewItem.sku && <InfoItem icon={<Barcode size={16}/>} label="SKU" Class="truncate" value={selectedViewItem.sku} />}
                     <InfoItem icon={<Hash size={16}/>} label="Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
-                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Não definido"} />
+                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name || "Raiz" : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Raiz"} />
                     <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>

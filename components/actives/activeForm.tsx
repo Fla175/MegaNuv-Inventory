@@ -70,8 +70,18 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
       // Suporta tanto campos simples (fatherSpaceId/parentId) quanto objetos aninhados (fatherSpace.id/parent.id)
-      const locId = initialData.fatherSpaceId || initialData.parentId || initialData.fatherSpace?.id || initialData.parent?.id || "";
-      const locType = initialData.fatherSpaceId || initialData.fatherSpace?.id ? "space" : (initialData.parentId || initialData.parent?.id ? "active" : "");
+      // Se tem parentId → está dentro de um espaço físico (active), senão está em pai (space)
+      const locId = initialData.parentId || initialData.parent?.id 
+        ? initialData.parentId || initialData.parent.id 
+        : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
+      const locType = initialData.parentId || initialData.parent?.id ? "active" : "space";
+
+      // Converte serialNumber (string) para array de serialNumbers
+      const serialArray = mode === "clone" 
+        ? Array(initialData.quantity || 1).fill("")
+        : (initialData.serialNumber 
+          ? (typeof initialData.serialNumber === 'string' ? initialData.serialNumber.split(',').map((s: string) => s.trim()) : [initialData.serialNumber])
+          : Array(initialData.quantity || 1).fill(""));
 
       setFormData(prev => ({
         ...prev,
@@ -81,9 +91,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         locationId: locId,
         locationType: locType,
         id: mode === "clone" ? undefined : initialData.id,
-        serialNumbers: mode === "clone" 
-          ? Array(initialData.quantity || 1).fill("") 
-          : [initialData.serialNumber || ""],
+        serialNumbers: serialArray,
       }));
     }
   }, [initialData, mode]);
