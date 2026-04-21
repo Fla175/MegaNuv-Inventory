@@ -72,9 +72,7 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string>('#4F46E5');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _color = selectedColor;
+  const [selectedColor, setSelectedColor] = useState<string>('#4F46E5'); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   
   // Estado do Dialog de Confirmação

@@ -2,8 +2,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const saltRounds = 10;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -17,15 +19,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // 1. Verificar se existe algum usuário ADMIN no sistema
+    const adminCount = await prisma.user.count({
+      where: { role: 'ADMIN' }
+    });
+
+    // 2. Se NÃO existe ADMIN, permitir registro (primeiro ADMIN do sistema)
+    // 3. Se JÁ existe ADMIN, exigir token de ADMIN autenticado
+    if (adminCount > 0) {
+      const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+      if (!token) {
+        return res.status(401).json({ message: 'Sessão expirada. Faça login.' });
+      }
+
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+        if (decoded.role !== 'ADMIN') {
+          return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
+        }
+      } catch {
+        return res.status(401).json({ message: 'Token inválido.' });
+      }
+    }
+
+    // 4. Verificar se email já existe
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'Já existe um usuário com este email.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // 5. Se é primeiro ADMIN, o role deve ser ADMIN
+    // Se já existe ADMIN, o role solicitado deve ser válido
+    const requestedRole = role === "MANAGER" || role === "VIEWER" || role === "ADMIN" ? role : "VIEWER";
+    const userRole = adminCount === 0 ? "ADMIN" : requestedRole;
 
-    // Evita que passem ADMIN pela requisição a menos que você construa uma trava futuramente
-    const userRole = role === "MANAGER" || role === "VIEWER" || role === "ADMIN" ? role : "VIEWER";
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     const newUser = await prisma.user.create({
       data: { 
@@ -42,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         action: "REGISTRO DE USUÁRIO",
         details: `Novo usuário registrado: ${name} com nível ${userRole}.`,
-        userId: newUser.id, // Quem sofreu a ação / Quem fez
+        userId: newUser.id,
         ip: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || "Desconhecido",
         userAgent: req.headers['user-agent'] || "Desconhecido"
       }

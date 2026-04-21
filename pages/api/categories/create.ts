@@ -25,9 +25,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
 
-    // 2. AUTORIZAÇÃO (Apenas ADMIN cria categorias)
-    if (decoded.role !== "ADMIN") {
-      return res.status(403).json({ error: "Apenas administradores podem criar categorias." });
+    // 2. AUTORIZAÇÃO (ADMIN e MANAGER criam categorias)
+    if (decoded.role === "VIEWER") {
+      return res.status(403).json({ error: "Visualizadores não podem criar categorias." });
     }
 
     // 3. LIMITE DE CATEGORIAS (máximo 18)

@@ -24,8 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
 
-    if (decoded.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado. Apenas administradores atualizam áreas." });
+    if (decoded.role === "VIEWER") {
+      return res.status(403).json({ error: "Visualizadores não podem atualizar categorias." });
     }
 
     const { id, name, color } = req.body;
