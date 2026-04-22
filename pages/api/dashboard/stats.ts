@@ -1,11 +1,21 @@
 // pages/api/dashboard/stats.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
+  // Autenticação JWT
+  const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "Sessão expirada." });
+
   try {
+    const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+    if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
+
     // 1. Estatísticas de Ativos e Valor
     const activeStats = await prisma.active.aggregate({
       _sum: { fixedValue: true },
