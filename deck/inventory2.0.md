@@ -5,7 +5,7 @@ for: Flávio Freires Pomin
 tags: Ação necessária
 date-mode: DD-MM-YY
 created-at: 20-02-26
-modificated-at: 07-04-26
+modificated-at: 24-04-26
 ---
 
 # Quadro KanBan Inventory 2.0
@@ -70,3 +70,21 @@ Aprimorar a aplicação com correções de bugs, melhorias de UX, novas funciona
 - [x] ATUALIZADO Adicionar a tab Categoria (category) para fazer o CRUD completo das Categorias que agora estarão no banco de dados (settings.tsx).
 - [x] Juntar as tabs Meu Perfil e Usuários (profile e users) (settings.tsx).
 - [x] Modificar view.tsx para ser compatível com a nova estrutura de tabelas e apresentar os novos campos.
+
+## 6. Melhorias v2.10 (24-04-26)
+
+### Fase 1: Tipagem & Correções
+
+- [x] catch(error) Typing: Corrigido tipagem em 19 arquivos de API para `catch(error: unknown)` com message narrowing
+- [x] Interfaces TypeScript: Nova biblioteca `lib/types.ts` com `ListSectionProps` e `ListSectionFilters` tipados
+- [x] React.memo: Adicionado memoização em `ListSection` para performance
+
+### Fase 2: Qualidade & Performance
+
+- [x] Hierarquia Visual: Espaçamento progressivo `ml-${level * 6}` para melhor diferenciação visual
+- [x] Memoization: Componentes agora usam `React.memo()`
+
+### Fase 3: Polish & UX
+
+- [x] Empty States: Estados vazios em `pages/settings.tsx` para usuários e espaços pai
+- [x] Feedback Visual: Toast notifications para todas as ações
