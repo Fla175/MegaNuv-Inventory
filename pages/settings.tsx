@@ -342,6 +342,15 @@ export default function SettingsPage() {
                       </button>
                     )}
                   </div>
+                  {usersList.filter(u => u.id !== user.id).length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <Users size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum membro cadastrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">Adicione membros para gerenciar o acesso ao sistema</p>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {usersList.filter(u => u.id !== user.id).map(u => (
                       <div key={u.id} className="flex items-center justify-between p-5 bg-gray-50 dark:bg-zinc-950 rounded-[1.5rem] border border-transparent hover:border-blue-500/20 transition-all group">
@@ -363,6 +372,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
               </div>
             )}
@@ -374,6 +384,15 @@ export default function SettingsPage() {
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
                   <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
+                {spacesList.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                      <LayoutDashboard size={32} className="text-gray-400" />
+                    </div>
+                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum espaço pai cadastrado</p>
+                    <p className="text-xs font-bold text-gray-500 mt-1">Crie um espaço pai para organizar seus ativos</p>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {spacesList.map((space) => (
                     <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
@@ -388,6 +407,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -403,6 +423,15 @@ export default function SettingsPage() {
                     <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
                   )}
                 </div>
+                {categoriesList.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                      <Group size={32} className="text-gray-400" />
+                    </div>
+                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhuma categoria cadastrada</p>
+                    <p className="text-xs font-bold text-gray-500 mt-1">Crie categorias para classificar seus ativos</p>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categoriesList.map((category) => (
                     <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
@@ -417,6 +446,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -433,9 +463,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   {logsList.length === 0 ? (
-                    <div className="py-20 text-center text-zinc-400 font-black uppercase text-xs">Nenhum log encontrado.</div>
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <ClipboardList size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum log encontrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">As atividades serão registradas aqui</p>
+                    </div>
                   ) : (
-                    logsList.map((log) => (
+                    [...logsList].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((log) => (
                       <div key={log.id} className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-white/5 flex items-start gap-4 text-[11px]">
                         <div className={`p-2 rounded-lg shrink-0 ${log.action.includes('DELETE') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
                           <Activity size={14}/>
