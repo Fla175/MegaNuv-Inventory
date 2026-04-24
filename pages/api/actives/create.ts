@@ -18,6 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const decoded = jwt.verify(token, JWT_SECRET!) as any;
     const userId = decoded.id || decoded.userId;
 
+    // VIEWER não pode criar ativos
+    if (decoded.role === "VIEWER") {
+      return res.status(403).json({ error: "Visualizadores não podem criar ativos." });
+    }
+
     const data = req.body;
     
     // Validação de integridade do Schema
@@ -46,6 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: finalId,
           name: data.name.trim(),
           categoryId: data.categoryId,
+          sku: data.sku || null,
           tag: data.tag || "IN-STOCK",
           manufacturer: data.manufacturer || null,
           model: data.model || null,

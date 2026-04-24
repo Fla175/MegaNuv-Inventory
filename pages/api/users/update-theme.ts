@@ -24,8 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     return res.status(200).json({ success: true, theme: updatedUser.theme });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Erro ao atualizar tema:", error);
-    return res.status(500).json({ error: "Erro interno no servidor" });
+    const message = error instanceof Error ? error.message : 'Erro interno no servidor';
+    return res.status(500).json({ error: message });
   }
 }

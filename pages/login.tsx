@@ -54,6 +54,8 @@ export default function Login() {
       const data = await res.json();
 
       if (res.ok) {
+        // Armazena no localStorage para forçar refresh no contexto do usuário
+        localStorage.setItem("justLoggedIn", "true");
         router.replace('/'); // redireciona após login
       } else {
         setMessage(data.message || 'Credenciais inválidas');

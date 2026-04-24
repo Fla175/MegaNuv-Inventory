@@ -1,6 +1,6 @@
 // pages/initial-setup/register.tsx
 /* eslint-disable @next/next/no-page-custom-font */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -13,7 +13,26 @@ export default function Signup() {
   const [role] = useState('ADMIN');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
+
+  // Verificar se sistema já possui ADMIN
+  useEffect(() => {
+    async function checkSetup() {
+      try {
+        const res = await fetch('/api/public/initial-check');
+        const data = await res.json();
+        if (!data.requiresSetup) {
+          router.replace('/login');
+        } else {
+          setChecking(false);
+        }
+      } catch {
+        setChecking(false);
+      }
+    }
+    checkSetup();
+  }, [router]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -42,6 +61,17 @@ export default function Signup() {
       setLoading(false);
     }
   };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#004AAD] to-[#38B6FF] p-4 font-inter">
+        <div className="bg-white p-8 rounded-xl shadow-2xl flex flex-col items-center">
+          <Loader2 size={40} className="animate-spin text-blue-600 mb-4" />
+          <p className="text-gray-600 font-medium">Verificando sistema...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#004AAD] to-[#38B6FF] p-4 font-inter">

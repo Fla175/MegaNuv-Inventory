@@ -69,8 +69,19 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   // Carrega os dados iniciais com segurança
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      const locId = initialData.fatherSpaceId || initialData.parentId || "";
-      const locType = initialData.fatherSpaceId ? "space" : (initialData.parentId ? "active" : "");
+      // Suporta tanto campos simples (fatherSpaceId/parentId) quanto objetos aninhados (fatherSpace.id/parent.id)
+      // Se tem parentId → está dentro de um espaço físico (active), senão está em pai (space)
+      const locId = initialData.parentId || initialData.parent?.id 
+        ? initialData.parentId || initialData.parent.id 
+        : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
+      const locType = initialData.parentId || initialData.parent?.id ? "active" : "space";
+
+      // Converte serialNumber (string) para array de serialNumbers
+      const serialArray = mode === "clone" 
+        ? Array(initialData.quantity || 1).fill("")
+        : (initialData.serialNumber 
+          ? (typeof initialData.serialNumber === 'string' ? initialData.serialNumber.split(',').map((s: string) => s.trim()) : [initialData.serialNumber])
+          : Array(initialData.quantity || 1).fill(""));
 
       setFormData(prev => ({
         ...prev,
@@ -80,9 +91,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         locationId: locId,
         locationType: locType,
         id: mode === "clone" ? undefined : initialData.id,
-        serialNumbers: mode === "clone" 
-          ? Array(initialData.quantity || 1).fill("") 
-          : [initialData.serialNumber || ""],
+        serialNumbers: serialArray,
       }));
     }
   }, [initialData, mode]);
@@ -270,16 +279,27 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let finalFatherSpaceId = formData.locationId;
-    let finalParentId: string | null = null;
+    // Na edição, preservar localização original se não foi alterada
+    let finalFatherSpaceId: string;
+    let finalParentId: string | null;
     
-    if (formData.locationType === "space") {
+    if (mode === "edit" && initialData) {
+      // Preservar caminho original
+      finalFatherSpaceId = initialData.fatherSpaceId;
+      finalParentId = initialData.parentId || null;
+    } else {
+      // Para criação ou clone, calcular normalmente
       finalFatherSpaceId = formData.locationId;
       finalParentId = null;
-    } else if (formData.locationType === "active") {
-      const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
-      finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
-      finalParentId = formData.locationId;
+      
+      if (formData.locationType === "space") {
+        finalFatherSpaceId = formData.locationId;
+        finalParentId = null;
+      } else if (formData.locationType === "active") {
+        const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
+        finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
+        finalParentId = formData.locationId;
+      }
     }
     
     const payload = { 
@@ -478,6 +498,13 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">SKU</label>
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.sku} onChange={e => setFormData(prev => ({...prev, sku: e.target.value}))} placeholder="Código SKU" />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2">
                   <Hash size={12} /> {mode === "edit" ? "Número de Série" : `Números de Série (${formData.quantity})`}
@@ -495,7 +522,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
           <div className="grid grid-cols-2 gap-4">
             <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData(prev => ({...prev, imageUrl: url}))} label="Foto do Ativo" />
-            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Documento" />
+            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Enviar Documento" />
           </div>
 
           <div>

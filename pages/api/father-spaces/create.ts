@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: "Acesso negado. Apenas admins criam espaços pai." });
     }
 
-    const { name, notes, parentId } = req.body;
+    const { name, notes, parentId, imageUrl, address, responsible, phone } = req.body;
 
     if (!name || name.trim().length < 2) {
       return res.status(400).json({ error: "Nome muito curto." });
@@ -43,7 +43,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: name.trim(),
         notes: notes || null,
         parentId: parentId || null,
-        createdById: userId
+        createdById: userId,
+        imageUrl: imageUrl || null,
+        address: address || null,
+        responsible: responsible || null,
+        phone: phone || null,
       }
     });
 

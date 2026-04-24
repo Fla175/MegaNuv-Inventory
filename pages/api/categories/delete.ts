@@ -23,8 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
 
-    if (decoded.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado." });
+    if (decoded.role === "VIEWER") {
+      return res.status(403).json({ error: "Visualizadores não podem excluir categorias." });
     }
 
     const { id } = req.query;
@@ -50,9 +50,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: "Área removida com sucesso." });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_CATEGORY_DELETE_ERROR:", error);
-    return res.status(500).json({ error: "Erro ao remover área. Verifique se existem ativos vinculados a ela." });
+    const message = error instanceof Error ? error.message : 'Erro ao remover área. Verifique se existem ativos vinculados a ela.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

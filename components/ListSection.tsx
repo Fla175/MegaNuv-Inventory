@@ -1,7 +1,7 @@
 // components/ListSection.tsx
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
@@ -11,18 +11,11 @@ import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { ListSectionFilters, ListSectionProps } from "../lib/types";
 
-interface ListSectionProps {
-  filters: any;
-  onEdit: (item: any, mode: 'view' | 'edit') => void; 
-  onClone: (item: any) => void;
-  onRefresh: () => void;
-  onMove?: (item: any) => void;
-  actives: any[];
-  fatherSpaces: any[];
-}
-
-export default function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
+function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
   
   // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
@@ -39,6 +32,15 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // Estado do Dialog de Confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
   
   const toggleItemSelection = (id: string) => {
     setSelectedItems(prev => {
@@ -165,7 +167,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
         while (currentParentId) {
           visibleActiveIds.add(currentParentId);
           const parent = actives.find(a => a.id === currentParentId);
-          currentParentId = parent?.parentId;
+          currentParentId = parent?.parentId ?? null;
         }
       }
     });
@@ -220,41 +222,66 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
   };
 
   const handleCloneClick = (item: any) => {
-    onClone({ ...item, id: undefined, serialNumber: "", quantity: 1 });
+    // Preserva o caminho original do ativo para o formulário de clone
+    onClone({ 
+      ...item, 
+      id: undefined, 
+      serialNumber: "", 
+      quantity: 1,
+      // Preservar localização original
+      fatherSpaceId: item.fatherSpaceId,
+      parentId: item.parentId 
+    });
     if (selectedViewItem) setSelectedViewItem(null);
   };
 
   const handleDelete = async (item: any) => {
-    if (!confirm(`Deseja remover "${item.name}" permanentemente?`)) return;
-    try {
-      const res = await fetch(`/api/actives/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [item.id] })
-      });
-      if (res.ok) { 
-        onRefresh(); 
-        if (selectedViewItem) setSelectedViewItem(null);
-        toast.showSuccess('Item excluído com sucesso.');
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirmar Exclusão',
+      message: `Tem certeza que deseja excluir "${item.name}"? Esta ação é irreversível e o item será removido permanentemente do sistema.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/actives/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [item.id] })
+          });
+          if (res.ok) { 
+            onRefresh(); 
+            if (selectedViewItem) setSelectedViewItem(null);
+            toast.showSuccess('Item excluído com sucesso.');
+          }
+        } catch { toast.showError('Erro ao excluir o item.'); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch { toast.showError('Erro ao excluir o item.'); }
+    });
   };
   
   const handleBatchDelete = async () => {
     const count = selectedItems.size;
-    if (!confirm(`Deseja remover ${count} ativo${count > 1 ? 's' : ''} permanentemente?`)) return;
-    try {
-      const res = await fetch(`/api/actives/delete`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedItems) })
-      });
-      if (res.ok) { 
-        onRefresh(); 
-        exitSelectionMode();
-        toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirmar Exclusão em Massa',
+      message: `Tem certeza que deseja excluir ${count} ativo${count > 1 ? 's' : ''}? Esta ação é irreversível e todos os itens selecionados serão removidos permanentemente do sistema.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/actives/delete`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: Array.from(selectedItems) })
+          });
+          if (res.ok) { 
+            onRefresh(); 
+            exitSelectionMode();
+            toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+          }
+        } catch { toast.showError('Erro ao excluir os itens.'); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch { toast.showError('Erro ao excluir os itens.'); }
+    });
   };
 
   // --- RENDERIZAÇÃO DA ÁRVORE ---
@@ -265,8 +292,12 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       return a.parentId === parentId;
     });
 
-    if (children.length === 0 && level >= 0) {
-      const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5` : "";
+    // Só mostra empty-state SE o nível tem filhos OU é um espaço físico que foi expandir E não tem filhos
+    // No nível raiz (level 0), não mostra empty-state se children está vazio (mostra o card do espaço pai)
+    const hasChildren = children.length > 0;
+    
+    if (!hasChildren && level > 0) {
+      const indentClass = level > 0 ? `ml-${level * 6} border-l-2 dark:border-white/5` : "";
       return (
         <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${indentClass}`}>
           <Ghost size={24} className="mb-2 text-zinc-400" />
@@ -277,6 +308,11 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       );
     }
 
+    // Se não há filhos no nível raiz, não renderiza nada (o card do espaço pai cuida de mostrar "Nenhum ativo")
+    if (!hasChildren && level === 0) {
+      return null;
+    }
+
     const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5 pl-2` : "";
     return (
       <div className={indentClass}>
@@ -285,7 +321,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           const hasSubItems = actives.some(a => a.parentId === active.id);
           
           // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
-          const a = active.category || categories.find(ar => ar.id === active.categoryId);
+          const a = categories.find(ar => ar.id === active.categoryId);
 
           const isSelected = selectedItems.has(active.id);
           
@@ -439,7 +475,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                       
                       {a && (
                         <p 
-                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-2"
+                          className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{ 
                             color: getCategoryColor(a.id, categories), 
                             backgroundColor: `${getCategoryColor(a.id, categories)}15`, 
@@ -450,8 +486,8 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                         </p>
                       )}
 
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
-                        <Hash size={10}/> SN: {active.serialNumber || 'SEM SN'}
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center">
+                        { active.sku && <span className="ml-1 flex"><Hash size={10}/> SKU: {active.sku}</span> } { active.serialNumber && <span className="ml-1 text-blue-400 flex">{active.sku ? "•" : <Hash size={10}/> } SN: {active.serialNumber}</span> }
                       </p>
                     </div>
                   </div>
@@ -563,8 +599,9 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <InfoItem icon={<Hash size={16}/>} label="Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
-                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name || "Não definido"} />
+                    <InfoItem icon={<Barcode size={16}/>} label="SKU" Class="truncate" value={selectedViewItem.sku || "N/A"} />
+                    <InfoItem icon={<Hash size={16}/>} label="Nº Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
+                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
                     <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
@@ -611,7 +648,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
 
                <div className="hidden sm:block flex-1"></div>
 
-               <button onClick={() => handleDelete(selectedViewItem)} className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
+               <button onClick={() => {handleDelete(selectedViewItem); setSelectedViewItem(false);}} className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
                  <Trash2 size={16}/> <span className="hidden sm:inline">Excluir</span>
                </button>
             </div>
@@ -902,6 +939,18 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           </div>
         )
       )}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmLabel="Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </>
   );
 }
@@ -933,3 +982,5 @@ function ContextBtn({ icon, label, onClick, danger, onClose }: { icon: any, labe
     </button>
   );
 }
+
+export default memo(ListSection);

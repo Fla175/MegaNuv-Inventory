@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
-import InteractiveFace from "@/components/svg/sad-face";
+import { useToast } from "@/lib/context/ToastContext";
+import ImageUpload from "@/components/imageUpload";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 // --- INTERFACES ---
 interface User {
@@ -29,6 +31,10 @@ interface FatherSpace {
   id: string;
   name: string;
   notes?: string;
+  imageUrl?: string;
+  address?: string;
+  responsible?: string;
+  phone?: string;
 }
 
 interface Category {
@@ -52,6 +58,7 @@ export default function SettingsPage() {
   const { tab } = router.query;
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
 
   // Estados de Listagem
@@ -65,6 +72,17 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string>('#4F46E5'); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
+  
+  // Estado do Dialog de Confirmação
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
 
   // Permissões
   const isAdmin = user?.role === 'ADMIN';
@@ -123,7 +141,14 @@ export default function SettingsPage() {
   const handleSpaceSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
-    const payload = Object.fromEntries(new FormData(e.currentTarget));
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData);
+    
+    // Adicionar imagem se foi carregada
+    if (spaceImageUrl) {
+      payload.imageUrl = spaceImageUrl;
+    }
+    
     if (selectedSpace) payload.id = selectedSpace.id;
 
     try {
@@ -134,6 +159,7 @@ export default function SettingsPage() {
       });
       if (res.ok) {
         setIsSpaceModalOpen(false);
+        setSpaceImageUrl(null);
         fetchData('/api/father-spaces/list', setSpacesList);
       }
     } finally { setSaving(false); }
@@ -145,7 +171,7 @@ export default function SettingsPage() {
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
     
-    const payload = { name };
+    const payload: { name: string; id?: string } = { name };
     if (selectedCategory) payload.id = selectedCategory.id;
 
     try {
@@ -162,23 +188,57 @@ export default function SettingsPage() {
   };
 
   const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
-    if (!confirm(`Confirmar exclusão permanente? Esta ação será registrada.`)) return;
-    try {
-      let endpoint = "";
-      if (type === 'user') endpoint = `/api/users/${id}`;
-      else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
-      else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
-      else if (type === 'logs') endpoint = `/api/logs/clear`;
+    const dialogConfig: Record<string, { title: string; message: string; variant: 'danger' }> = {
+      user: { 
+        title: 'Confirmar Exclusão de Usuário', 
+        message: 'Tem certeza que deseja excluir este usuário? Esta ação é irreversível e o acesso será removido permanentemente.',
+        variant: 'danger' 
+      },
+      space: { 
+        title: 'Confirmar Exclusão de Espaço', 
+        message: 'Tem certeza que deseja excluir este espaço pai? Todos os ativos associados serão excluídos permanentemente.',
+        variant: 'danger' 
+      },
+      category: { 
+        title: 'Confirmar Exclusão de Categoria', 
+        message: 'Tem certeza que deseja excluir esta categoria? Esta ação é irreversível.',
+        variant: 'danger' 
+      },
+      logs: { 
+        title: 'Confirmar Limpeza de Logs', 
+        message: 'Tem certeza que deseja limpar todos os logs do sistema? Esta ação é irreversível.',
+        variant: 'danger' 
+      },
+    };
+    
+    const config = dialogConfig[type];
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      variant: config.variant,
+      onConfirm: async () => {
+        try {
+          let endpoint = "";
+          if (type === 'user') endpoint = `/api/users/${id}`;
+          else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
+          else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
+          else if (type === 'logs') endpoint = `/api/logs/clear`;
 
-      const res = await fetch(endpoint, { method: 'DELETE' });
-      if (res.ok) {
-        if (type === 'user' && id === user?.id) window.location.href = '/login';
-        else if (activeTab === 'users') fetchData('/api/users', setUsersList);
-        else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
-        else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
-        else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
+          const res = await fetch(endpoint, { method: 'DELETE' });
+          if (res.ok) {
+            if (type === 'user' && id === user?.id) window.location.href = '/login';
+            else if (activeTab === 'users') fetchData('/api/users', setUsersList);
+            else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
+            else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
+            else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
+            toast.showSuccess('Exclusão realizada com sucesso.');
+          }
+        } catch (err) { console.error(err); }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    } catch (err) { console.error(err); }
+    });
   };
 
   const updateConfig = async (body: Record<string, string>, endpoint: string) => {
@@ -195,14 +255,8 @@ export default function SettingsPage() {
 
   if (loading) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Sincronizando...</div></Layout>;
 
-  if (!user) return (
-    <Layout title="Configurações">
-      <div className="h-96 flex flex-col items-center justify-center font-black text-blue-900 italic gap-4">
-        <div className="w-16 h-16 text-blue-600"><InteractiveFace /></div>
-        <p>Usuário não encontrado. <span className="text-blue-500 underline cursor-pointer" onClick={refreshUser}>Recarregue.</span></p>
-      </div>
-    </Layout>
-  );
+  // Se ainda não carregou, mostra tela vazia
+  if (!user) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Carregando...</div></Layout>;
 
   const tabs = [
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
@@ -259,17 +313,17 @@ export default function SettingsPage() {
                     </div>
                     <div className="text-center md:text-left">
                       <div className="flex items-center gap-3 justify-center md:justify-start">
-                        <h2 className="text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user.name || 'Usuário'}</h2>
-                        <span className={`px-3 py-1 ${user.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                          {user.role}
+                        <h2 className="text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user?.name || 'Usuário'}</h2>
+                        <span className={`px-3 py-1 ${user?.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user?.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                          {user?.role}
                         </span>
                       </div>
-                      <p className="text-gray-400 font-bold text-sm mt-1">{user.email}</p>
+                      <p className="text-gray-400 font-bold text-sm mt-1">{user?.email}</p>
                       <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 mt-4">
                         <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
-                          <CalendarFold size={12}/> Desde {new Date(user.createdAt).toLocaleDateString()}
+                          <CalendarFold size={12}/> Desde {new Date(user?.createdAt).toLocaleDateString()}
                         </div>
-                        {user.lastLogin && (
+                        {user?.lastLogin && (
                           <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
                             <Clock size={12}/> Login em {new Date(user.lastLogin).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                           </div>
@@ -288,6 +342,15 @@ export default function SettingsPage() {
                       </button>
                     )}
                   </div>
+                  {usersList.filter(u => u.id !== user.id).length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <Users size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum membro cadastrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">Adicione membros para gerenciar o acesso ao sistema</p>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {usersList.filter(u => u.id !== user.id).map(u => (
                       <div key={u.id} className="flex items-center justify-between p-5 bg-gray-50 dark:bg-zinc-950 rounded-[1.5rem] border border-transparent hover:border-blue-500/20 transition-all group">
@@ -309,6 +372,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
               </div>
             )}
@@ -318,8 +382,17 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
-                  <button onClick={() => { setSelectedSpace(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                 </div>
+                {spacesList.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                      <LayoutDashboard size={32} className="text-gray-400" />
+                    </div>
+                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum espaço pai cadastrado</p>
+                    <p className="text-xs font-bold text-gray-500 mt-1">Crie um espaço pai para organizar seus ativos</p>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {spacesList.map((space) => (
                     <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
@@ -328,12 +401,13 @@ export default function SettingsPage() {
                         <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
                       </div>
                       <div className="flex gap-3 mt-6">
-                        <button onClick={() => { setSelectedSpace(space); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                        <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
                         <button onClick={() => handleDelete('space', space.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
                       </div>
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -342,8 +416,22 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  {categoriesList.length < 18 && (
+                    <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  )}
+                  {categoriesList.length >= 18 && (
+                    <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
+                  )}
                 </div>
+                {categoriesList.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                      <Group size={32} className="text-gray-400" />
+                    </div>
+                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhuma categoria cadastrada</p>
+                    <p className="text-xs font-bold text-gray-500 mt-1">Crie categorias para classificar seus ativos</p>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categoriesList.map((category) => (
                     <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
@@ -358,6 +446,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -374,9 +463,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   {logsList.length === 0 ? (
-                    <div className="py-20 text-center text-zinc-400 font-black uppercase text-xs">Nenhum log encontrado.</div>
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <ClipboardList size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum log encontrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">As atividades serão registradas aqui</p>
+                    </div>
                   ) : (
-                    logsList.map((log) => (
+                    [...logsList].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((log) => (
                       <div key={log.id} className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-white/5 flex items-start gap-4 text-[11px]">
                         <div className={`p-2 rounded-lg shrink-0 ${log.action.includes('DELETE') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
                           <Activity size={14}/>
@@ -480,7 +575,7 @@ export default function SettingsPage() {
           <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
+              <button type="button" onClick={() => { setIsCategoryModalOpen(false); setSelectedColor('#4F46E5'); }} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
@@ -503,6 +598,18 @@ export default function SettingsPage() {
             <div className="space-y-6 mb-10">
               <input name="name" placeholder="Nome do Local" defaultValue={selectedSpace?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
               <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Observações..."></textarea>
+              <ImageUpload 
+                value={spaceImageUrl || selectedSpace?.imageUrl || null} 
+                onChange={(url) => setSpaceImageUrl(url)} 
+                label="Imagem do Espaço" 
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <input name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+                <input name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input name="phone" placeholder="Telefone" defaultValue={selectedSpace?.phone || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+              </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço
@@ -510,6 +617,18 @@ export default function SettingsPage() {
           </form>
         </div>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+        confirmLabel="Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </Layout>
   );
 }

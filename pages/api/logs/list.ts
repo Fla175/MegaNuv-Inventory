@@ -49,9 +49,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(logs);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_LOG_LIST_ERROR:", error);
-    return res.status(500).json({ error: "Erro ao buscar logs de auditoria." });
+    const message = error instanceof Error ? error.message : 'Erro ao buscar logs de auditoria.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

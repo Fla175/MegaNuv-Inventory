@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: "Acesso negado. Apenas admins editam espaços." });
     }
 
-    const { id, name, notes, parentId } = req.body;
+    const { id, name, notes, parentId, imageUrl, address, responsible, phone } = req.body;
     if (!id) return res.status(400).json({ error: "ID obrigatório." });
 
     const updatedFatherSpace = await db.fatherSpace.update({
@@ -31,7 +31,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: {
         name,
         notes,
-        parentId
+        parentId,
+        imageUrl: imageUrl || null,
+        address: address || null,
+        responsible: responsible || null,
+        phone: phone || null,
       },
     });
 

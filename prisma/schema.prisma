@@ -70,6 +70,12 @@ model FatherSpace {
   name  String  @unique
   notes String? @db.Text
 
+  // Novos campos opcionais
+  imageUrl     String?
+  address      String?
+  responsible String?
+  phone       String?
+
   createdById String?
   createdBy   User?   @relation("UserToSpace", fields: [createdById], references: [id])
 

@@ -1,7 +1,7 @@
 // pages/api/categories/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
-import * as jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -16,23 +16,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    jwt.verify(token, JWT_SECRET!);
+    const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+    if (decoded.role === "VIEWER") return res.status(403).json({ error: "Visualizadores não podem listar categorias." });
 
     // Busca todas as áreas ordenadas por nome
     const categories = await prisma.category.findMany({
       orderBy: { name: "asc" },
       include: {
         _count: {
-          select: { actives: true } // Útil para mostrar quantos ativos tem em cada área
+          select: { actives: true }
         }
       }
     });
 
     return res.status(200).json(categories);
 
-  } catch (error) {
-    console.error("API_AREA_LIST_ERROR:", error);
-    return res.status(500).json({ error: "Erro ao buscar áreas." });
+  } catch (error: unknown) {
+    console.error("API_CATEGORY_LIST_ERROR:", error);
+    const message = error instanceof Error ? error.message : 'Erro ao buscar categorias.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

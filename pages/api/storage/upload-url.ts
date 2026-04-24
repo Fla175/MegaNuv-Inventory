@@ -34,8 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const publicUrl = `http://10.20.31.142:9000/${bucketName}/${objectName}`;
     return res.status(200).json({ publicUrl });
-  } catch (error) {
-    const err = error as Error;
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error('Unknown error');
     console.error("Erro no upload:", err);
     return res.status(500).json({ error: err.message });
   }

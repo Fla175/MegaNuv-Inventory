@@ -24,15 +24,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isOwner = requester.id === targetUser.id;
     const isAdmin = requester.role === "ADMIN";
     const isManager = requester.role === "MANAGER";
-    const targetIsViewer = targetUser.role === "VIEWER";
+    const isViewer = requester.role === "VIEWER";
+    const targetIsAdmin = targetUser.role === "ADMIN";
 
     if (req.method === "DELETE") {
-      const canDelete = isOwner || isAdmin || (isManager && targetIsViewer);
-
-      if (!canDelete) {
-        return res.status(403).json({ 
-          message: "Você não tem permissão para excluir este nível de usuário." 
-        });
+      // ADMIN: pode excluir qualquer um (exceto si mesmo se for o único admin)
+      // MANAGER: pode excluir VIEWER e MANAGER, mas NÃO pode excluir ADMIN
+      // VIEWER: não pode excluir ninguém
+      // Owner: pode excluir a si mesmo
+      if (isViewer) {
+        return res.status(403).json({ message: "Visualizadores não podem excluir usuários." });
+      }
+      if (isManager && targetIsAdmin) {
+        return res.status(403).json({ message: "Gerentes não podem excluir administradores." });
+      }
+      if (!isOwner && !isAdmin && !isManager) {
+        return res.status(403).json({ message: "Você não tem permissão para excluir este usuário." });
       }
 
       await prisma.user.delete({ where: { id: String(id) } });
@@ -40,19 +47,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "PATCH") {
-      const canEdit = isOwner || isAdmin || (isManager && targetIsViewer);
-      
-      if (!canEdit) return res.status(403).json({ message: "Sem permissão para editar" });
+      // ADMIN: pode editar qualquer um
+      // MANAGER: pode editar si mesmo e VIEWER, mas NÃO pode editar ADMIN
+      // VIEWER: pode editar apenas si mesmo (nome, senha)
+      if (isViewer && !isOwner) {
+        return res.status(403).json({ message: "Visualizadores não podem editar outros usuários." });
+      }
+      if (isManager && targetIsAdmin) {
+        return res.status(403).json({ message: "Gerentes não podem editar administradores." });
+      }
+      if (!isOwner && !isAdmin && !isManager) {
+        return res.status(403).json({ message: "Você não tem permissão para editar este usuário." });
+      }
 
       const { name, email, role, password } = req.body;
 
-      const finalRole = isAdmin ? role : targetUser.role;
+      // ADMIN pode alterar role; MANAGER/VIEWER não podem
+      let finalRole = targetUser.role;
+      if (isAdmin && role) {
+        finalRole = role;
+      }
+      
+      // MANAGER não pode promover VIEWER para MANAGER ou ADMIN
+      if (isManager && role && (role === 'ADMIN' || role === 'MANAGER')) {
+        return res.status(403).json({ message: "Gerentes não podem promover usuários." });
+      }
 
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const hashedPassword = password ? await bcrypt.hash(password, saltRounds) : undefined;
 
       const updated = await prisma.user.update({
         where: { id: String(id) },
-        data: { name, email, role: finalRole, password: hashedPassword }
+        data: { 
+          name, 
+          email, 
+          role: finalRole, 
+          ...(hashedPassword ? { password: hashedPassword } : {})
+        }
       });
       return res.status(200).json(updated);
     }

@@ -73,8 +73,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Erro no login:', error);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    const message = error instanceof Error ? error.message : 'Erro interno do servidor.';
+    return res.status(500).json({ message });
   }
 }

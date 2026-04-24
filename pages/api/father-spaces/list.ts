@@ -1,10 +1,10 @@
 // pages/api/father-spaces/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient } from "@prisma/client";
-// import { getServerSession } from "next-auth/next"; 
-// import { authOptions } from "../auth/[...nextauth]";
+import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,14 +16,16 @@ export default async function handler(
   }
 
   try {
-    // 1. VERIFICAÇÃO DE SESSÃO (Opcional, mas recomendado)
-    // const session = await getServerSession(req, res, authOptions);
-    // if (!session) return res.status(401).json({ error: "Não autenticado." });
+    // Verificação de autenticação
+    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+
+    const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+    if (decoded.role === "VIEWER") return res.status(403).json({ error: "Visualizadores não podem listar espaços." });
 
     // 2. BUSCA NO BANCO COM RELACIONAMENTOS E CONTAGENS
     const spaces = await prisma.fatherSpace.findMany({
       include: {
-        // Traz quem criou o local
         createdBy: {
           select: {
             id: true,
@@ -31,32 +33,31 @@ export default async function handler(
             role: true
           }
         },
-        // Traz o nome do espaço pai caso seja uma sub-área
         parent: {
           select: {
             id: true,
             name: true
           }
         },
-        // Conta quantos ativos estão vinculados diretamente a este espaço
         _count: {
           select: {
             actives: true,
-            children: true // Quantas sub-áreas existem dentro dele
+            children: true
           }
         }
       },
       orderBy: {
-        name: 'asc' // Ordena alfabeticamente para facilitar a busca
+        name: 'asc'
       }
     });
 
     // 3. RETORNO DOS DADOS
     return res.status(200).json(spaces);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("ERRO father-spaces/list:", error);
-    return res.status(500).json({ error: "Erro interno ao listar os espaços pai." });
+    const message = error instanceof Error ? error.message : 'Erro interno ao listar os espaços pai.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

@@ -2,11 +2,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const saltRounds = 10;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  
+
   // 1. Lógica para LISTAR usuários (GET)
   if (req.method === 'GET') {
     try {
@@ -23,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       res.status(200).json(users);
-    } catch (error) {
-      const err = error as Error;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Unknown error');
       console.error("Erro ao listar usuários:", err.message);
       res.status(500).json({ message: "Erro interno ao buscar usuários." });
     }
@@ -34,7 +36,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 2. Lógica para CRIAR usuário (POST)
   if (req.method === 'POST') {
     try {
+      // Autenticação
+      const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ message: "Sessão expirada." });
+
+      const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+
+      // VIEWER não pode criar ninguém
+      if (decoded.role === 'VIEWER') {
+        return res.status(403).json({ message: "Visualizadores não podem criar usuários." });
+      }
+
+      // MANAGER só pode criar VIEWER e MANAGER
       const data = req.body;
+      if (decoded.role === 'MANAGER' && data.role === 'ADMIN') {
+        return res.status(403).json({ message: "Gerentes não podem criar administradores." });
+      }
 
       const hashedPassword = await bcrypt.hash(data.password, saltRounds);
 
@@ -42,14 +59,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           name: data.name,
           email: data.email,
-          role: data.role || 'USER',
+          role: data.role || 'VIEWER',
           password: hashedPassword,
         }
       });
 
       res.status(201).json(newUser);
-    } catch (error) {
-      const err = error as Error;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Unknown error');
       console.error("Erro ao criar usuário:", err.message);
 
       if (err.message.includes('Unique constraint')) {
