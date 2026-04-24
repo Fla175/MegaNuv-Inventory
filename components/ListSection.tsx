@@ -1,7 +1,7 @@
 // components/ListSection.tsx
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
@@ -12,18 +12,10 @@ import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { ListSectionFilters, ListSectionProps } from "../lib/types";
 
-interface ListSectionProps {
-  filters: any;
-  onEdit: (item: any, mode: 'view' | 'edit') => void; 
-  onClone: (item: any) => void;
-  onRefresh: () => void;
-  onMove?: (item: any) => void;
-  actives: any[];
-  fatherSpaces: any[];
-}
-
-export default function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
+function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
   
   // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
@@ -175,7 +167,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
         while (currentParentId) {
           visibleActiveIds.add(currentParentId);
           const parent = actives.find(a => a.id === currentParentId);
-          currentParentId = parent?.parentId;
+          currentParentId = parent?.parentId ?? null;
         }
       }
     });
@@ -300,8 +292,12 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       return a.parentId === parentId;
     });
 
-    if (children.length === 0 && level >= 0) {
-      const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5` : "";
+    // Só mostra empty-state SE o nível tem filhos OU é um espaço físico que foi expandir E não tem filhos
+    // No nível raiz (level 0), não mostra empty-state se children está vazio (mostra o card do espaço pai)
+    const hasChildren = children.length > 0;
+    
+    if (!hasChildren && level > 0) {
+      const indentClass = level > 0 ? `ml-${level * 6} border-l-2 dark:border-white/5` : "";
       return (
         <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${indentClass}`}>
           <Ghost size={24} className="mb-2 text-zinc-400" />
@@ -312,6 +308,11 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
       );
     }
 
+    // Se não há filhos no nível raiz, não renderiza nada (o card do espaço pai cuida de mostrar "Nenhum ativo")
+    if (!hasChildren && level === 0) {
+      return null;
+    }
+
     const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5 pl-2` : "";
     return (
       <div className={indentClass}>
@@ -320,7 +321,7 @@ export default function ListSection({ filters, onEdit, onClone, onRefresh, activ
           const hasSubItems = actives.some(a => a.parentId === active.id);
           
           // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
-          const a = active.category || categories.find(ar => ar.id === active.categoryId);
+          const a = categories.find(ar => ar.id === active.categoryId);
 
           const isSelected = selectedItems.has(active.id);
           
@@ -981,3 +982,5 @@ function ContextBtn({ icon, label, onClick, danger, onClose }: { icon: any, labe
     </button>
   );
 }
+
+export default memo(ListSection);
