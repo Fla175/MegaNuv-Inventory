@@ -28,6 +28,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const space = await db.fatherSpace.findUnique({ where: { id } });
     if (!space) return res.status(404).json({ error: "Espaço não encontrado." });
 
+    // Deleção em cascata: remove todos os ativos pertencentes a este espaço pai
+    await db.active.deleteMany({
+      where: { fatherSpaceId: id }
+    });
+
+    // Remove também todos os espaços físicos (ativos com isPhysicalSpace) deste espaço pai
+    await db.active.deleteMany({
+      where: {
+        isPhysicalSpace: true,
+        fatherSpaceId: id,
+      }
+    });
+
     await db.fatherSpace.delete({ where: { id } });
 
     await createLog(

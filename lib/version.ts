@@ -1,4 +1,4 @@
 // lib/version.ts
-// Versão centralizada do app - atualize aqui quando incrementar versão
-export const VERSION = "2.10.0";
-export const BUILD_DATE = new Date().toISOString().split('T')[0];
+// Versão dinâmica - baseada em npm_package_version (disponível durante build)
+export const VERSION = process.env.npm_package_version || "1.0.0";
+export const BUILD_DATE = new Date().toISOString().split("T")[0];
