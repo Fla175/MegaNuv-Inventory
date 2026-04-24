@@ -70,17 +70,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(201).json(newCategory);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_CATEGORY_CREATE_ERROR:", error);
     if (error instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: "Token inválido." });
     
-    // Trata nome duplicado (Unique constraint no Prisma)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === 'P2002') {
+    const err = error as { code?: string };
+    if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2002') {
       return res.status(400).json({ error: "Já existe uma categoria com este nome." });
     }
 
-    return res.status(500).json({ error: "Erro interno ao criar categoria." });
+    const message = error instanceof Error ? error.message : 'Erro interno ao criar categoria.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

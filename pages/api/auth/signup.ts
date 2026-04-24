@@ -78,11 +78,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(201).json({ message: 'Usuário registrado com sucesso!', user: newUser });
 
-  } catch (error) {
-    const err = error as Error & { code?: string };
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error('Erro ao registrar usuário');
     console.error('ERRO NO REGISTER:', err.message);
 
-    if (err.code?.startsWith('P')) {
+    if (err.message.includes('Unique constraint')) {
       return res.status(500).json({ message: 'Erro de banco de dados.', details: err.message });
     }
     return res.status(500).json({ message: 'Erro interno de servidor.' });

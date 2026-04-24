@@ -36,8 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }));
 
     return res.status(200).json(formatted);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("ERRO actives/list:", error);
-    return res.status(500).json({ error: "Erro ao listar ativos" });
+    const message = error instanceof Error ? error.message : 'Erro ao listar ativos';
+    return res.status(500).json({ error: message });
   }
 }

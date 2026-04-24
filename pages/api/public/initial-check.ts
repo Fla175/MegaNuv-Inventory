@@ -13,9 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Retorna true se precisar de configuração inicial (zero usuários)
     return res.status(200).json({ requiresSetup: userCount === 0 });
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Erro ao verificar contagem de usuários:", error);
-    // Em caso de erro de conexão, assuma que precisa de setup para ser seguro
     return res.status(500).json({ requiresSetup: true, message: 'Database error' });
   }
 }

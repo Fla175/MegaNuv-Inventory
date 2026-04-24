@@ -54,9 +54,10 @@ export default async function handler(
     // 3. RETORNO DOS DADOS
     return res.status(200).json(spaces);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("ERRO father-spaces/list:", error);
-    return res.status(500).json({ error: "Erro interno ao listar os espaços pai." });
+    const message = error instanceof Error ? error.message : 'Erro interno ao listar os espaços pai.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

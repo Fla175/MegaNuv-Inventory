@@ -44,8 +44,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json(results);
-  } catch (error) {
-     error = "Falha na movimentação";
-    return res.status(500).json({ error:error });
+  } catch (error: unknown) {
+    console.error("ERRO actives/move:", error);
+    const message = error instanceof Error ? error.message : 'Falha na movimentação';
+    return res.status(500).json({ error: message });
   }
 }

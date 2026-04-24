@@ -31,9 +31,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(categories);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_CATEGORY_LIST_ERROR:", error);
-    return res.status(500).json({ error: "Erro ao buscar categorias." });
+    const message = error instanceof Error ? error.message : 'Erro ao buscar categorias.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

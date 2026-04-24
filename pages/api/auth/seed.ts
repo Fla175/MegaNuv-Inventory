@@ -61,8 +61,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(405).json({ message: "Método não permitido." });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Erro no processo de seed:", error);
-    return res.status(500).json({ message: "Erro interno no servidor." });
+    const message = error instanceof Error ? error.message : 'Erro interno no servidor.';
+    return res.status(500).json({ message });
   }
 }

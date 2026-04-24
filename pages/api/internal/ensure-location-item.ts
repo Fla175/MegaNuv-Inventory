@@ -76,11 +76,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       fatherSpaceId: locationActive.fatherSpaceId
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Erro ao garantir item de localização:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({ 
       message: 'Erro interno ao processar a estrutura de ativos.',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: message
     });
   }
 }

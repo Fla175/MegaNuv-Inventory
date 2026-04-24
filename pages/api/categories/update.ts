@@ -48,16 +48,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(updatedCategory);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_AREA_UPDATE_ERROR:", error);
     if (error instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: "Token inválido." });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === 'P2025') {
+    const err = error as { code?: string };
+    if (typeof error === 'object' && error !== null && 'code' in error && err.code === 'P2025') {
       return res.status(404).json({ error: "Categoria não encontrada." });
     }
 
-    return res.status(500).json({ error: "Erro interno ao atualizar área." });
+    const message = error instanceof Error ? error.message : 'Erro interno ao atualizar área.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

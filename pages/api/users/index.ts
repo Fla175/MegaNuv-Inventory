@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       res.status(200).json(users);
-    } catch (error) {
-      const err = error as Error;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Unknown error');
       console.error("Erro ao listar usuários:", err.message);
       res.status(500).json({ message: "Erro interno ao buscar usuários." });
     }
@@ -65,8 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       res.status(201).json(newUser);
-    } catch (error) {
-      const err = error as Error;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Unknown error');
       console.error("Erro ao criar usuário:", err.message);
 
       if (err.message.includes('Unique constraint')) {

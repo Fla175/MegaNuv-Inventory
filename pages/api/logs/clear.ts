@@ -51,9 +51,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: "Logs processados com sucesso." });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("API_LOG_CLEAR_ERROR:", error);
-    return res.status(500).json({ error: "Erro ao limpar logs." });
+    const message = error instanceof Error ? error.message : 'Erro ao limpar logs.';
+    return res.status(500).json({ error: message });
   } finally {
     await prisma.$disconnect();
   }

@@ -98,10 +98,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       assetsByCategory: assetsByCategory
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("ERRO dashboard/stats:", error);
+    const message = error instanceof Error ? error.message : 'Falha ao processar estatísticas do dashboard';
     return res.status(500).json({ 
-      error: 'Falha ao processar estatísticas do dashboard',
+      error: message,
       totalValue: 0,
       totalActives: 0,
       totalActivesQuantity: 0,
