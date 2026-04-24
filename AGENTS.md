@@ -34,7 +34,7 @@ JWT_SECRET="sua_chave_secreta"
 - `/prisma/` — Schema e migrações
 - `/components/` — Componentes reutilizáveis e Layout
 
-## Fluxo de Trabalho
+## Workflow
 
 1. `yarn dev` para desenvolvimento local
 2. `npx prisma migrate dev` após mudanças no schema
@@ -66,12 +66,6 @@ JWT_SECRET="sua_chave_secreta"
 Task → Task-manager → Architect (PERGUNTAS) → Coder → Designer → QA → (loop 3x) → Report
 ```
 
-### Workflow Reviewer
-
-```
-Task → Ler código → Analisar → Reportar issues (NUNCA alterar)
-```
-
 ## Skills
 
 | Skill | Descrição |
@@ -81,11 +75,7 @@ Task → Ler código → Analisar → Reportar issues (NUNCA alterar)
 | `@auditor-yard` | Análise: código estático + dinâmica |
 | `@inventory` | Commit, versionamento |
 
-## Hermes (CEO)
-
-O *Hermes Agent* é o **"CEO"** que delega tasks para o *OpenCode* **(operário)**. Configuração em `~/.hermes/config.yaml`.
-
 ## Referências
 
-- Agentes: `~/.config/opencode/agents/`
-- Skills: `~/.config/opencode/skills/`
+- [GSD-MESTRE.md](../knowledge-base/gsd/GSD-MESTRE.md) — Guia completo GSD
+- [AGENTS.md](../knowledge-base/AGENTS.md) — Referência de agentes
