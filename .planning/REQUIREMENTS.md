@@ -19,9 +19,16 @@
 
 ### UX
 
-- [ ] **UX-01**: Empty states em listas
-- [ ] **UX-02**: Indicadores visuais de profundidade
-- [ ] **UX-03**: Melhorar feedback visual
+- [x] **UX-01**: Empty states em listas — Implementado na Fase 3/4
+- [x] **UX-02**: Indicadores visuais de profundidade — Implementado
+- [x] **UX-03**: Melhorar feedback visual — Implementado
+
+### Responsividade
+
+- [ ] **RSP-01**: Tabs para ícones em telas narrow
+- [ ] **RSP-02**: Reduzir padding e fonte em telas narrow
+- [ ] **RSP-03**: Simplificar footer (versão) em mobile
+- [ ] **RSP-04**: Grid de categorias responsivo
 
 ---
 
@@ -45,20 +52,27 @@
 ## Traceability
 
 | REQ-ID | Phase | Status |
-|--------|-------|---------|
-| TYP-01 | 1 | pending |
-| TYP-02 | 1 | pending |
-| TYP-03 | 1 | pending |
-| TYP-04 | 1 | pending |
-| TYP-05 | 1 | pending |
-| PERF-01 | 2 | pending |
-| PERF-02 | 2 | pending |
-| PERF-03 | 2 | pending |
-| PERF-04 | 2 | pending |
-| UX-01 | 3 | pending |
-| UX-02 | 3 | pending |
-| UX-03 | 3 | pending |
+|--------|-------|--------|
+| TYP-01 | 1 | done |
+| TYP-02 | 1 | done |
+| TYP-03 | 1 | done |
+| TYP-04 | 1 | done |
+| TYP-05 | 1 | done |
+| PERF-01 | 2 | done |
+| PERF-02 | 2 | done |
+| PERF-03 | 2 | done |
+| PERF-04 | 2 | done |
+| UX-01 | 3 | done |
+| UX-02 | 3 | done |
+| UX-03 | 3 | done |
+| FIX-01 | 4 | done |
+| FIX-02 | 4 | done |
+| FIX-03 | 4 | done |
+| RSP-01 | 5 | pending |
+| RSP-02 | 5 | pending |
+| RSP-03 | 5 | pending |
+| RSP-04 | 5 | pending |
 
 ---
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-04-27*

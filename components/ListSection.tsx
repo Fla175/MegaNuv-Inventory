@@ -553,7 +553,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     </div>
                   </div>
                   <div onContextMenu={(e) => handleContextMenu(e, space, true)} className="bg-white dark:bg-zinc-900/50">
-                    {renderActiveTree(null, space.id)}
+                    {hasActives ? renderActiveTree(null, space.id) : (
+                      <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">
+                        <Ghost size={24} className="mb-2 text-zinc-400" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
+                          Nenhum ativo neste local
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )})}
