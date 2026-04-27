@@ -88,3 +88,17 @@ Aprimorar a aplicação com correções de bugs, melhorias de UX, novas funciona
 
 - [x] Empty States: Estados vazios em `pages/settings.tsx` para usuários e espaços pai
 - [x] Feedback Visual: Toast notifications para todas as ações
+
+## 7. Melhorias v2.11.0 (27-04-26)
+
+### Fase 1: Correções de Build e Hidratação
+- [x] Fix: Hydration error em versão dinâmica e BUILD_DATE client-side (`lib/version.ts`)
+- [x] Fix: Empty-state em categorias, fonte monospace no SKU (`components/actives/activeForm.tsx`)
+
+### Fase 2: Correções de Implementação
+- [x] Fix: Empty-state em ListSection, versão dinâmica, deleção em cascata (`components/ListSection.tsx`, `lib/version.ts`, `pages/api/father-spaces/delete.ts`)
+
+### Fase 3: Responsividade e UI
+- [x] Fix: Responsividade completa em `pages/settings.tsx` para telas estreitas (half monitor)
+- [x] Fix: Ajustes em `components/Layout.tsx` (footer: ícone UserCircle 16px, truncamento de nome, botão logout)
+- [x] Docs: Remoção de `d.md` (release notes v2.11.0)
