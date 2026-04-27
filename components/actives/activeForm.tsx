@@ -1,7 +1,7 @@
 // components/actives/activeForm.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo } from "react";
-import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2 } from "lucide-react";
+import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2, Ghost } from "lucide-react";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
@@ -396,32 +396,39 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               )}
             </div>
 
-            {loadingCategories ? (
+{loadingCategories ? (
                 <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando categorias...</div>
-            ) : (
-              <div className={`grid gap-2 ${gridConfig}`}>
-                {categories.map((category) => {
-                  const isSelected = formData.categoryId === category.id;
-                  const color = category.color || '#2563eb';
-                  
-                  return (
-                    <button 
-                      key={category.id} 
-                      type="button" 
-                      onClick={() => setFormData(prev => ({ ...prev, categoryId: category.id }))} 
-                      style={isSelected ? { 
-                        borderColor: color, 
-                        backgroundColor: `${color}15`, 
-                        color: color 
-                      } : {}}
-                      className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
-                    >
-                      {category.name}
-                    </button>
-                  );
+              ) : categories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">
+                  <Ghost size={24} className="mb-2 text-zinc-400" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
+                    Nenhuma categoria cadastrada
+                  </p>
+                </div>
+              ) : (
+                <div className={`grid gap-2 ${gridConfig}`}>
+                  {categories.map((category) => {
+                    const isSelected = formData.categoryId === category.id;
+                    const color = category.color || '#2563eb';
+                    
+                    return (
+                      <button 
+                        key={category.id} 
+                        type="button" 
+                        onClick={() => setFormData(prev => ({ ...prev, categoryId: category.id }))} 
+                        style={isSelected ? { 
+                          borderColor: color, 
+                          backgroundColor: `${color}15`, 
+                          color: color 
+                        } : {}}
+                        className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
+                      >
+                        {category.name}
+                      </button>
+                    );
                 })}
-              </div>
-            )}
+                </div>
+              )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -501,7 +508,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">SKU</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.sku} onChange={e => setFormData(prev => ({...prev, sku: e.target.value}))} placeholder="Código SKU" />
+                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30 font-mono uppercase" value={formData.sku} onChange={e => setFormData(prev => ({...prev, sku: e.target.value}))} placeholder="Código SKU" />
                 </div>
               </div>
 
