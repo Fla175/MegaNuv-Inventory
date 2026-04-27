@@ -1,4 +1,10 @@
 // lib/version.ts
-// Versão dinâmica - baseada em npm_package_version (disponível durante build)
-export const VERSION = process.env.npm_package_version || "1.0.0";
-export const BUILD_DATE = new Date().toISOString().split("T")[0];
+// Versão dinâmica - importação direta de package.json (Next.js suporta JSON)
+import packageJson from '../package.json';
+
+export const VERSION = packageJson.version || "1.0.0";
+
+// BUILD_DATE é definido apenas no client-side para evitar hydration mismatch
+export const BUILD_DATE = typeof window !== 'undefined' 
+  ? new Date().toISOString().split('T')[0]
+  : '';
