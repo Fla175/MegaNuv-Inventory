@@ -5,6 +5,8 @@
 | 1 | **Tipagem & Correções** | Corrigir issues críticos de TypeScript | [TYP-01 → TYP-05] | 5 critérios verificáveis | ✅ executed |
 | 2 | **Qualidade & Performance** | Melhorar patterns de código e performance | [PERF-01 → PERF-04] | 4 critérios verificáveis | ✅ executed |
 | 3 | **Polish & UX** | Ajustar Empty States e UI/UX | [UX-01 → UX-03] | 3 critérios verificáveis | ✅ executed |
+| 4 | **Correções de Implementação** | Empty-state, versão dinâmica e deleção em cascata | [FIX-01 → FIX-03] | 3 critérios verificáveis | ✅ executed |
+| 5 | **Responsividade Settings** | Ajustar UI para telas narrow (half monitor) | [RSP-01 → RSP-04] | 4 critérios verificáveis | ⏳ planned |
 
 ---
 
@@ -77,13 +79,59 @@ Ajustar empty states e UI/UX para melhor experiência.
 
 ---
 
+## Fase 4: Correções de Implementação
+
+### Meta
+Empty-state em espaço pai sem ativos, versão dinâmica do projeto, deleção em cascata de espaço pai.
+
+### Requirements
+
+| ID | Requisito | Fonte |
+|---|-----------|-------|
+| FIX-01 | Empty-state no render do espaço pai quando não há ativos | ListSection.tsx:556 |
+| FIX-02 | Versão dinâmica lida de package.json | Layout.tsx + lib/version.ts |
+| FIX-03 | Deleção em cascata de espaço pai (OBRIGATÓRIO) | father-spaces/delete.ts |
+
+### Success Criteria
+
+1. Espaço pai mostra "Nenhum ativo neste local" quando vazio
+2. `VERSION` é lida de `package.json` em tempo de build
+3. `/api/father-spaces/delete` remove todos os ativos antes de remover o espaço
+
+---
+
+## Fase 5: Responsividade Settings
+
+### Meta
+Corrigir responsividade da página de configurações em telas narrow (metade do monitor Full HD 23").
+
+### Requirements
+
+| ID | Requisito | Fonte |
+|---|-----------|-------|
+| RSP-01 | Reduzir botões de tabs para ícones em telas < 1024px | settings.tsx:282-297 |
+| RSP-02 | Reduzir padding e fonte em telas narrow | settings.tsx: containers |
+| RSP-03 | Simplificar footer (remover versão) em mobile | Layout.tsx:128-155 |
+| RSP-04 | Ajustar grid de categorias para não estourar | settings.tsx:435 |
+
+### Success Criteria
+
+1. Tabs mostram apenas ícone abaixo de 1024px
+2. Layout adapta-se sem quebra ou scroll horizontal
+3. Footer mostra apenas usuário + logout em mobile
+4. Grid de categorias com colunas adequadas ao tamanho
+
+---
+
 ## Evolução
 
 | Fase | Status | Atualizado |
-|------|--------|-----------|
+|------|--------|------------|
 | 1 | ✅ executed | 2026-04-24 |
 | 2 | ✅ executed | 2026-04-24 |
 | 3 | ✅ executed | 2026-04-24 |
+| 4 | ✅ executed | 2026-04-27 |
+| 5 | ⏳ planned | 2026-04-27 |
 
 ---
 

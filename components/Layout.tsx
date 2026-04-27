@@ -128,9 +128,9 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
         {/* Footer fixo na tela - bottom-left (sobre sidebar em desktop) */}
         <div className="hidden lg:flex fixed bottom-4 left-4 z-40">
           <div className="bg-gray-800/95 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-700 shadow-xl">
-            <div className="flex items-center gap-2">
-              <UserCircle size={18} className="shrink-0 text-gray-400" />
-              <span className="text-xs text-gray-200 font-medium min-w-[100px]">{user?.name || "Usuário"}</span>
+            <div className="flex items-center gap-4">
+              <UserCircle size={16} className="shrink-0 text-gray-400" />
+              <span className="text-xs text-gray-200 font-medium min-w-[80px] truncate">{user?.name || "Usuário"}</span>
               <button
                 onClick={async () => {
                   try {
@@ -141,13 +141,13 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
                     console.error("Erro ao fazer logout");
                   }
                 }}
-                className="shrink-0 p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
+                className="shrink-0 p-1 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
                 title="Sair"
               >
                 <LogOut size={14} />
               </button>
             </div>
-            <div className="flex items-center justify-between text-blue-400 font-bold py-0.5">
+            <div className="hidden lg:flex items-center justify-between text-blue-400 font-bold py-0.5">
               <span className="text-[13px]">MegaNuv Inventory&trade;</span>
               <span className="text-gray-500 text-[12px] pl-0.5">v{projectVersion}</span>
             </div>
