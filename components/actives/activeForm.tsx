@@ -115,6 +115,15 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     const filteredParents = parentSpaces.filter((opt: any) => 
       opt.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const filteredAll = useMemo(() => {
+      if (!searchTerm) return [];
+      const term = searchTerm.toLowerCase();
+      return [
+        ...parentSpaces.filter(opt => opt.name.toLowerCase().includes(term)),
+        ...physicalSpaces.filter(opt => opt.name.toLowerCase().includes(term))
+      ];
+    }, [searchTerm, parentSpaces, physicalSpaces]);
     
     const getDirectChildren = (parentId: string) => {
       return physicalSpaces.filter((opt: any) => opt.parentId === parentId);
@@ -142,7 +151,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
 
-      const indentClass = depth > 0 ? `ml-${depth * 4} pl-2 border-l-2 dark:border-white/5` : "";
+      const indentClass = depth > 0 ? `ml-${depth * 6} pl-2 border-l-2 dark:border-white/5` : "";
 
       return children.map((child: any) => {
         const grandChildren = getDirectChildren(child.id);
@@ -205,47 +214,77 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             </div>
             <div className="max-h-72 overflow-y-auto custom-scrollbar">
               {/* Espaços Pai com hierarquia */}
-              {filteredParents.length > 0 && filteredParents.map((space: any) => {
-                const descendantsCount = getDescendantsCount(space.id);
-                const isExpanded = expandedSpaces[space.id];
-                
-                return (
-                  <div key={space.id}>
-                    <div className="flex items-center border-b dark:border-white/5">
-                      <button 
-                        type="button" 
-                        onClick={() => { onChange(space.id, 'space'); setIsOpen(false); setSearchTerm(""); }} 
-                        className="flex-1 text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold dark:text-zinc-200">{space.name}</span>
-                            <span className="text-[8px] uppercase font-black text-gray-400">Espaço Pai</span>
+              {searchTerm ? (
+                filteredAll.length > 0 ? (
+                  <div>
+                    {filteredAll.map((opt: any) => (
+                      <div key={opt.id} className="border-b dark:border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }}
+                          className="w-full text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${opt.type === 'space' ? 'bg-blue-500' : 'bg-emerald-500'} shrink-0`} />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
+                              <span className="text-[8px] uppercase font-black text-gray-400">
+                                {opt.type === 'space' ? 'PAI' : 'FÍSICO'}
+                              </span>
+                            </div>
                           </div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+                )
+              ) : (
+                <div>
+                  {filteredParents.length > 0 && filteredParents.map((space: any) => {
+                    const descendantsCount = getDescendantsCount(space.id);
+                    const isExpanded = expandedSpaces[space.id];
+                    
+                    return (
+                      <div key={space.id}>
+                        <div className="flex items-center border-b dark:border-white/5">
+                          <button 
+                            type="button" 
+                            onClick={() => { onChange(space.id, 'space'); setIsOpen(false); setSearchTerm(""); }} 
+                            className="flex-1 text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold dark:text-zinc-200">{space.name}</span>
+                                <span className="text-[8px] uppercase font-black text-gray-400">Espaço Pai</span>
+                              </div>
+                              {descendantsCount > 0 && (
+                                <span className="ml-auto text-[8px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{descendantsCount}</span>
+                              )}
+                            </div>
+                          </button>
                           {descendantsCount > 0 && (
-                            <span className="ml-auto text-[8px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{descendantsCount}</span>
+                            <button 
+                              type="button"
+                              onClick={() => toggleExpand(space.id)}
+                              className="px-3 py-3 mr-1 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors rounded-2xl"
+                            >
+                              <ChevronDown size={14} className={`text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
                           )}
                         </div>
-                      </button>
-                        {descendantsCount > 0 && (
-                          <button 
-                            type="button"
-                            onClick={() => toggleExpand(space.id)}
-                            className="px-3 py-3 mr-1 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors rounded-2xl"
-                          >
-                            <ChevronDown size={14} className={`text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          </button>
-                        )}
-                    </div>
-                    {/* Descendentes recursivos */}
-                    {descendantsCount > 0 && isExpanded && renderChildren(space.id, 1)}
-                  </div>
-                );
-              })}
-              
-              {filteredParents.length === 0 && (
-                <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+                        {/* Descendentes recursivos */}
+                        {descendantsCount > 0 && isExpanded && renderChildren(space.id, 1)}
+                      </div>
+                    );
+                  })}
+                  
+                  {filteredParents.length === 0 && (
+                    <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -469,10 +508,10 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             <div className="relative">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
               <SearchableSelect 
-                options={[
-                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
-                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.fatherSpaceId || null }))
-                ]}
+      options={[
+        ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
+        ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || c.fatherSpaceId || null }))
+      ]}
                 value={formData.locationId}
                 onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
                 placeholder="Selecione local..."
