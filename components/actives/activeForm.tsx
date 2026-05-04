@@ -116,14 +116,14 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       opt.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const filteredAll = useMemo(() => {
-      if (!searchTerm) return [];
-      const term = searchTerm.toLowerCase();
-      return [
-        ...parentSpaces.filter(opt => opt.name.toLowerCase().includes(term)),
-        ...physicalSpaces.filter(opt => opt.name.toLowerCase().includes(term))
-      ];
-    }, [searchTerm, parentSpaces, physicalSpaces]);
+const filteredAll = useMemo(() => {
+       if (!searchTerm) return [];
+       const term = searchTerm.toLowerCase();
+       return [
+         ...parentSpaces.filter((opt: any) => opt.name.toLowerCase().includes(term)),
+         ...physicalSpaces.filter((opt: any) => opt.name.toLowerCase().includes(term))
+       ];
+     }, [searchTerm, parentSpaces, physicalSpaces]);
     
     const getDirectChildren = (parentId: string) => {
       return physicalSpaces.filter((opt: any) => opt.parentId === parentId);
@@ -147,19 +147,19 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const renderChildren = (parentId: string, depth: number) => {
+const renderChildren = (parentId: string, depth: number) => {
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
-
-      const indentClass = depth > 0 ? `ml-${depth * 6} pl-2 border-l-2 dark:border-white/5` : "";
 
       return children.map((child: any) => {
         const grandChildren = getDirectChildren(child.id);
         const hasGrandChildren = grandChildren.length > 0;
         const isExpanded = expandedSpaces[child.id];
 
+        const indentStyle = depth > 0 ? { marginLeft: `${depth * 24}px` } : {};
+        
         return (
-          <div key={child.id} className={indentClass}>
+          <div key={child.id} className={depth > 0 ? "pl-2 border-l-2 dark:border-white/5" : ""} style={indentStyle}>
             <div className={`flex items-center border-b dark:border-white/5`}>
               <button 
                 type="button" 
@@ -510,7 +510,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <SearchableSelect 
       options={[
         ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
-        ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || c.fatherSpaceId || null }))
+        ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || null }))
       ]}
                 value={formData.locationId}
                 onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
