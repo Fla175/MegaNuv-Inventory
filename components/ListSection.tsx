@@ -54,6 +54,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const activateSelectionMode = (itemId: string) => {
     setIsSelectionMode(true);
     setSelectedItems(new Set([itemId]));
+    setContextMenu(null); // FECHA menu ao ativar seleção
   };
   
   const exitSelectionMode = () => {
@@ -122,6 +123,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     e.preventDefault();
     e.stopPropagation();
 
+    if (isMobile) return; // EVITA context menu no mobile
     if (isBaseCompletelyEmpty || hasNoResultsFromFilter) return;
 
     const menuWidth = 256; 
