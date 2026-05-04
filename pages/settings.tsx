@@ -339,7 +339,7 @@ export default function SettingsPage() {
                       <button onClick={() => { setSelectedUser(null); setIsUserModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                     )}
                   </div>
-                  {usersList.length === 0 ? (
+                  {usersList.filter(u => u.id !== user?.id).length === 0 ? (
                     <div className="py-20 flex flex-col items-center justify-center text-center">
                       <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
                         <Users size={32} className="text-gray-400" />
@@ -349,20 +349,23 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
-                      {usersList.map((u) => (
+                      {usersList.filter(u => u.id !== user?.id).map((u) => (
                         <div key={u.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 ${u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                                {u.role}
-                              </span>
-                              <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{u.name || 'Usuário'}</h4>
+                            <div className="flex items-center gap-2 mb-1">
+                              <UserCircle size={18} className="text-zinc-400 shrink-0" />
+                              <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic">{u.name || 'Usuário'}</h4>
                             </div>
-                            <p className="text-xs text-zinc-500 mt-2 font-medium">{u.email}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-zinc-500 font-medium italic">{u.email}</p>
+                              <span className={`px-2 py-0.5 ${u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                                {u.role === "MANAGER" ? "Gerente" : u.role === "VIEWER" ? "VISUALIZADOR" : "ADMIN"}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex gap-3 mt-6">
                             <button onClick={() => { setSelectedUser(u); setIsUserModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
-                            {canManageUsers && u.id !== user?.id && (
+                            {canManageUsers && (
                               <button onClick={() => handleDelete('user', u.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
                             )}
                           </div>
