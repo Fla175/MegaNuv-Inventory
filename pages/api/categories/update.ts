@@ -1,10 +1,9 @@
 // pages/api/categories/update.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import * as jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
+import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 interface DecodedToken {
@@ -22,7 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as unknown as DecodedToken;
 
     if (decoded.role === "VIEWER") {
       return res.status(403).json({ error: "Visualizadores não podem atualizar categorias." });
@@ -47,19 +48,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(200).json(updatedCategory);
-
+  
   } catch (error: unknown) {
-    console.error("API_AREA_UPDATE_ERROR:", error);
-    if (error instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: "Token inválido." });
-
+    if (error instanceof jose.errors.JWTInvalid) return res.status(401).json({ error: "Token inválido." });
+    
     const err = error as { code?: string };
     if (typeof error === 'object' && error !== null && 'code' in error && err.code === 'P2025') {
       return res.status(404).json({ error: "Categoria não encontrada." });
     }
-
+    
     const message = error instanceof Error ? error.message : 'Erro interno ao atualizar área.';
     return res.status(500).json({ error: message });
-  } finally {
-    await prisma.$disconnect();
   }
 }

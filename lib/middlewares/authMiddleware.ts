@@ -30,7 +30,7 @@ export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]
     const token = authHeader.split(' ')[1]; // Pega a parte do token após "Bearer "
 
     // 2. Verificar o token
-    const decodedUser = verifyAuthToken(token);
+    const decodedUser = await verifyAuthToken(token);
 
     if (!decodedUser) {
       // Token inválido ou expirado

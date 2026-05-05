@@ -1,7 +1,7 @@
 // pages/api/users/[id].ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
+import * as jose from "jose";
 import bcrypt from 'bcryptjs';
 
 const saltRounds = 10;
@@ -13,7 +13,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token) return res.status(401).json({ message: "Não autorizado" });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { email: string };
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { email: string };
     const requester = await prisma.user.findUnique({ where: { email: decoded.email } });
     
     if (!requester) return res.status(401).json({ message: "Usuário não encontrado" });

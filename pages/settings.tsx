@@ -95,12 +95,11 @@ export default function SettingsPage() {
   useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchData = async (endpoint: string, setter: (data: any) => void) => {
     try {
       const res = await fetch(endpoint);
       if (res.ok) setter(await res.json());
-    } catch (err) { console.error(`Erro ao carregar ${endpoint}:`, err); }
+    } catch (err) { /* erro silencioso */ }
   };
 
   useEffect(() => {
@@ -233,8 +232,8 @@ export default function SettingsPage() {
             else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
             toast.showSuccess('Exclusão realizada com sucesso.');
           }
-        } catch (err) { console.error(err); }
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          } catch (err) { /* erro silencioso */ }
+         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
   };

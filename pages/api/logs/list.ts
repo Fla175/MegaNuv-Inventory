@@ -1,9 +1,8 @@
 // pages/api/logs/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import * as jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
+import * as jose from "jose";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 interface DecodedToken {
@@ -20,7 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as unknown as DecodedToken;
 
     if (decoded.role === "VIEWER") {
       return res.status(403).json({ error: "Acesso negado." });
@@ -48,12 +49,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     return res.status(200).json(logs);
-
   } catch (error: unknown) {
-    console.error("API_LOG_LIST_ERROR:", error);
     const message = error instanceof Error ? error.message : 'Erro ao buscar logs de auditoria.';
     return res.status(500).json({ error: message });
-  } finally {
-    await prisma.$disconnect();
   }
 }

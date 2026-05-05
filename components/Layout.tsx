@@ -73,7 +73,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
                   localStorage.removeItem("user");
                   window.location.href = "/login";
                 } catch {
-                  console.error("Erro ao fazer logout");
+                  // Erro silencioso - redirecionamento ainda ocorre
                 }
               }}
               className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20"
@@ -133,13 +133,13 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
               <span className="text-xs text-gray-200 font-medium min-w-[80px] truncate">{user?.name || "Usuário"}</span>
               <button
                 onClick={async () => {
-                  try {
-                    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-                    localStorage.removeItem("user");
-                    window.location.href = "/login";
-                  } catch {
-                    console.error("Erro ao fazer logout");
-                  }
+                try {
+                  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+                  localStorage.removeItem("user");
+                  window.location.href = "/login";
+                } catch {
+                  // Erro silencioso - redirecionamento ainda ocorre
+                }
                 }}
                 className="shrink-0 p-1 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition"
                 title="Sair"

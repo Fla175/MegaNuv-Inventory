@@ -76,8 +76,7 @@ export default function DashboardPage() {
           assetsByCategory: mappedCategories,
           recentMovements: data.recentMovements || (data.recentActives ? data.recentActives.slice().reverse() : [])
         });
-      } catch (err) {
-        console.error("Erro:", err);
+    } catch (err) {
         setError(true);
       } finally {
         setLoading(false);

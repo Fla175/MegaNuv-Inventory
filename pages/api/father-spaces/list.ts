@@ -1,9 +1,8 @@
 // pages/api/father-spaces/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
+import * as jose from "jose";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(
@@ -20,7 +19,9 @@ export default async function handler(
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string };
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Visualizadores não podem listar espaços." });
 
     // 2. BUSCA NO BANCO COM RELACIONAMENTOS E CONTAGENS
@@ -53,12 +54,9 @@ export default async function handler(
 
     // 3. RETORNO DOS DADOS
     return res.status(200).json(spaces);
-
-  } catch (error: unknown) {
-    console.error("ERRO father-spaces/list:", error);
-    const message = error instanceof Error ? error.message : 'Erro interno ao listar os espaços pai.';
-    return res.status(500).json({ error: message });
-  } finally {
-    await prisma.$disconnect();
-  }
+ 
+   } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro interno ao listar os espaços pai.';
+     return res.status(500).json({ error: message });
+   }
 }

@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/signup",
   "/api/auth",
   "/api/public",
+  "/api/hello",
   "/api/qrcode",
   "/api/storage/upload-url",
   "/qrcode",

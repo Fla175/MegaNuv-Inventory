@@ -1,7 +1,7 @@
 // pages/api/dashboard/stats.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import * as jose from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -13,7 +13,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string };
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
 
     // 1. Estatísticas de Ativos e Valor
@@ -99,7 +101,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error: unknown) {
-    console.error("ERRO dashboard/stats:", error);
     const message = error instanceof Error ? error.message : 'Falha ao processar estatísticas do dashboard';
     return res.status(500).json({ 
       error: message,

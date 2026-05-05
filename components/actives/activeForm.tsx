@@ -57,7 +57,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           });
         }
       } catch (err) {
-        console.error("Erro ao carregar categorias:", err);
+        // Erro silencioso - categorias são opcionais
       } finally {
         if (isMounted) setLoadingCategories(false);
       }

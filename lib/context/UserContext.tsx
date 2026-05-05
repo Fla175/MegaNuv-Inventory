@@ -53,7 +53,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setUser(null);
       }
     } catch (err) {
-      console.error("Erro crítico no UserContext:", err);
       setUser(null);
     } finally {
       // O ponto mais importante: DESLIGA o "Sincronizando"

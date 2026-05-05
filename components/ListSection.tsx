@@ -89,7 +89,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           setCategories(data);
         }
       } catch (err) {
-        console.error("Erro ao carregar categorias no ListSection:", err);
+        // Erro silencioso - categorias são opcionais
       }
     }
     fetchCategories();
@@ -217,7 +217,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         toast.showSuccess(isBatch ? `${selectedItems.size} ativo${selectedItems.size > 1 ? 's' : ''} movido${selectedItems.size > 1 ? 's' : ''} com sucesso.` : 'Ativo movido com sucesso.');
       }
     } catch (err) {
-      console.error(err);
+      // Erro silencioso
     } finally {
       setIsMovingLoading(false);
     }
@@ -403,9 +403,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       }),
                     });
                     onRefresh();
-                  } catch (err) {
-                    console.error('Erro ao mover para nível do pai:', err);
-                  }
+                } catch (err) {
+                  // Erro silencioso - fallback para toggle normal
+                }
                 }
               }
               setSelectedItems(prev => {

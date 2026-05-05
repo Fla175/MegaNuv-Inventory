@@ -1,8 +1,8 @@
 // pages/api/father-spaces/delete.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// pages/api/father-spaces/delete.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
-import * as jwt from "jsonwebtoken";
+import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -14,8 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as any;
-    const userId = decoded.id || decoded.userId;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string; userId?: string; id?: string; [key: string]: unknown };
+    const userId = (decoded.id || decoded.userId) ?? null;
 
     if (decoded.role !== "ADMIN") {
       return res.status(403).json({ error: "Acesso negado. Apenas admins excluem espaços." });
@@ -53,7 +55,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ message: "Espaço excluído com sucesso." });
 
   } catch (error: unknown) {
-    console.error("ERRO father-spaces/delete:", error);
     return res.status(500).json({ error: "Erro ao excluir. Verifique se há ativos vinculados a este espaço." });
   }
 }

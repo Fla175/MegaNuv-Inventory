@@ -31,7 +31,7 @@ export default function Login() {
           window.location.href = data.redirectTo;
         }
       } catch (err) {
-        console.error("Erro ao verificar seed:", err);
+        // Erro silencioso - redirecionamento opcional
       }
     };
   
@@ -61,7 +61,6 @@ export default function Login() {
         setMessage(data.message || 'Credenciais inválidas');
       }
     } catch (err) {
-      console.error(err);
       setMessage('Erro de rede. Tente novamente.');
     } finally {
       setLoading(false);

@@ -1,7 +1,7 @@
 // pages/api/actives/move.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import db from "@/lib/prisma";
-import * as jwt from "jsonwebtoken";
+import db from "@/lib/prisma"; 
+import * as jose from "jose";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -10,8 +10,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Sessão expirada." });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const decoded = jwt.verify(token!, JWT_SECRET!) as any;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string; userId: string; [key: string]: unknown };
 
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Negado" });
 
@@ -45,7 +48,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json(results);
   } catch (error: unknown) {
-    console.error("ERRO actives/move:", error);
     const message = error instanceof Error ? error.message : 'Falha na movimentação';
     return res.status(500).json({ error: message });
   }

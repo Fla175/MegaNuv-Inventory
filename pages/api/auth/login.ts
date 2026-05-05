@@ -1,7 +1,7 @@
 // pages/api/auth/login.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import * as jose from 'jose';
 import { serialize } from 'cookie';
 import prisma from '@/lib/prisma';
 
@@ -13,7 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!JWT_SECRET) {
-    console.error("ERRO CRÍTICO: JWT_SECRET não configurado no .env");
     return res.status(500).json({ message: 'Internal Server Error (Config)' });
   }
 
@@ -36,11 +35,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Gerando o token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role, name: user.name },
-      JWT_SECRET,
-      { expiresIn: '8h' } // Aumentei para 8h para melhor UX no dia de trabalho
-    );
+    const secret = new TextEncoder().encode(JWT_SECRET);
+    const token = await new jose.SignJWT(
+      { userId: user.id, email: user.email, role: user.role, name: user.name }
+    )
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('8h')
+      .sign(secret);
 
     // Configurando o Cookie
     res.setHeader('Set-Cookie', serialize('auth_token', token, {
@@ -74,7 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error: unknown) {
-    console.error('Erro no login:', error);
     const message = error instanceof Error ? error.message : 'Erro interno do servidor.';
     return res.status(500).json({ message });
   }

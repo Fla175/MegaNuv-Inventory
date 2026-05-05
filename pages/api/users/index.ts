@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import * as jose from "jose";
 
 const saltRounds = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -27,7 +27,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(200).json(users);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Unknown error');
-      console.error("Erro ao listar usuários:", err.message);
       res.status(500).json({ message: "Erro interno ao buscar usuários." });
     }
     return;
@@ -40,7 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
       if (!token) return res.status(401).json({ message: "Sessão expirada." });
 
-      const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
+      const secret = new TextEncoder().encode(JWT_SECRET!);
+      const { payload } = await jose.jwtVerify(token, secret);
+      const decoded = payload as { role: string };
 
       // VIEWER não pode criar ninguém
       if (decoded.role === 'VIEWER') {
@@ -67,7 +68,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(201).json(newUser);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Unknown error');
-      console.error("Erro ao criar usuário:", err.message);
 
       if (err.message.includes('Unique constraint')) {
          res.status(409).json({ message: "Email já cadastrado." });
