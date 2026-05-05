@@ -93,7 +93,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(404).json({ message: 'Não encontrado' });
   } catch (error: unknown) {
-    console.error("ERRO qrcode/public-get:", error);
     const message = error instanceof Error ? error.message : 'Erro interno';
     return res.status(500).json({ message });
   }

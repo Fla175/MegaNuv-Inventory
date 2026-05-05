@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
-import * as jwt from "jsonwebtoken";
+import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -14,7 +14,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Não autorizado" });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as any;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string; userId: string; [key: string]: unknown };
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado" });
 
     const { id, ...data } = req.body;
@@ -46,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await createLog(
       req,
-      decoded.id,
+      String(decoded.id),
       "EDIÇÃO DE ATIVO",
       `Editou o Ativo ${id}`
     );

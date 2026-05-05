@@ -1,10 +1,9 @@
 // pages/api/logs/clear.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import * as jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
+import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 interface DecodedToken {
@@ -21,7 +20,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Não autorizado." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as unknown as DecodedToken;
 
     if (decoded.role !== "ADMIN") {
       return res.status(403).json({ error: "Acesso restrito a administradores." });
@@ -50,12 +51,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(200).json({ message: "Logs processados com sucesso." });
-
+ 
   } catch (error: unknown) {
-    console.error("API_LOG_CLEAR_ERROR:", error);
     const message = error instanceof Error ? error.message : 'Erro ao limpar logs.';
     return res.status(500).json({ error: message });
-  } finally {
-    await prisma.$disconnect();
   }
 }

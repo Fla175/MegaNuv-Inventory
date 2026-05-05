@@ -3,7 +3,7 @@ import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import { 
-  UserPlus, Moon, Sun, Monitor, Shield, Loader2, Trash2, 
+  Moon, Sun, Monitor, Shield, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
   Plus, LayoutDashboard, ChevronRight, 
   CalendarFold, KeyRound, CirclePlus, ArrowDownAZ, CalendarArrowDown,
@@ -72,7 +72,6 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string>('#4F46E5'); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   
   // Estado do Dialog de Confirmação
@@ -96,22 +95,21 @@ export default function SettingsPage() {
   useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchData = async (endpoint: string, setter: (data: any) => void) => {
     try {
       const res = await fetch(endpoint);
       if (res.ok) setter(await res.json());
-    } catch (err) { console.error(`Erro ao carregar ${endpoint}:`, err); }
+    } catch (err) { /* erro silencioso */ }
   };
 
   useEffect(() => {
     if (activeTab === 'users') fetchData('/api/users', setUsersList);
     if (activeTab === 'spaces' && isAdmin) fetchData('/api/father-spaces/list', setSpacesList);
-    if (activeTab === 'categories' && isAdmin) fetchData('/api/categories/list', setCategoriesList);
+    if (activeTab === 'categories' && canManageUsers) fetchData('/api/categories/list', setCategoriesList);
     if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
     if (tab) {
       setActiveTab(tab as TabType);
-    };
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, tab, user]);
 
@@ -144,7 +142,6 @@ export default function SettingsPage() {
     const formData = new FormData(e.currentTarget);
     const payload = Object.fromEntries(formData);
     
-    // Adicionar imagem se foi carregada
     if (spaceImageUrl) {
       payload.imageUrl = spaceImageUrl;
     }
@@ -235,8 +232,8 @@ export default function SettingsPage() {
             else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
             toast.showSuccess('Exclusão realizada com sucesso.');
           }
-        } catch (err) { console.error(err); }
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          } catch (err) { /* erro silencioso */ }
+         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -255,7 +252,6 @@ export default function SettingsPage() {
 
   if (loading) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Sincronizando...</div></Layout>;
 
-  // Se ainda não carregou, mostra tela vazia
   if (!user) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Carregando...</div></Layout>;
 
   const tabs = [
@@ -270,7 +266,7 @@ export default function SettingsPage() {
     <Layout title="Configurações">
         <div className="max-w-6xl mx-auto pb-10 lg:pb-20">
           <div className="flex items-center gap-3 mb-6 lg:mb-10">
-            <div className="bg-blue-600 p-2 lg:p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Settings size={20} lg:size={24}/></div>
+            <div className="bg-blue-600 p-2 lg:p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Settings className="w-5 h-5 lg:w-6 lg:h-6"/></div>
             <div>
               <h1 className="text-2xl lg:text-3xl font-black text-blue-950 dark:text-white italic tracking-tighter uppercase">Configurações</h1>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Painel de Controle e personalização</p>
@@ -302,7 +298,7 @@ export default function SettingsPage() {
             {/* TAB: USERS (MEU PERFIL + GESTÃO) */}
             {activeTab === 'users' && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-950/30">
+                <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-950/30">
                   <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
                     <div className="relative group">
                       <div className="w-20 h-20 lg:w-28 lg:h-28 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl transform rotate-3 group-hover:rotate-0 transition-transform">
@@ -337,43 +333,94 @@ export default function SettingsPage() {
 
                 <div className="p-4 md:p-6">
                   <div className="flex justify-between items-center mb-6 lg:mb-8">
-                    <h3 className="text-xl lg:text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
-                  <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
-                </div>
-                {spacesList.length === 0 ? (
-                  <div className="py-20 flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                      <LayoutDashboard size={32} className="text-gray-400" />
-                    </div>
-                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum espaço pai cadastrado</p>
-                    <p className="text-xs font-bold text-gray-500 mt-1">Crie um espaço pai para organizar seus ativos</p>
+                    <h3 className="text-xl lg:text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Membros da Equipe</h3>
+                    {canManageUsers && (
+                      <button onClick={() => { setSelectedUser(null); setIsUserModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                    )}
                   </div>
-                ) : (
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
-                   {spacesList.map((space) => (
-                     <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
-                       <div>
-                         <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
-                        <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
+                  {usersList.filter(u => u.id !== user?.id).length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <Users size={32} className="text-gray-400" />
                       </div>
-                      <div className="flex gap-3 mt-6">
-                        <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
-                        <button onClick={() => handleDelete('space', space.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
-                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum membro cadastrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">Adicione membros à equipe</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+                      {usersList.filter(u => u.id !== user?.id).map((u) => (
+                        <div key={u.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <UserCircle size={18} className="text-zinc-400 shrink-0" />
+                              <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic">{u.name || 'Usuário'}</h4>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-zinc-500 font-medium italic">{u.email}</p>
+                              <span className={`px-2 py-0.5 ${u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                                {u.role === "MANAGER" ? "Gerente" : u.role === "VIEWER" ? "VISUALIZADOR" : "ADMIN"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-3 mt-6">
+                            <button onClick={() => { setSelectedUser(u); setIsUserModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                            {canManageUsers && (
+                              <button onClick={() => handleDelete('user', u.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                )}
               </div>
-        )}
+            )}
 
-            {/* TAB: AREAS */}
-            {activeTab === 'categories' && isAdmin && (
+            {/* TAB: SPACES */}
+            {activeTab === 'spaces' && isAdmin && (
+              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl lg:text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
+                    <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                  </div>
+                </div>
+                <div className="p-4 md:p-6">
+                  {spacesList.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <LayoutDashboard size={32} className="text-gray-400" />
+                      </div>
+                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum espaço pai cadastrado</p>
+                      <p className="text-xs font-bold text-gray-500 mt-1">Crie um espaço pai para organizar seus ativos</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
+                      {spacesList.map((space) => (
+                        <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
+                          <div>
+                            <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
+                            <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
+                          </div>
+                          <div className="flex gap-3 mt-6">
+                            <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                            <button onClick={() => handleDelete('space', space.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CATEGORIES */}
+            {activeTab === 'categories' && canManageUsers && (
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
                   {categoriesList.length < 18 && (
-                    <button onClick={() => { setSelectedCategory(null); setSelectedColor('#4F46E5'); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
+                    <button onClick={() => { setSelectedCategory(null); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                   )}
                   {categoriesList.length >= 18 && (
                     <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
@@ -387,22 +434,22 @@ export default function SettingsPage() {
                     <p className="text-lg font-black text-gray-400 uppercase italic">Nenhuma categoria cadastrada</p>
                     <p className="text-xs font-bold text-gray-500 mt-1">Crie categorias para classificar seus ativos</p>
                   </div>
-                 ) : (
-                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
-                   {categoriesList.map((category) => (
-                     <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
-                       <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: category.color || '#2563eb' }}>
-                         <Group size={18} className="lg:hidden" />
-                         <Group size={24} className="hidden lg:block" />
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
+                    {categoriesList.map((category) => (
+                      <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
+                        <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: category.color || '#2563eb' }}>
+                          <Group size={18} className="lg:hidden" />
+                          <Group size={24} className="hidden lg:block" />
+                        </div>
+                        <h4 className="text-xs lg:text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
+                        <div className="flex gap-2 mt-4">
+                          <button onClick={() => { setSelectedCategory(category); setIsCategoryModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
+                          <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
+                        </div>
                       </div>
-                      <h4 className="text-xs lg:text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
-                      <div className="flex gap-2 mt-4">
-                        <button onClick={() => { setSelectedCategory(category); setSelectedColor(category.color || '#4F46E5'); setIsCategoryModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
-                        <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -456,7 +503,7 @@ export default function SettingsPage() {
                 <div className="space-y-4 mb-12">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 block">Esquema Visual</label>
                   <div className="grid grid-cols-3 gap-4">
-                    {(['LIGHT', 'DARK', 'SISTEM'] as const).map(t => (
+                    {(['LIGHT', 'DARK', 'SYSTEM'] as const).map(t => (
                       <button key={t} onClick={() => updateConfig({ theme: t }, 'update-theme')} className={`flex flex-col items-center gap-3 p-6 border rounded-[2rem] transition-all ${user.theme === t ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100'}`}>
                         {t === 'LIGHT' ? <Sun size={20}/> : t === 'DARK' ? <Moon size={20}/> : <Monitor size={20}/>}
                         <span className="text-[10px] font-black uppercase">{t}</span>
@@ -532,7 +579,7 @@ export default function SettingsPage() {
           <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button type="button" onClick={() => { setIsCategoryModalOpen(false); setSelectedColor('#4F46E5'); }} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
+              <button type="button" onClick={() => { setIsCategoryModalOpen(false); }} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />

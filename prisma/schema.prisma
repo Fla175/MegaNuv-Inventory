@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +5,97 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  name           String?
+  role           UserRole      @default(VIEWER)
+  theme          Theme         @default(SISTEM)
+  defaultSort    String        @default("name")
+  lastLogin      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  activesCreated Active[]      @relation("UserToActive")
+  spacesCreated  FatherSpace[] @relation("UserToSpace")
+  logs           Log[]         @relation("UserLogs")
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  actives   Active[]
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  action    String
+  details   String   @db.Text
+  ip        String?
+  userAgent String?  @db.Text
+  userId    String?
+  createdAt DateTime @default(now())
+  user      User?    @relation("UserLogs", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+}
+
+model FatherSpace {
+  id          String        @id
+  name        String        @unique
+  notes       String?       @db.Text
+  createdById String?
+  parentId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  address     String?
+  imageUrl    String?
+  phone       String?
+  responsible String?
+  actives     Active[]
+  createdBy   User?         @relation("UserToSpace", fields: [createdById], references: [id])
+  parent      FatherSpace?  @relation("SpaceHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    FatherSpace[] @relation("SpaceHierarchy")
+
+  @@index([parentId])
+  @@index([createdById])
+}
+
+model Active {
+  id              String      @id
+  name            String
+  categoryId      String?
+  sku             String?
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+  fixedValue      Float       @default(0)
+  parentId        String?
+  isPhysicalSpace Boolean
+  tag             String      @default("IN-STOCK")
+  notes           String?     @db.Text
+  fatherSpaceId   String
+  createdById     String?
+  imageUrl        String?
+  fileUrl         String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  category        Category?   @relation(fields: [categoryId], references: [id])
+  createdBy       User?       @relation("UserToActive", fields: [createdById], references: [id])
+  fatherSpace     FatherSpace @relation(fields: [fatherSpaceId], references: [id])
+  parent          Active?     @relation("ActiveHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        Active[]    @relation("ActiveHierarchy")
+
+  @@index([fatherSpaceId])
+  @@index([parentId])
+  @@index([createdById])
+  @@index([categoryId])
 }
 
 enum UserRole {
@@ -18,116 +108,4 @@ enum Theme {
   DARK
   LIGHT
   SISTEM
-}
-
-model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  password     String
-  name         String?
-  role         UserRole  @default(VIEWER)
-  theme        Theme     @default(SISTEM)
-  defaultSort  String    @default("name")
-  lastLogin    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relações
-  activesCreated Active[]      @relation("UserToActive")
-  spacesCreated  FatherSpace[] @relation("UserToSpace")
-  logs           Log[]         @relation("UserLogs")
-}
-
-model Category {
-  id        String   @id @default(uuid())
-  name      String   @unique // Ex: "Redes", "Servidor"
-  color     String?  @unique // Cor única para cada categoria
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  actives   Active[]
-}
-
-model Log {
-  id        String   @id @default(uuid())
-  action    String   // Ex: "CREATE_ACTIVE", "LOGIN", "MOVE_ACTIVE", "DELETE_USER"
-  details   String   @db.Text
-  ip        String?
-  userAgent String?  @db.Text
-  
-  // Relacionamento com quem fez a ação
-  userId    String?
-  user      User?    @relation("UserLogs", fields: [userId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([action])
-}
-
-model FatherSpace {
-  id    String  @id
-  name  String  @unique
-  notes String? @db.Text
-
-  // Novos campos opcionais
-  imageUrl     String?
-  address      String?
-  responsible String?
-  phone       String?
-
-  createdById String?
-  createdBy   User?   @relation("UserToSpace", fields: [createdById], references: [id])
-
-  parentId String?
-  parent   FatherSpace?  @relation("SpaceHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children FatherSpace[] @relation("SpaceHierarchy")
-
-  actives Active[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([parentId])
-  @@index([createdById])
-}
-
-model Active {
-  id   String  @id
-  name String
-
-  // RELAÇÃO COM CATEGORY (Substituindo o Enum)
-  categoryId String?
-  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  sku          String?
-  manufacturer String?
-  model        String?
-  serialNumber String?
-  fixedValue   Float   @default(0)
-
-  parentId String?
-  parent   Active?  @relation("ActiveHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children Active[] @relation("ActiveHierarchy")
-
-  isPhysicalSpace Boolean
-  tag             String  @default("IN-STOCK")
-  notes           String? @db.Text
-
-  fatherSpaceId String
-  fatherSpace   FatherSpace @relation(fields: [fatherSpaceId], references: [id])
-
-  createdById String?
-  createdBy   User?   @relation("UserToActive", fields: [createdById], references: [id])
-
-  imageUrl String?
-  fileUrl  String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([fatherSpaceId])
-  @@index([parentId])
-  @@index([createdById])
-  @@index([categoryId])
 }

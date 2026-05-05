@@ -1,11 +1,10 @@
 // pages/api/categories/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { PrismaClient } from "@prisma/client";
-import * as jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
+import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 interface DecodedToken {
@@ -23,7 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as DecodedToken;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string; userId: string; [key: string]: unknown };
 
     // 2. AUTORIZAÇÃO (ADMIN e MANAGER criam categorias)
     if (decoded.role === "VIEWER") {
@@ -69,19 +70,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(201).json(newCategory);
-
-  } catch (error: unknown) {
-    console.error("API_CATEGORY_CREATE_ERROR:", error);
-    if (error instanceof jwt.JsonWebTokenError) return res.status(401).json({ error: "Token inválido." });
-    
-    const err = error as { code?: string };
-    if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2002') {
-      return res.status(400).json({ error: "Já existe uma categoria com este nome." });
-    }
-
-    const message = error instanceof Error ? error.message : 'Erro interno ao criar categoria.';
-    return res.status(500).json({ error: message });
-  } finally {
-    await prisma.$disconnect();
-  }
+ 
+   } catch (error: unknown) {
+      if (error instanceof jose.errors.JWTInvalid) return res.status(401).json({ error: "Token inválido." });
+     
+     const err = error as { code?: string };
+     if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2002') {
+       return res.status(400).json({ error: "Já existe uma categoria com este nome." });
+     }
+ 
+     const message = error instanceof Error ? error.message : 'Erro interno ao criar categoria.';
+     return res.status(500).json({ error: message });
+   }
 }

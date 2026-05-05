@@ -55,7 +55,6 @@ export default function Signup() {
         setMessage(data.message || 'Erro no cadastro. Verifique os dados.');
       }
     } catch (error) {
-      console.error('Erro ao tentar cadastro:', error);
       setMessage('Erro de rede ou servidor. Tente novamente mais tarde.');
     } finally {
       setLoading(false);

@@ -26,13 +26,10 @@ export const deleteFileFromMinio = async (url: string | null) => {
     const urlParts = url.split('/');
     const objectName = urlParts.pop();
 
-    if (objectName) {
+      if (objectName) {
       await minioClient.removeObject(BUCKET_NAME, objectName);
-      console.log(`[MINIO]: Arquivo ${objectName} removido com sucesso.`);
     }
-  } catch (error) {
-    console.error(`[MINIO ERROR]: Falha ao remover arquivo do storage:`, error);
-    // Não lançamos o erro aqui para não travar a exclusão no banco de dados,
-    // mas deixamos o log para sabermos que o arquivo ficou lá.
+    } catch (error) {
+    // Erro silencioso - exclusão no banco continua normalmente
   }
 };

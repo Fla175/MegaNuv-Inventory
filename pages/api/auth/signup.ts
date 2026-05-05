@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import * as jose from 'jose';
 
 const saltRounds = 10;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -33,8 +33,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       try {
-        const decoded = jwt.verify(token, JWT_SECRET!) as { role: string };
-        if (decoded.role !== 'ADMIN') {
+        const secret = new TextEncoder().encode(JWT_SECRET!);
+        const { payload } = await jose.jwtVerify(token, secret);
+        if (payload.role !== 'ADMIN') {
           return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
         }
       } catch {
@@ -80,7 +81,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Erro ao registrar usuário');
-    console.error('ERRO NO REGISTER:', err.message);
 
     if (err.message.includes('Unique constraint')) {
       return res.status(500).json({ message: 'Erro de banco de dados.', details: err.message });

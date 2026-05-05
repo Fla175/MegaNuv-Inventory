@@ -1,8 +1,8 @@
 // pages/api/father-spaces/create.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// pages/api/father-spaces/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
-import * as jwt from "jsonwebtoken";
+import * as jose from "jose";
 import { randomBytes } from "crypto";
 import { createLog } from "@/lib/logger";
 
@@ -15,8 +15,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
-    const decoded = jwt.verify(token, JWT_SECRET!) as any;
-    const userId = decoded.id || decoded.userId || decoded.sub;
+    const secret = new TextEncoder().encode(JWT_SECRET!);
+    const { payload } = await jose.jwtVerify(token, secret);
+    const decoded = payload as { role: string; userId?: string; id?: string; sub?: string; [key: string]: unknown };
+    const userId = (decoded.id || decoded.userId || decoded.sub) ?? null;
 
     if (decoded.role !== "ADMIN") {
       return res.status(403).json({ error: "Acesso negado. Apenas admins criam espaços pai." });
@@ -61,7 +63,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(201).json(newSpace);
 
   } catch (error: unknown) {
-    console.error("ERRO father-spaces/create:", error instanceof Error ? error.message : error);
     const message = error instanceof Error ? error.message : "Erro interno";
     return res.status(500).json({ error: "Erro interno.", details: message });
   }

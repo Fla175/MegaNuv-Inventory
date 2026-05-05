@@ -32,13 +32,12 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
 
       const text = await res.text();
       
-      try {
+       try {
         const data = JSON.parse(text);
         if (!res.ok) throw new Error(data.error || "Erro no upload");
         onChange(data.publicUrl);
         toast.showSuccess('Imagem enviada com sucesso.');
       } catch {
-        console.error("Conteúdo recebido do servidor:", text);
         toast.showError('Erro no servidor. Verifique a conexão e tente novamente.');
         return;
       }

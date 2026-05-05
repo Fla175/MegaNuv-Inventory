@@ -34,7 +34,7 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           setCategories(data);
         }
       } catch (err) {
-        console.error("Erro ao buscar categorias:", err);
+        // Erro silencioso - categorias são opcionais
       }
     }
     fetchCategories();

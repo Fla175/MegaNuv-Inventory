@@ -1,8 +1,6 @@
 // lib/logger.ts
-import { PrismaClient } from "@prisma/client";
+import prisma from "./prisma";
 import { NextApiRequest } from "next";
-
-const prisma = new PrismaClient();
 
 /**
  * Registra uma ação no banco de dados para auditoria.

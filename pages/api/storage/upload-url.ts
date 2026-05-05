@@ -36,7 +36,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ publicUrl });
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Unknown error');
-    console.error("Erro no upload:", err);
     return res.status(500).json({ error: err.message });
   }
 }

@@ -33,7 +33,7 @@ export default function GestaoAtivosPage() {
         setActives(data);
       }
     } catch (error) {
-      console.error("Erro ao carregar dados:", error);
+      // Erro silencioso - dados serão recarregados no próximo refresh
     }
   };
 
