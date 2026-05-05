@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** v2.11.1
+**Current Version:** v2.12.1
 
 ## 🚀 Features
 
@@ -24,7 +24,7 @@
 * **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/) (v6)
 * **Styling:** [Tailwind CSS](https://tailwindcss.com) (v4)
 * **Icons:** [Lucide React](https://lucide.dev)
-* **Authentication:** JSON Web Tokens (JWT) & BcryptJS
+* **Authentication:** JSON Web Tokens (JWT) with jose & BcryptJS
 * **Language:** TypeScript (Strict Mode)
 
 ---
