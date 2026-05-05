@@ -18,11 +18,19 @@
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
 
+---
+
 ## 🛠 Tech Stack
 
+<<<<<<< HEAD
 * **Framework:** [Next.js](https://nextjs.org/) (Pages Router, v15)
 * **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/) (v6)
 * **Styling:** [Tailwind CSS](https://tailwindcss.com) (v4)
+=======
+* **Framework:** [Next.js](https://nextjs.org/) (Pages Router)
+* **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/)
+* **Styling:** [Tailwind CSS](https://tailwindcss.com)
+>>>>>>> origin/main
 * **Icons:** [Lucide React](https://lucide.dev)
 * **Authentication:** JSON Web Tokens (JWT) with jose & BcryptJS
 * **Language:** TypeScript (Strict Mode)
@@ -36,6 +44,8 @@
 * Node.js (LTS version)
 * Yarn or NPM
 * A running MySQL/MariaDB instance
+
+---
 
 ### Installation
 
@@ -69,6 +79,8 @@ yarn dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+---
+
 ### 📂 Project Structure
 
 * **/pages/api/** - Backend routes for all resources (users, actives, father-spaces, categories, logs)
@@ -78,10 +90,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 * **/prisma/** - Database schema and migration files
 * **/components/** - Reusable UI components (Layout, ListSection, SearchSection, activeForm)
 
+---
+
 ### 🛡 API Hierarchy & Security
 
 The system implements a strict permission logic:
 
+<<<<<<< HEAD
 * **Admins:** Full control over all users, settings, and can delete/edit logs.
 * **Managers:** Can manage VIEWER accounts but cannot delete or edit ADMINS, can view logs.
 * **Viewers:** Users that only can look the inventory, but can't do any process.
@@ -103,6 +118,15 @@ The system implements a strict permission logic:
 - Enhanced footer UI in Layout component
 - Better truncation for user names
 - Responsive grid for category cards (2 columns mobile, 3-4 desktop)
+=======
+* **Admins:** Full control over all users and settings.
+
+* **Managers:** Can manage VIEWER accounts but cannot delete or edit ADMINS.
+
+* **Owners:** Users can always edit their own profile or delete their own account.
+
+* **Viewers:** Users that only can look the inventory, but can't do any process.
+>>>>>>> origin/main
 
 ---
 
@@ -112,3 +136,8 @@ The system implements a strict permission logic:
 > * [***Next.js Documentation*** - learn about Next.js features and API.](https://nextjs.org/docs)
 >
 > * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
+<<<<<<< HEAD
+=======
+>
+> * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
+>>>>>>> origin/main
