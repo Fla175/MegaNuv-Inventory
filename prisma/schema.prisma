@@ -13,14 +13,14 @@ model User {
   password       String
   name           String?
   role           UserRole      @default(VIEWER)
-  theme          Theme         @default(SISTEM)
-  defaultSort    String        @default("name")
+  theme          Theme         @default(SYSTEM)
   lastLogin      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   activesCreated Active[]      @relation("UserToActive")
   spacesCreated  FatherSpace[] @relation("UserToSpace")
   logs           Log[]         @relation("UserLogs")
+  isSystem       Boolean       @default(false) // Somente o primeiro ADMIN criado terá este campo setado como "true"
 }
 
 model Category {
@@ -99,6 +99,7 @@ model Active {
 }
 
 enum UserRole {
+  DIRECTOR
   ADMIN
   MANAGER
   VIEWER
@@ -107,5 +108,5 @@ enum UserRole {
 enum Theme {
   DARK
   LIGHT
-  SISTEM
+  SYSTEM
 }

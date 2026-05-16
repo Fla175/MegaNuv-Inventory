@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { theme } = req.body;
 
     // Validação básica do valor do tema
-    if (!['LIGHT', 'DARK', 'SISTEM'].includes(theme)) {
+    if (!['LIGHT', 'DARK', 'SYSTEM'].includes(theme)) {
       return res.status(400).json({ error: "Tema inválido" });
     }
 
