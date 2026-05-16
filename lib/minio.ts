@@ -29,7 +29,7 @@ export const deleteFileFromMinio = async (url: string | null) => {
       if (objectName) {
       await minioClient.removeObject(BUCKET_NAME, objectName);
     }
-    } catch (error) {
+    } catch {
     // Erro silencioso - exclusão no banco continua normalmente
   }
 };

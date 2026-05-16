@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 1. Verificar se existe algum usuário ADMIN no sistema
+    // 1. Verificar se existe algum usuário no sistema
     const adminCount = await prisma.user.count({
       where: { role: 'ADMIN' }
     });
@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: name || null, 
         email, 
         password: hashedPassword, 
-        role: userRole 
+        role: userRole,
       },
       select: { id: true, email: true, name: true, role: true, createdAt: true },
     });

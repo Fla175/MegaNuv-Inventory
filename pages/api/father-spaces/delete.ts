@@ -1,5 +1,4 @@
 // pages/api/father-spaces/delete.ts
-// pages/api/father-spaces/delete.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";
@@ -54,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: "Espaço excluído com sucesso." });
 
-  } catch (error: unknown) {
+  } catch {
     return res.status(500).json({ error: "Erro ao excluir. Verifique se há ativos vinculados a este espaço." });
   }
 }

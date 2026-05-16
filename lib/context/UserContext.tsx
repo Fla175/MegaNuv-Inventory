@@ -10,7 +10,6 @@ export type User = {
   email: string;
   role: Role;
   theme: Theme;
-  defaultSort?: string;
   lastLogin?: string;
   createdAt: string;
 };
@@ -52,7 +51,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Se a resposta for 401, 404 ou 500, limpamos o usuário
         setUser(null);
       }
-    } catch (err) {
+    } catch {
       setUser(null);
     } finally {
       // O ponto mais importante: DESLIGA o "Sincronizando"

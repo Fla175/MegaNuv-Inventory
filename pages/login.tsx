@@ -30,7 +30,7 @@ export default function Login() {
         if (data.redirectTo) {
           window.location.href = data.redirectTo;
         }
-      } catch (err) {
+      } catch {
         // Erro silencioso - redirecionamento opcional
       }
     };
@@ -60,7 +60,7 @@ export default function Login() {
       } else {
         setMessage(data.message || 'Credenciais inválidas');
       }
-    } catch (err) {
+    } catch {
       setMessage('Erro de rede. Tente novamente.');
     } finally {
       setLoading(false);

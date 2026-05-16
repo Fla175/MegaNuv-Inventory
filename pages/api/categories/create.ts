@@ -7,11 +7,6 @@ import { CATEGORY_PALETTE } from "@/lib/constants/colors";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-interface DecodedToken {
-  userId: string;
-  role: string;
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido." });

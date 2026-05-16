@@ -1,5 +1,4 @@
 // pages/api/actives/delete.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";
@@ -55,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: `${count} ativo${count > 1 ? 's' : ''} removido${count > 1 ? 's' : ''} com sucesso.` });
 
-  } catch (error: unknown) {
+  } catch {
     return res.status(500).json({ error: "Erro ao excluir ativo." });
   }
 }

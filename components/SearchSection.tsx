@@ -33,7 +33,7 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           const data = await res.json();
           setCategories(data);
         }
-      } catch (err) {
+      } catch {
         // Erro silencioso - categorias são opcionais
       }
     }
