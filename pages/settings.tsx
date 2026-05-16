@@ -6,7 +6,7 @@ import {
   Moon, Sun, Monitor, Shield, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
   Plus, LayoutDashboard, ChevronRight, 
-  CalendarFold, KeyRound, CirclePlus, ArrowDownAZ, CalendarArrowDown,
+  CalendarFold, KeyRound, CirclePlus,
   Activity, ClipboardList, Group
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
@@ -24,7 +24,7 @@ interface User {
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
-  defaultSort?: string;
+
 }
 
 interface FatherSpace {
@@ -51,7 +51,7 @@ interface Log {
   user: { name: string; email: string };
 }
 
-type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'system';
+type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -95,11 +95,11 @@ export default function SettingsPage() {
   useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
-  const fetchData = async (endpoint: string, setter: (data: any) => void) => {
+  const fetchData = async <T,>(endpoint: string, setter: (data: T) => void) => {
     try {
       const res = await fetch(endpoint);
       if (res.ok) setter(await res.json());
-    } catch (err) { /* erro silencioso */ }
+    } catch { /* erro silencioso */ }
   };
 
   useEffect(() => {
@@ -232,7 +232,7 @@ export default function SettingsPage() {
             else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
             toast.showSuccess('Exclusão realizada com sucesso.');
           }
-          } catch (err) { /* erro silencioso */ }
+          } catch { /* erro silencioso */ }
          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -259,7 +259,7 @@ export default function SettingsPage() {
     { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: isAdmin },
     { id: 'categories', label: 'Categorias', icon: Group, show: canManageUsers },
     { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
-    { id: 'system', label: 'Preferências', icon: Monitor, show: true },
+    { id: 'theme', label: 'Temas', icon: Monitor, show: true },
   ];
 
   return (
@@ -495,39 +495,22 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* TAB: SYSTEM */}
-            {activeTab === 'system' && (
+            {/* TAB: THEME */}
+            {activeTab === 'theme' && (
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
-                <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic mb-10 tracking-tighter">Preferências</h3>
-                
+                <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic mb-10 tracking-tighter">Tema</h3>
+
                 <div className="space-y-4 mb-12">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 block">Esquema Visual</label>
                   <div className="grid grid-cols-3 gap-4">
-                    {(['LIGHT', 'DARK', 'SYSTEM'] as const).map(t => (
-                      <button key={t} onClick={() => updateConfig({ theme: t }, 'update-theme')} className={`flex flex-col items-center gap-3 p-6 border rounded-[2rem] transition-all ${user.theme === t ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100'}`}>
-                        {t === 'LIGHT' ? <Sun size={20}/> : t === 'DARK' ? <Moon size={20}/> : <Monitor size={20}/>}
-                        <span className="text-[10px] font-black uppercase">{t}</span>
+                    {([['LIGHT', 'Claro'], ['DARK', 'Escuro'], ['SYSTEM', 'Sistema']] as const).map(([value, label]) => (
+                      <button key={value} onClick={() => updateConfig({ theme: value }, 'update-theme')} className={`flex flex-col items-center gap-3 p-6 border rounded-[2rem] transition-all ${user.theme === value ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100'}`}>
+                        {value === 'LIGHT' ? <Sun size={20}/> : value === 'DARK' ? <Moon size={20}/> : <Monitor size={20}/>}
+                        <span className="text-[10px] font-black uppercase">{label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 block">Ordenação Padrão</label>
-                  <div className="relative group max-w-sm">
-                    <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${user.defaultSort === "name" ? "text-blue-600" : "text-amber-600"}`}>
-                      {user.defaultSort === "name" ? <ArrowDownAZ size={18} /> : <CalendarArrowDown size={18} />}
-                    </div>
-                    <select 
-                      value={user.defaultSort || 'name'} 
-                      onChange={(e) => updateConfig({ defaultSort: e.target.value }, 'update-sort')}
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white pl-12 pr-4 py-4 rounded-2xl border-none font-bold text-sm focus:ring-2 focus:ring-blue-600 appearance-none shadow-sm cursor-pointer"
-                    >
-                      <option value="name">Alfabética (A-Z)</option>
-                      <option value="newest">Recentes</option>
-                    </select>
-                  </div>
-                </div>
               </div>
             )}
           </div>
