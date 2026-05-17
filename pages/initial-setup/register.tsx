@@ -1,5 +1,4 @@
 // pages/initial-setup/register.tsx
-/* eslint-disable @next/next/no-page-custom-font */
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -11,6 +10,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role] = useState('ADMIN');
+  const [isSystem] = useState('true');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -43,7 +43,7 @@ export default function Signup() {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role, isSystem }),
       });
 
       const data = await response.json();
@@ -54,7 +54,7 @@ export default function Signup() {
       } else {
         setMessage(data.message || 'Erro no cadastro. Verifique os dados.');
       }
-    } catch (error) {
+    } catch {
       setMessage('Erro de rede ou servidor. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
@@ -76,7 +76,6 @@ export default function Signup() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#004AAD] to-[#38B6FF] p-4 font-inter">
       <Head>
         <title>Cadastro Inventory</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
       <div className="bg-white p-8 sm:p-10 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md border border-gray-200 transform transition duration-300 hover:scale-[1.01]">

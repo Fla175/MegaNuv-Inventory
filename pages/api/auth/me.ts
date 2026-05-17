@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: true,
         role: true,
         theme: true,
-        defaultSort: true,
+        isSystem: true,
         lastLogin: true,
         createdAt: true,
       }

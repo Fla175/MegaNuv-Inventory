@@ -1,8 +1,8 @@
 // lib/context/UserContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 
-export type Role = 'ADMIN' | 'MANAGER' | 'VIEWER';
-export type Theme = 'DARK' | 'LIGHT' | 'SISTEM';
+export type Role = 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
+export type Theme = 'DARK' | 'LIGHT' | 'SYSTEM';
 
 export type User = {
   id: string;
@@ -10,6 +10,7 @@ export type User = {
   email: string;
   role: Role;
   theme: Theme;
+  isSystem: boolean;
   lastLogin?: string;
   createdAt: string;
 };
@@ -83,8 +84,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   
     const applyTheme = () => {
-      const currentTheme = user?.theme || 'SISTEM';
-      const isDark = currentTheme === 'DARK' || (currentTheme === 'SISTEM' && mediaQuery.matches);
+      const currentTheme = user?.theme || 'SYSTEM';
+      const isDark = currentTheme === 'DARK' || (currentTheme === 'SYSTEM' && mediaQuery.matches);
       
       if (isDark) {
         root.classList.add('dark');

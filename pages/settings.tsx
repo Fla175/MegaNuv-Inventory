@@ -7,7 +7,7 @@ import {
   UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
   Plus, LayoutDashboard, ChevronRight, 
   CalendarFold, KeyRound, CirclePlus,
-  Activity, ClipboardList, Group
+  Activity, ClipboardList, Group, Palette
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
@@ -20,7 +20,7 @@ interface User {
   id: string;
   name: string | null; 
   email: string;
-  role: 'ADMIN' | 'MANAGER' | 'VIEWER';
+  role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
+  const [existingDirector, setExistingDirector] = useState<boolean>(false);
   
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -84,10 +85,18 @@ export default function SettingsPage() {
   }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
 
   // Permissões
+  const isDirector = user?.role === 'DIRECTOR';
   const isAdmin = user?.role === 'ADMIN';
   const isManager = user?.role === 'MANAGER';
-  const canManageUsers = isAdmin || isManager;
-  const canSeeLogs = isAdmin || isManager;
+  const canManageAll = isDirector || isAdmin;
+  const canManageUsers = isDirector || isAdmin || isManager;
+  const canSeeLogs = isDirector || isAdmin || isManager;
+
+  useEffect(() => {
+    fetchData<{ exists: boolean }>('/api/users/check-director', (data) => {
+      setExistingDirector(data.exists);
+    });
+  }, []);
 
   // Fechar modais com Esc
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
@@ -104,7 +113,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (activeTab === 'users') fetchData('/api/users', setUsersList);
-    if (activeTab === 'spaces' && isAdmin) fetchData('/api/father-spaces/list', setSpacesList);
+    if (activeTab === 'spaces' && canManageAll) fetchData('/api/father-spaces/list', setSpacesList);
     if (activeTab === 'categories' && canManageUsers) fetchData('/api/categories/list', setCategoriesList);
     if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
     if (tab) {
@@ -256,10 +265,10 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
-    { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: isAdmin },
+    { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: canManageAll },
     { id: 'categories', label: 'Categorias', icon: Group, show: canManageUsers },
     { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
-    { id: 'theme', label: 'Temas', icon: Monitor, show: true },
+    { id: 'theme', label: 'Tema', icon: Palette, show: true },
   ];
 
   return (
@@ -312,7 +321,7 @@ export default function SettingsPage() {
                     <div className="text-center md:text-left">
                       <div className="flex items-center gap-3 justify-center md:justify-start">
                         <h2 className="text-2xl lg:text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user?.name || 'Usuário'}</h2>
-                        <span className={`px-3 py-1 ${user?.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user?.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                        <span className={`px-3 py-1 ${user?.role === "DIRECTOR" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400" : user?.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user?.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
                           {user?.role}
                         </span>
                       </div>
@@ -357,8 +366,8 @@ export default function SettingsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <p className="text-xs text-zinc-500 font-medium italic">{u.email}</p>
-                              <span className={`px-2 py-0.5 ${u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                                {u.role === "MANAGER" ? "Gerente" : u.role === "VIEWER" ? "VISUALIZADOR" : "ADMIN"}
+                              <span className={`px-2 py-0.5 ${u.role === "DIRECTOR" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400" : u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
+                                {u.role === "MANAGER" ? "Gerente" : u.role === "VIEWER" ? "Visualizador" : u.role === "DIRECTOR" ? "Diretor" : "ADMIN"}
                               </span>
                             </div>
                           </div>
@@ -377,7 +386,7 @@ export default function SettingsPage() {
             )}
 
             {/* TAB: SPACES */}
-            {activeTab === 'spaces' && isAdmin && (
+            {activeTab === 'spaces' && canManageAll && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5">
                   <div className="flex justify-between items-center">
@@ -459,7 +468,7 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Logs</h3>
-                  {isAdmin && (
+                  {canManageAll && (
                     <button onClick={() => handleDelete('logs')} className="flex items-center gap-2 text-red-500 font-black text-[10px] uppercase tracking-widest hover:underline transition-all">
                       <Trash2 size={14}/> Limpar Tudo
                     </button>
@@ -544,7 +553,8 @@ export default function SettingsPage() {
                   <select name="role" defaultValue={selectedUser?.role || 'VIEWER'} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold">
                     <option value="VIEWER">Visualizador</option>
                     <option value="MANAGER">Gerente</option>
-                    {isAdmin && <option value="ADMIN">Administrador</option>}
+                    {(isAdmin || isDirector ) && <option value="ADMIN">Administrador</option>}
+                    {(user.isSystem && !existingDirector) && <option value="DIRECTOR">Diretor</option>}
                   </select>
                 </div>
               )}
