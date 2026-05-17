@@ -27,16 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: "Acesso negado." });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { defaultSort: true }
-    });
-
-    const sortOrder = user?.defaultSort === "name" ? "asc" : "desc";
-
     const logs = await prisma.log.findMany({
       take: 200,
-      orderBy: { createdAt: sortOrder },
+      orderBy: { createdAt: 'asc', },
       include: {
         user: {
           select: {
