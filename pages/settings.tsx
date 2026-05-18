@@ -14,6 +14,7 @@ import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { useToast } from "@/lib/context/ToastContext";
 import ImageUpload from "@/components/imageUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { PatternFormat } from 'react-number-format';
 
 // --- INTERFACES ---
 interface User {
@@ -388,9 +389,9 @@ export default function SettingsPage() {
             {/* TAB: SPACES */}
             {activeTab === 'spaces' && canManageAll && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5">
+                <div className="p-8 md:p-12 border-gray-50 dark:border-white/5">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-xl lg:text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
+                    <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
                     <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
                   </div>
                 </div>
@@ -407,9 +408,12 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
                       {spacesList.map((space) => (
                         <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
+                          <div className="p-2 relative overflow-hidden group flex flex-col justify-between">
                           <div>
+                              <div className="absolute top-0 right-2 p-2 text-blue-500/10 group-hover:scale-125 transition-transform duration-500"><LayoutDashboard size={60} /></div>
                             <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
                             <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
+                            </div>
                           </div>
                           <div className="flex gap-3 mt-6">
                             <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
@@ -602,10 +606,11 @@ export default function SettingsPage() {
               />
               <div className="grid grid-cols-2 gap-4">
                 <input name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
-                <input name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+                <input type="text" name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <input name="phone" placeholder="Telefone" defaultValue={selectedSpace?.phone || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm"
+                />
               </div>
             </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
