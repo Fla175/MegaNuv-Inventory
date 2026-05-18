@@ -3,8 +3,8 @@ import Layout from "../components/Layout";
 import { useState, useEffect, useMemo } from "react";
 import {
   LineChart, Package, DollarSign, Activity, Loader2,
-  Layers, Box, AlertCircle, TrendingUp, PackageOpen, Clock, 
-  ArrowDownAZ, ArrowLeftRight, ChevronLeft, ChevronRight, X, Inbox, Tag
+  Layers, Box, AlertCircle, TrendingUp, PackageOpen, ArrowLeftRight,
+  ChevronLeft, ChevronRight, X, Inbox, Tag
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 
@@ -51,7 +51,6 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useUser();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -60,6 +59,8 @@ export default function DashboardPage() {
   const [creationPage, setCreationPage] = useState(1);
   const [movementPage, setMovementPage] = useState(1);
   const itemsPerPage = 10;
+
+  const { user } = useUser();
 
   useEffect(() => {
     async function fetchStats() {
@@ -76,7 +77,7 @@ export default function DashboardPage() {
           assetsByCategory: mappedCategories,
           recentMovements: data.recentMovements || (data.recentActives ? data.recentActives.slice().reverse() : [])
         });
-    } catch (err) {
+    } catch {
         setError(true);
       } finally {
         setLoading(false);
@@ -84,22 +85,21 @@ export default function DashboardPage() {
     }
     fetchStats();
   }, []);
+  const isDirector = user?.role === "DIRECTOR";
 
   const sortedCreations = useMemo(() => {
     const list = stats?.recentActives || [];
     if (!list.length) return [];
     const copy = [...list];
-    if (user?.defaultSort === 'name') return copy.sort((a, b) => a.name.localeCompare(b.name));
     return copy;
-  }, [stats?.recentActives, user?.defaultSort]);
+  }, [stats?.recentActives]);
 
   const sortedMovements = useMemo(() => {
     const list = stats?.recentMovements || [];
     if (!list.length) return [];
     const copy = [...list];
-    if (user?.defaultSort === 'name') return copy.sort((a, b) => a.name.localeCompare(b.name));
     return copy;
-  }, [stats?.recentMovements, user?.defaultSort]);
+  }, [stats?.recentMovements]);
 
   const paginatedCreations = sortedCreations.slice((creationPage - 1) * itemsPerPage, creationPage * itemsPerPage);
   const paginatedMovements = sortedMovements.slice((movementPage - 1) * itemsPerPage, movementPage * itemsPerPage);
@@ -144,26 +144,22 @@ export default function DashboardPage() {
               <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Visão Geral do Patrimônio</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-zinc-950 rounded-full border border-gray-100 dark:border-white/10">
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Ordenação:</span>
-            <span className={`text-[10px] font-bold ${user?.defaultSort === "newest" ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"} flex items-center gap-1`}>
-              {user?.defaultSort === 'newest' ? <><Clock size={12}/> Recentes</> : <><ArrowDownAZ size={12}/> A-Z</>}
-            </span>
-          </div>
         </div>
 
         {/* CARDS KPI */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 text-teal-500/10 group-hover:scale-125 transition-transform duration-500"><TrendingUp size={80} /></div>
-            <div className="relative z-10">
-                <div className="p-3 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl w-fit mb-6"><DollarSign size={24} /></div>
-                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Patrimônio</p>
-                <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalValue || 0)}
-                </h2>
+          {isDirector === true &&
+            <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-8 text-teal-500/10 group-hover:scale-125 transition-transform duration-500"><TrendingUp size={80} /></div>
+              <div className="relative z-10">
+                  <div className="p-3 bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-2xl w-fit mb-6"><DollarSign size={24} /></div>
+                  <p className="text-gray-400 dark:text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">Patrimônio</p>
+                  <h2 className="text-3xl font-black text-blue-950 dark:text-white tracking-tighter">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalValue || 0)}
+                  </h2>
+              </div>
             </div>
-          </div>
+          }
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group flex flex-col justify-between">
             <div className="absolute top-0 right-0 p-8 text-blue-500/10 group-hover:scale-125 transition-transform duration-500"><PackageOpen size={80} /></div>
             <div className="relative z-10">
@@ -260,7 +256,7 @@ export default function DashboardPage() {
                   <div key={`${ativo.id}-m-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all group">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-amber-500 shadow-sm"><Box size={16}/></div>
-                      <div className="truncate"><h4 className="font-black text-blue-950 dark:text-gray-200 text-xs uppercase truncate">{ativo.name}</h4></div>
+                      <div className="truncate mr-0.5"><h4 className="font-black text-blue-950 dark:text-gray-200 text-xs uppercase truncate">{ativo.name}</h4></div>
                     </div>
                     <span className="text-[9px] font-black px-2 py-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 rounded-lg">{ativo.tag === "IN-USE" ? "Em Uso" : "Em Estoque"}</span>
                   </div>

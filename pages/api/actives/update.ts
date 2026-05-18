@@ -1,5 +1,4 @@
 // pages/api/actives/update.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";

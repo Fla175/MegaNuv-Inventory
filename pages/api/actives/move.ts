@@ -11,7 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Sessão expirada." });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const secret = new TextEncoder().encode(JWT_SECRET!);
     const { payload } = await jose.jwtVerify(token, secret);
     const decoded = payload as { role: string; userId: string; [key: string]: unknown };

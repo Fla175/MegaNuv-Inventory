@@ -50,9 +50,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // 5. Se é primeiro ADMIN, o role deve ser ADMIN
-    // Se já existe ADMIN, o role solicitado deve ser válido
-    const requestedRole = role === "MANAGER" || role === "VIEWER" || role === "ADMIN" ? role : "VIEWER";
+    const requestedRole = ["VIEWER", "MANAGER", "ADMIN", "DIRECTOR"].includes(role) ? role : "VIEWER";
+    if (requestedRole === "DIRECTOR") {
+      const existingDirector = await prisma.user.findFirst({
+        where: { role: "DIRECTOR" },
+      });
+    
+      if (existingDirector) {
+        throw new Error("Já existe um usuário com a role DIRECTOR no sistema.");
+      }
+    }
+
     const userRole = adminCount === 0 ? "ADMIN" : requestedRole;
+    const userSystem = adminCount === 0 ? true : false;
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -61,9 +71,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: name || null, 
         email, 
         password: hashedPassword, 
-        role: userRole 
+        role: userRole,
+        isSystem: userSystem,
       },
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isSystem: true, createdAt: true },
     });
 
     // SISTEMA DE LOGS: Registro de novo cadastro

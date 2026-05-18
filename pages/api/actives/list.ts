@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           select: { children: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { name: 'desc', },
     });
 
     const formatted = actives.map(item => ({

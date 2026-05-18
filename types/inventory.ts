@@ -2,8 +2,8 @@
 
 // --- ENUMS ---
 // Mantidos conforme o Prisma
-export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
-export type Theme = 'DARK' | 'LIGHT' | 'SISTEM';
+export type UserRole = 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
+export type Theme = 'DARK' | 'LIGHT' | 'SYSTEM';
 
 // --- INTERFACES DE MODELO (Refletindo o Prisma) ---
 export interface Category {
@@ -37,7 +37,7 @@ export interface User {
   name?: string | null;
   role: UserRole;
   theme: Theme;
-  defaultSort: string;
+  isSystem: boolean;
   lastLogin?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;

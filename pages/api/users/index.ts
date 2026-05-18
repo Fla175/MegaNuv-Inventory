@@ -25,8 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       res.status(200).json(users);
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error('Unknown error');
+    } catch {
       res.status(500).json({ message: "Erro interno ao buscar usuários." });
     }
     return;

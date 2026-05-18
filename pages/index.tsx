@@ -32,7 +32,7 @@ export default function GestaoAtivosPage() {
         const data = await resActives.json();
         setActives(data);
       }
-    } catch (error) {
+    } catch {
       // Erro silencioso - dados serão recarregados no próximo refresh
     }
   };

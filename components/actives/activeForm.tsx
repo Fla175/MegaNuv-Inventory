@@ -56,7 +56,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             return prev;
           });
         }
-      } catch (err) {
+      } catch {
         // Erro silencioso - categorias são opcionais
       } finally {
         if (isMounted) setLoadingCategories(false);

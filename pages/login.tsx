@@ -12,26 +12,27 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // 🧩 Checa seed e redireciona para registro inicial se necessário
+  // Checa seed e redireciona para registro inicial se necessário
   useEffect(() => {
     const checkSeed = async () => {
       try {
-        // Só faz a requisição se ainda não tivermos verificado
-        const alreadyChecked = sessionStorage.getItem("seedChecked");
-        if (alreadyChecked) return;
-  
         const res = await fetch("/api/auth/seed", { credentials: 'include' });
         if (!res.ok) return;
   
         const data = await res.json();
-        sessionStorage.setItem("seedChecked", "true"); // marca que já foi verificado
-  
-        // redireciona só se necessário
+
         if (data.redirectTo) {
-          window.location.href = data.redirectTo;
+          // Cria URLs absolutas para comparar o caminho (path) de forma segura
+          const currentUrl = new URL(window.location.href);
+          const targetUrl = new URL(data.redirectTo, window.location.origin);
+
+          // SÓ redireciona se a página de destino for DIFERENTE da atual
+          if (currentUrl.pathname !== targetUrl.pathname) {
+            window.location.href = data.redirectTo;
+          }
         }
-      } catch (err) {
-        // Erro silencioso - redirecionamento opcional
+      } catch {
+        // Erro silencioso
       }
     };
   
@@ -60,7 +61,7 @@ export default function Login() {
       } else {
         setMessage(data.message || 'Credenciais inválidas');
       }
-    } catch (err) {
+    } catch {
       setMessage('Erro de rede. Tente novamente.');
     } finally {
       setLoading(false);
