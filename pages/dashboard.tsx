@@ -147,7 +147,7 @@ export default function DashboardPage() {
         </div>
 
         {/* CARDS KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`${(isDirector) ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}`}>
           {isDirector === true &&
             <div className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-8 text-teal-500/10 group-hover:scale-125 transition-transform duration-500"><TrendingUp size={80} /></div>
