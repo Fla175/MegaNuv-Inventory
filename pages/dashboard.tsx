@@ -28,6 +28,8 @@ interface ActiveItem {
   area?: { name: string; color?: string };
   updatedAt?: string;
   createdAt?: string;
+  fromSpaceId?: string;
+  toSpaceId?: string;
 }
 
 interface CategoryInfo {
@@ -254,11 +256,14 @@ export default function DashboardPage() {
               {paginatedMovements.length > 0 ? (
                 paginatedMovements.map((ativo, idx) => (
                   <div key={`${ativo.id}-m-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-amber-500/20 transition-all group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-amber-500 shadow-sm"><Box size={16}/></div>
-                      <div className="truncate mr-0.5"><h4 className="font-black text-blue-950 dark:text-gray-200 text-xs uppercase truncate">{ativo.name}</h4></div>
+                    <div className="flex flex-col items-center">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-amber-500 shadow-sm"><Box size={16}/></div>
+                        <div className="truncate mr-0.5"><h4 className="font-black text-blue-950 dark:text-gray-200 text-xs uppercase truncate">{ativo.name}</h4></div>
+                      </div>
+                      <span className="text-[10px] font-black italic px-2 py-1 text-gray-500 dark:text-gray-400">De: {ativo.fromSpaceId} Para: {ativo.toSpaceId}</span>
                     </div>
-                    <span className="text-[9px] font-black px-2 py-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 rounded-lg">{ativo.tag === "IN-USE" ? "Em Uso" : "Em Estoque"}</span>
+                    <span className={`text-[9px] font-black px-2 py-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-white/10 ${ativo.tag === "IN-STOCK" ? "text-emerald-500 dark:text-emerald-400" : "text-sky-500 dark:text-sky-400"} rounded-lg`}>{ativo.tag === "IN-USE" ? "Em Uso" : "Em Estoque"}</span>
                   </div>
                 ))
               ) : (
@@ -275,7 +280,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ESTRUTURA */}
-          <div className="bg-blue-950 dark:bg-zinc-900 p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col border dark:border-white/5">
+          <div className="bg-blue-950 dark:bg-zinc-900 p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col border dark:border-white/5 h-[27rem]">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-blue-500/20 rounded-2xl border border-blue-400/30"><Layers size={20} className="text-blue-400" /></div>
