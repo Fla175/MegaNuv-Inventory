@@ -74,7 +74,6 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
-  const [existingDirector, setExistingDirector] = useState<boolean>(false);
   
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -92,12 +91,7 @@ export default function SettingsPage() {
   const canManageAll = isDirector || isAdmin;
   const canManageUsers = isDirector || isAdmin || isManager;
   const canSeeLogs = isDirector || isAdmin || isManager;
-
-  useEffect(() => {
-    fetchData<{ exists: boolean }>('/api/users/check-director', (data) => {
-      setExistingDirector(data.exists);
-    });
-  }, []);
+  const existingDirector = usersList.some(u => u.role === 'DIRECTOR');
 
   // Fechar modais com Esc
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
@@ -409,10 +403,10 @@ export default function SettingsPage() {
                       {spacesList.map((space) => (
                         <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
                           <div className="p-2 relative overflow-hidden group flex flex-col justify-between">
-                          <div>
+                            <div>
                               <div className="absolute top-0 right-2 p-2 text-blue-500/10 group-hover:scale-125 transition-transform duration-500"><LayoutDashboard size={60} /></div>
-                            <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
-                            <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
+                              <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
+                              <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
                             </div>
                           </div>
                           <div className="flex gap-3 mt-6">
@@ -605,10 +599,17 @@ export default function SettingsPage() {
                 label="Imagem do Espaço" 
               />
               <div className="grid grid-cols-2 gap-4">
-                <input name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
+                <input type="text" name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
                 <input type="text" name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <PatternFormat
+                  type="tel"
+                  name="phone"
+                  placeholder="Telefone" 
+                  format="(##) #####-####"
+                  mask="_"
+                  defaultValue={selectedSpace?.phone || ''}
                   className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm"
                 />
               </div>
