@@ -59,8 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return acc;
     }, {});
 
-    // 5. Listagens Recentes
-    const recentActives = await prisma.active.findMany({
+    // 5. Listagens Recentes de Ativos Criados
+    const rawRecentActives = await prisma.active.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
       select: { 
@@ -73,7 +73,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Consulta real no histórico de movimentações da nova tabela 'Movement'
+    // Mapeia os ativos recentes convertendo a data para string ISO
+    const recentActives = rawRecentActives.map(ativo => ({
+      ...ativo,
+      createdAt: ativo.createdAt ? ativo.createdAt.toISOString() : undefined
+    }));
+
+    // 6. Consulta real no histórico de movimentações da nova tabela 'Movement'
     const movementsHistory = await prisma.movement.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
@@ -97,7 +103,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name: mov.active?.name,
       tag: mov.active?.tag,
       category: mov.active?.category || null,
-      updatedAt: mov.createdAt // Usamos a data de criação do histórico de movimentação real
+      updatedAt: mov.createdAt ? mov.createdAt.toISOString() : undefined,
+      fromSpaceId: mov.fromSpaceId,
+      toSpaceId: mov.toSpaceId,
     }));
     
     return res.status(200).json({
