@@ -73,18 +73,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    const recentMovements = await prisma.active.findMany({
+    // Consulta real no histórico de movimentações da nova tabela 'Movement'
+    const movementsHistory = await prisma.movement.findMany({
       take: 20,
-      orderBy: { updatedAt: 'desc' },
-      select: { 
-        imageUrl: true, 
-        id: true, 
-        name: true, 
-        tag: true, 
-        category: { select: { name: true, color: true } }, 
-        updatedAt: true 
+      orderBy: { createdAt: 'desc' },
+      include: {
+        active: {
+          select: {
+            imageUrl: true,
+            id: true,
+            name: true,
+            tag: true,
+            category: { select: { name: true, color: true } }
+          }
+        }
       }
     });
+
+    // Mapeia o histórico para manter o mesmo contrato exato esperado pelo Front-end
+    const recentMovements = movementsHistory.map(mov => ({
+      imageUrl: mov.active?.imageUrl || null,
+      id: mov.active?.id,
+      name: mov.active?.name,
+      tag: mov.active?.tag,
+      category: mov.active?.category || null,
+      updatedAt: mov.createdAt // Usamos a data de criação do histórico de movimentação real
+    }));
     
     return res.status(200).json({
       totalValue: totalValue,
