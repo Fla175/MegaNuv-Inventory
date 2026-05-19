@@ -366,10 +366,12 @@ export default function SettingsPage() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex gap-3 mt-6">
-                            <button onClick={() => { setSelectedUser(u); setIsUserModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                          <div className={`${canManageUsers && "flex gap-3 mt-6"}`}>
                             {canManageUsers && (
-                              <button onClick={() => handleDelete('user', u.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
+                              <>
+                                <button onClick={() => { setSelectedUser(u); setIsUserModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
+                                <button onClick={() => handleDelete('user', u.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
+                              </>
                             )}
                           </div>
                         </div>
