@@ -17,6 +17,7 @@ import { useUser } from "@/lib/context/UserContext";
 
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
+
   // Permissão de visualização dos preços individuais dos produtos.
   const { user } = useUser();
   const isViewer = user?.role === 'VIEWER';
@@ -87,6 +88,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories/list');
+        
+        // Se a API de categorias falhar explicitamente por falta de permissão
+        if (!res.ok) {
           toast.showError(`Erro ao carregar categorias (Status: ${res.status}). Verifique as permissões de VIEWER no backend.`);
           return;
         }
@@ -101,6 +105,33 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     }
     fetchCategories();
     return () => { isMounted = false; };
+  }, [toast]);
+
+  // --- DESCOBRIR BLOQUEIO DE DADOS PARA VIEWER ---
+  useEffect(() => {
+    // Se o usuário é um Viewer e os dados cruciais vieram vazios da página pai
+    if (isViewer && fatherSpaces.length === 0 && actives.length === 0) {
+      
+      // Criamos uma função rápida para testar o status real das rotas e jogar no Toast
+      const testBackendPermissions = async () => {
+        try {
+          const [resSpaces, resActives] = await Promise.all([
+            fetch('/api/father-spaces/list'),
+            fetch('/api/actives/list')
+          ]);
+
+          if (!resSpaces.ok || !resActives.ok) {
+            const spaceStatus = resSpaces.status;
+            const activeStatus = resActives.status;
+            
+            toast.showError(
+              `Bloqueio detectado! A Listagem de espaços Pai retornou Status ${spaceStatus} e a Listagem de Ativos retornou Status ${activeStatus}.`
+            );
+          }
+        } catch {
+          toast.showError("Falha crítica de comunicação com o servidor ao tentar validar as permissões.");
+        }
+      };
 
       testBackendPermissions();
     }
@@ -506,12 +537,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </div>
                 
                 <div className={`flex items-center gap-4 text-right pr-2 ${!active.isPhysicalSpace && "mr-8"}`}>
-                    <div className="hidden sm:block">
+                    {!isViewer &&
+                      <div className="hidden sm:block">
                         <p className="text-[9px] font-black text-emerald-500/80 uppercase">Valor</p>
                         <p className="text-xs font-black dark:text-white tracking-tighter">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(active.fixedValue || 0)}
                         </p>
                       </div>
+                    }
                     {active.isPhysicalSpace &&
                       <ChevronRight size={16} className={`text-gray-300 opacity-50 group-hover:opacity-100 group-hover:text-blue-500 group-hover:translate-x-1 transition-all ${isExpanded && "rotate-90"}`} />
                     }
