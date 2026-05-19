@@ -12,11 +12,14 @@ import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { ListSectionFilters, ListSectionProps } from "../lib/types";
+import { ListSectionProps } from "../lib/types";
+import { useUser } from "@/lib/context/UserContext";
 
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
+  // Permissão de visualização dos preços individuais dos produtos.
+  const { user } = useUser();
+  const isViewer = user?.role === 'VIEWER';
   
   // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -75,7 +78,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
   useEscapeKey(exitSelectionMode, isSelectionMode);
 
-  // Toast notifications
+  /// Toast notifications
   const toast = useToast();
 
   // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
@@ -84,17 +87,24 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories/list');
+          toast.showError(`Erro ao carregar categorias (Status: ${res.status}). Verifique as permissões de VIEWER no backend.`);
+          return;
+        }
+
         const data = await res.json();
         if (res.ok && isMounted) {
           setCategories(data);
         }
-      } catch (err) {
-        // Erro silencioso - categorias são opcionais
+      } catch (error) {
+        console.error("Erro na rota de categorias:", error);
       }
     }
     fetchCategories();
     return () => { isMounted = false; };
-  }, []);
+
+      testBackendPermissions();
+    }
+  }, [isViewer, fatherSpaces, actives, toast]);
 
   // --- FECHAMENTO E POSICIONAMENTO DO MENU ---
   useEffect(() => {
@@ -216,7 +226,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         if (isBatch) exitSelectionMode();
         toast.showSuccess(isBatch ? `${selectedItems.size} ativo${selectedItems.size > 1 ? 's' : ''} movido${selectedItems.size > 1 ? 's' : ''} com sucesso.` : 'Ativo movido com sucesso.');
       }
-    } catch (err) {
+    } catch {
       // Erro silencioso
     } finally {
       setIsMovingLoading(false);
@@ -403,7 +413,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       }),
                     });
                     onRefresh();
-                } catch (err) {
+                } catch {
                   // Erro silencioso - fallback para toggle normal
                 }
                 }
