@@ -114,8 +114,7 @@ export default function SettingsPage() {
     if (tab) {
       setActiveTab(tab as TabType);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, tab, user]);
+  }, [activeTab, canManageAll, canManageUsers, canSeeLogs, tab, user]);
 
   // --- HANDLERS ---
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

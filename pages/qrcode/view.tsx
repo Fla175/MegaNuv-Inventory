@@ -1,8 +1,7 @@
 // pages/qrcode/view.tsx
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import Head from "next/head";
 import { useRouter } from "next/router";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import {
   Layers, Loader2, AlertCircle, PackageOpen, CornerDownRight,
@@ -21,7 +20,7 @@ interface AssetItem {
   tag: string;
   fileUrl?: string;
   category?: string;
-  createdBy?: any;
+  createdBy?: Date;
   createdAt?: string;
   isPhysicalSpace?: boolean | number;
 }
@@ -48,7 +47,7 @@ interface ViewData {
     serialNumber?: string;
     tag?: string;
     fileUrl?: string;
-    createdBy?: any;
+    createdBy?: Date;
     createdAt?: string;
   };
   sections: Section[];
@@ -85,10 +84,21 @@ export default function SpacePublicView() {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
-  const getCreatorName = (creator: any): string => {
+  const getCreatorName = (creator: unknown): string => {
     if (!creator) return 'Sistema';
     if (typeof creator === 'string') return creator;
-    if (typeof creator === 'object' && creator.name) return creator.name;
+    
+    // Verifica se é um objeto e se a propriedade 'name' existe nele
+    if (typeof creator === 'object' && 'name' in creator) {
+      // Fazemos uma asserção segura para ler o valor de 'name'
+      const nameValue = (creator as { name: unknown }).name;
+      
+      // Mantém o exato comportamento original: se 'name' for um valor válido (truthy)
+      if (nameValue) {
+        return String(nameValue);
+      }
+    }
+    
     return 'Sistema';
   };
 
@@ -131,8 +141,8 @@ export default function SpacePublicView() {
         </Head>
 
         <div className="h-80 bg-zinc-100 dark:bg-zinc-900 relative rounded-b-[3rem] overflow-hidden shadow-2xl">
-          {active.imageUrl || active.image ? (
-            <img src={active.imageUrl || active.image} className="w-full h-full object-cover" alt="" />
+          {active.imageUrl ? (
+            <Image src={active.imageUrl} className="w-full h-full object-cover" alt="" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-800 bg-zinc-50 dark:bg-zinc-900">
               <PackageOpen size={80} strokeWidth={1} />
@@ -220,7 +230,7 @@ export default function SpacePublicView() {
         <div className="bg-indigo-700 dark:bg-indigo-900 pb-16 pt-12 px-6 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
           {active.imageUrl && (
             <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-30">
-              <img src={active.imageUrl} alt="" className="w-full h-full object-cover" />
+              <Image src={active.imageUrl} alt="" className="w-full h-full object-cover" />
             </div>
           )}
           <div className="relative z-20">
@@ -269,7 +279,7 @@ export default function SpacePublicView() {
                     >
                       <div className="h-16 w-16 rounded-2xl bg-zinc-50 dark:bg-zinc-950 shrink-0 border border-zinc-100 dark:border-white/5 flex items-center justify-center overflow-hidden">
                         {item.image ? (
-                          <img src={item.image} className="w-full h-full object-cover" alt="" />
+                          <Image src={item.image} className="w-full h-full object-cover" alt="" />
                         ) : (
                           <Layers size={24} className="text-zinc-300 dark:text-zinc-700" />
                         )}
@@ -308,7 +318,7 @@ export default function SpacePublicView() {
             </button>
             <div className="h-72 bg-zinc-100 dark:bg-zinc-800 relative">
               {selectedItem.image ? (
-                <img src={selectedItem.image} className="w-full h-full object-cover" alt="" />
+                <Image src={selectedItem.image} className="w-full h-full object-cover" alt="" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-300"><PackageOpen size={80} strokeWidth={1} /></div>
               )}

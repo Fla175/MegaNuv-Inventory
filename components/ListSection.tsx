@@ -1,5 +1,4 @@
 // components/ListSection.tsx
-/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
@@ -14,6 +13,7 @@ import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/co
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
 import { useUser } from "@/lib/context/UserContext";
+import Image from "next/image";
 
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
@@ -641,7 +641,11 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                <div className="flex-1 space-y-6">
                   <div className="w-full h-48 sm:h-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 overflow-hidden flex items-center justify-center relative group">
                     {selectedViewItem.imageUrl ? (
-                      <img src={selectedViewItem.imageUrl} alt={selectedViewItem.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image
+                        src={selectedViewItem.imageUrl}
+                        alt={selectedViewItem.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-300 dark:text-zinc-700">
                         <ImageIcon size={48} className="mb-2 opacity-50" />

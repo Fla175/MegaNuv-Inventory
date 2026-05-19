@@ -32,8 +32,7 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
 
   useEffect(() => {
     if (isSidebarOpen) setIsSidebarOpen(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.asPath]);
+  }, [router.asPath, isSidebarOpen]);
 
   useEscapeKey(() => setIsSidebarOpen(false), isSidebarOpen);
 

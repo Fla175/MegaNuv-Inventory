@@ -50,9 +50,9 @@ export default function FileUpload({ value, onChange, label = "Documento" }: Fil
       
       onChange(data.publicUrl);
       toast.showSuccess('Arquivo enviado com sucesso.');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      toast.showError(err.message || 'Erro ao enviar arquivo.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar arquivo.';
+      toast.showError(errorMessage);
     } finally {
       setLoading(false);
     }
