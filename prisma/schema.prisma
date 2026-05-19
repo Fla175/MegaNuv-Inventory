@@ -23,6 +23,17 @@ model User {
   isSystem       Boolean       @default(false) // Somente o primeiro ADMIN criado terá este campo setado como "true"
 }
 
+model Movement {
+  id       String @id @default(uuid())
+  activeId String
+  active   Active @relation(fields: [activeId], references: [id], onDelete: Cascade)
+
+  fromSpaceId String
+  toSpaceId   String
+
+  createdAt DateTime @default(now())
+}
+
 model Category {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -91,6 +102,7 @@ model Active {
   fatherSpace     FatherSpace @relation(fields: [fatherSpaceId], references: [id])
   parent          Active?     @relation("ActiveHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children        Active[]    @relation("ActiveHierarchy")
+  Movement        Movement[]
 
   @@index([fatherSpaceId])
   @@index([parentId])

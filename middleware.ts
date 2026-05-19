@@ -78,8 +78,7 @@ export async function middleware(req: NextRequest) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || "");
     await jose.jwtVerify(token, secret);
     return NextResponse.next();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
+  } catch {
   if (pathname.startsWith("/api/")) {
     // Em vez de redirect, retornamos um erro JSON puro que o componente consegue ler
     return new NextResponse(

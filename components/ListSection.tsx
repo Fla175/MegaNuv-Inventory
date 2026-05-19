@@ -1,5 +1,4 @@
 // components/ListSection.tsx
-/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
@@ -12,11 +11,16 @@ import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { useToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { ListSectionFilters, ListSectionProps } from "../lib/types";
+import { ListSectionProps } from "../lib/types";
+import { useUser } from "@/lib/context/UserContext";
+import Image from "next/image";
 
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
+
+  // Permissão de visualização dos preços individuais dos produtos.
+  const { user } = useUser();
+  const isViewer = user?.role === 'VIEWER';
   
   // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -75,7 +79,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
   useEscapeKey(exitSelectionMode, isSelectionMode);
 
-  // Toast notifications
+  /// Toast notifications
   const toast = useToast();
 
   // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
@@ -84,17 +88,54 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories/list');
+        
+        // Se a API de categorias falhar explicitamente por falta de permissão
+        if (!res.ok) {
+          toast.showError(`Erro ao carregar categorias (Status: ${res.status}). Verifique as permissões de VIEWER no backend.`);
+          return;
+        }
+
         const data = await res.json();
         if (res.ok && isMounted) {
           setCategories(data);
         }
-      } catch (err) {
-        // Erro silencioso - categorias são opcionais
+      } catch (error) {
+        console.error("Erro na rota de categorias:", error);
       }
     }
     fetchCategories();
     return () => { isMounted = false; };
-  }, []);
+  }, [toast]);
+
+  // --- DESCOBRIR BLOQUEIO DE DADOS PARA VIEWER ---
+  useEffect(() => {
+    // Se o usuário é um Viewer e os dados cruciais vieram vazios da página pai
+    if (isViewer && fatherSpaces.length === 0 && actives.length === 0) {
+      
+      // Criamos uma função rápida para testar o status real das rotas e jogar no Toast
+      const testBackendPermissions = async () => {
+        try {
+          const [resSpaces, resActives] = await Promise.all([
+            fetch('/api/father-spaces/list'),
+            fetch('/api/actives/list')
+          ]);
+
+          if (!resSpaces.ok || !resActives.ok) {
+            const spaceStatus = resSpaces.status;
+            const activeStatus = resActives.status;
+            
+            toast.showError(
+              `Bloqueio detectado! A Listagem de espaços Pai retornou Status ${spaceStatus} e a Listagem de Ativos retornou Status ${activeStatus}.`
+            );
+          }
+        } catch {
+          toast.showError("Falha crítica de comunicação com o servidor ao tentar validar as permissões.");
+        }
+      };
+
+      testBackendPermissions();
+    }
+  }, [isViewer, fatherSpaces, actives, toast]);
 
   // --- FECHAMENTO E POSICIONAMENTO DO MENU ---
   useEffect(() => {
@@ -216,7 +257,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         if (isBatch) exitSelectionMode();
         toast.showSuccess(isBatch ? `${selectedItems.size} ativo${selectedItems.size > 1 ? 's' : ''} movido${selectedItems.size > 1 ? 's' : ''} com sucesso.` : 'Ativo movido com sucesso.');
       }
-    } catch (err) {
+    } catch {
       // Erro silencioso
     } finally {
       setIsMovingLoading(false);
@@ -403,7 +444,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       }),
                     });
                     onRefresh();
-                } catch (err) {
+                } catch {
                   // Erro silencioso - fallback para toggle normal
                 }
                 }
@@ -496,12 +537,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </div>
                 
                 <div className={`flex items-center gap-4 text-right pr-2 ${!active.isPhysicalSpace && "mr-8"}`}>
-                    <div className="hidden sm:block">
+                    {!isViewer &&
+                      <div className="hidden sm:block">
                         <p className="text-[9px] font-black text-emerald-500/80 uppercase">Valor</p>
                         <p className="text-xs font-black dark:text-white tracking-tighter">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(active.fixedValue || 0)}
                         </p>
                       </div>
+                    }
                     {active.isPhysicalSpace &&
                       <ChevronRight size={16} className={`text-gray-300 opacity-50 group-hover:opacity-100 group-hover:text-blue-500 group-hover:translate-x-1 transition-all ${isExpanded && "rotate-90"}`} />
                     }
@@ -598,7 +641,11 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                <div className="flex-1 space-y-6">
                   <div className="w-full h-48 sm:h-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 overflow-hidden flex items-center justify-center relative group">
                     {selectedViewItem.imageUrl ? (
-                      <img src={selectedViewItem.imageUrl} alt={selectedViewItem.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Image
+                        src={selectedViewItem.imageUrl}
+                        alt={selectedViewItem.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-300 dark:text-zinc-700">
                         <ImageIcon size={48} className="mb-2 opacity-50" />

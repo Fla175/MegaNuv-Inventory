@@ -11,7 +11,7 @@ import { useUser } from "@/lib/context/UserContext";
 export default function GestaoAtivosPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit" | "clone">("create");
-  const [selectedActive, setSelectedActive] = useState<any>(null);
+  const [selectedActive, setSelectedActive] = useState<null>(null);
   const [fatherSpaces, setFatherSpaces] = useState([]);
   const [actives, setActives] = useState([]);
   const { refreshUser } = useUser();
@@ -68,8 +68,8 @@ export default function GestaoAtivosPage() {
           fatherSpaces={fatherSpaces}
           filters={filters} 
           onRefresh={loadData}
-          onEdit={(data: any) => handleOpenForm("edit", data)}
-          onClone={(data: any) => handleOpenForm("clone", data)}
+          onEdit={(data) => handleOpenForm("edit", data)}
+          onClone={(data) => handleOpenForm("clone", data)}
         />
       </div>
 

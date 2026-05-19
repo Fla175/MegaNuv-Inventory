@@ -1,9 +1,8 @@
 // components/imageUpload.tsx
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/lib/context/ToastContext';
+import Image from 'next/image';
 
 interface ImageUploadProps {
   value: string | null;
@@ -41,8 +40,9 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
         toast.showError('Erro no servidor. Verifique a conexão e tente novamente.');
         return;
       }
-    } catch (err: any) {
-      toast.showError(err.message || 'Erro ao enviar imagem.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar imagem.';
+      toast.showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,11 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
           </div>
         ) : value ? (
           <>
-            <img src={value} alt="Preview" className="w-full h-full object-cover bg-white/ dark:bg-zinc-800" />
+            <Image
+              src={value}
+              alt="Preview"
+              className="w-full h-full object-cover bg-white/ dark:bg-zinc-800"
+            />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                <button type="button" onClick={(e) => { e.stopPropagation(); onChange(null); }} className="bg-white p-2 rounded-xl text-red-500 shadow-lg"><X size={20}/></button>
             </div>

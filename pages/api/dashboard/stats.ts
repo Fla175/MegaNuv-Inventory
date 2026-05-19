@@ -59,8 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return acc;
     }, {});
 
-    // 5. Listagens Recentes
-    const recentActives = await prisma.active.findMany({
+    // 5. Listagens Recentes de Ativos Criados
+    const rawRecentActives = await prisma.active.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
       select: { 
@@ -73,18 +73,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    const recentMovements = await prisma.active.findMany({
+    // Mapeia os ativos recentes convertendo a data para string ISO
+    const recentActives = rawRecentActives.map(ativo => ({
+      ...ativo,
+      createdAt: ativo.createdAt ? ativo.createdAt.toISOString() : undefined
+    }));
+
+    // 6. Consulta real no histórico de movimentações da nova tabela 'Movement'
+    const movementsHistory = await prisma.movement.findMany({
       take: 20,
-      orderBy: { updatedAt: 'desc' },
-      select: { 
-        imageUrl: true, 
-        id: true, 
-        name: true, 
-        tag: true, 
-        category: { select: { name: true, color: true } }, 
-        updatedAt: true 
+      orderBy: { createdAt: 'desc' },
+      include: {
+        active: {
+          select: {
+            imageUrl: true,
+            id: true,
+            name: true,
+            tag: true,
+            category: { select: { name: true, color: true } }
+          }
+        }
       }
     });
+
+    // Mapeia o histórico para manter o mesmo contrato exato esperado pelo Front-end
+    const recentMovements = movementsHistory.map(mov => ({
+      imageUrl: mov.active?.imageUrl || null,
+      id: mov.active?.id,
+      name: mov.active?.name,
+      tag: mov.active?.tag,
+      category: mov.active?.category || null,
+      updatedAt: mov.createdAt ? mov.createdAt.toISOString() : undefined,
+      fromSpaceId: mov.fromSpaceId,
+      toSpaceId: mov.toSpaceId,
+    }));
     
     return res.status(200).json({
       totalValue: totalValue,
