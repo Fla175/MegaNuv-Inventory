@@ -32,7 +32,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     tag: "IN-STOCK",
     notes: "",
     imageUrl: null as string | null,
-    fileUrl: null as string | null,
+    fileUrl: [] as string[],
     locationId: "", 
     locationType: "" as "space" | "active" | "", 
   });
@@ -348,19 +348,36 @@ const renderChildren = (parentId: string, depth: number) => {
       fatherSpaceId: finalFatherSpaceId,
       parentId: finalParentId
     };
+
     try {
       const isEdit = mode === "edit";
       const url = isEdit ? `/api/actives/update` : `/api/actives/create`;
+      
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error("Erro na operação");
+
+      // 1. Lendo o corpo da resposta JSON enviado pela API
+      const data = await response.json();
+
+      // 2. Se a API retornou um status de erro (400, 409, 500, etc.)
+      if (!response.ok) {
+        const apiError = data.error || "Erro ao processar a operação.";
+        // Se houver detalhes extras (ex: qual SKU duplicou), concatena na mensagem
+        const apiDetails = data.details ? ` (${data.details})` : "";
+        throw new Error(`${apiError}${apiDetails}`);
+      }
+
+      // Se deu certo:
       toast.showSuccess(mode === 'edit' ? 'Item atualizado com sucesso.' : 'Item criado com sucesso.');
       onClose();
-    } catch (error: any) { 
-      toast.showError(error.message || 'Erro ao processar a operação.');
+
+    } catch (error: unknown) { 
+      // 3. Tipagem limpa e segura usando narrowing (afunilamento de tipo)
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao conectar com o servidor.';
+      toast.showError(message);
     }
   };
 
@@ -435,7 +452,7 @@ const renderChildren = (parentId: string, depth: number) => {
               )}
             </div>
 
-{loadingCategories ? (
+            {loadingCategories ? (
                 <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando categorias...</div>
               ) : categories.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">

@@ -12,11 +12,9 @@ interface FileUploadProps {
 
 // Função auxiliar para extrair dados da URL e definir o visual
 const getFileDetails = (url: string) => {
-  // Pega o último segmento da URL (o nome do arquivo) e remove parâmetros
   const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
   const displayName = decodeURIComponent(rawFilename);
   
-  // Extrai a extensão
   const extMatch = displayName.match(/\.([a-zA-Z0-9]+)$/);
   const extension = extMatch ? extMatch[1].toLowerCase() : 'link';
 
@@ -78,50 +76,92 @@ export default function FileUpload({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    // 1. Captura múltiplos arquivos
+    let selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
 
-    if (currentFiles.length >= maxFiles) {
-      toast.showWarning(`Limite de ${maxFiles} arquivos atingido.`);
-      return;
+    // 2. Valida o limite de arquivos
+    const availableSlots = maxFiles - currentFiles.length;
+    if (selectedFiles.length > availableSlots) {
+      toast.showWarning(`Você só pode enviar mais ${availableSlots} arquivo(s). Os extras foram ignorados.`);
+      selectedFiles = selectedFiles.slice(0, availableSlots); // Corta a array para não passar do limite
     }
 
     const allowedTypes = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', 'image/png', 'image/jpeg', 'application/pdf'];
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    const isAllowed = allowedTypes.some(type => 
-      fileExtension === type.toLowerCase() || file.type === type
-    );
+    const validFiles: File[] = [];
 
-    if (!isAllowed) {
-      toast.showWarning("Tipo de arquivo não permitido. Use PDF, DOC, DOCX, PNG, JPG ou JPEG.");
+    // 3. Validações individuais (Tipo e Tamanho)
+    for (const file of selectedFiles) {
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      const isAllowed = allowedTypes.some(type => 
+        fileExtension === type.toLowerCase() || file.type === type
+      );
+
+      if (!isAllowed) {
+        toast.showWarning(`Arquivo "${file.name}" recusado: tipo não permitido.`);
+        continue;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast.showWarning(`Arquivo "${file.name}" recusado: tamanho acima de 5MB.`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-        toast.showWarning("Arquivo muito grande. Máximo 5MB.");
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
+    // 4. Envio em lote (Batch Upload)
     try {
       setLoading(true);
-      const res = await fetch('/api/storage/upload-url', {
-        method: 'POST',
-        body: formData,
+      const newUploadedUrls: string[] = [];
+
+      // Mapeia os arquivos para Promises de upload simultâneas
+      const uploadPromises = validFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/storage/upload-url', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Erro no upload de ${file.name}`);
+        
+        return data.publicUrl as string;
       });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro no upload");
-      
-      onChange([...currentFiles, data.publicUrl]);
-      toast.showSuccess('Arquivo enviado com sucesso.');
+
+      // Executa os uploads simultaneamente e coleta os resultados usando Promise.allSettled 
+      // (Isso evita que todos falhem caso apenas um arquivo dê erro)
+      const results = await Promise.allSettled(uploadPromises);
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          newUploadedUrls.push(result.value);
+        } else {
+          toast.showError(`Erro ao enviar "${validFiles[index].name}": ${result.reason.message}`);
+        }
+      });
+
+      // Atualiza o estado com as URLs que tiveram sucesso
+      if (newUploadedUrls.length > 0) {
+        onChange([...currentFiles, ...newUploadedUrls]);
+        if (newUploadedUrls.length === validFiles.length) {
+          toast.showSuccess(`${newUploadedUrls.length} arquivo(s) enviado(s) com sucesso.`);
+        }
+      }
+
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro ao enviar arquivo.';
+      const errorMessage = err instanceof Error ? err.message : 'Erro crítico ao enviar arquivos.';
       toast.showError(errorMessage);
     } finally {
       setLoading(false);
+      // Limpa o input file para permitir selecionar o mesmo arquivo novamente, se necessário
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -134,7 +174,6 @@ export default function FileUpload({
         {label} ({currentFiles.length}/{maxFiles})
       </label>
       
-      {/* Lista de Arquivos Anexados com Design Visual */}
       {currentFiles.length > 0 && (
         <div className="flex flex-col gap-2 mb-3">
           {currentFiles.map((url, index) => {
@@ -180,7 +219,6 @@ export default function FileUpload({
         </div>
       )}
 
-      {/* Inputs de Adição */}
       {canAddMore && (
         <>
           <div className="flex gap-2 mb-2">
@@ -209,12 +247,19 @@ export default function FileUpload({
             onClick={() => !loading && fileInputRef.current?.click()}
             className="relative w-full h-16 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900 hover:border-indigo-400 transition-all cursor-pointer overflow-hidden flex items-center justify-center gap-2"
           >
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" />
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileSelect} 
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" 
+              className="hidden" 
+              multiple 
+            />
             
             {loading ? (
-              <><Loader2 className="animate-spin text-indigo-600" size={16}/> <span className="text-[10px] font-bold text-indigo-600">Enviando...</span></>
+              <><Loader2 className="animate-spin text-indigo-600" size={16}/> <span className="text-[10px] font-bold text-indigo-600">Enviando arquivos...</span></>
             ) : (
-              <><UploadCloud className="text-gray-400" size={16}/> <span className="text-[10px] pl-2 font-bold text-gray-400 uppercase">Enviar documento</span></>
+              <><UploadCloud className="text-gray-400" size={16}/> <span className="text-[10px] pl-2 font-bold text-gray-400 uppercase">Enviar documento(s)</span></>
             )}
           </div>
         </>

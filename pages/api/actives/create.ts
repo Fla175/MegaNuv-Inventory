@@ -1,6 +1,7 @@
 // pages/api/actives/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import db from "@/lib/prisma"; 
+import db from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import * as jose from "jose";
 import { randomBytes } from "crypto";
 import { createLog } from "@/lib/logger";
@@ -16,29 +17,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const secret = new TextEncoder().encode(JWT_SECRET!);
     const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as { role: string; userId: string; [key: string]: unknown };
-    const userId = String(decoded.id || decoded.userId);
+    const decoded = payload as { role: string; id?: string; userId?: string; sub?: string; [key: string]: unknown };
+    
+    const userId = decoded.id || decoded.userId || decoded.sub;
 
-    // VIEWER não pode criar ativos
+    if (!userId || userId === "undefined") {
+      return res.status(401).json({ error: "Usuário não identificado no token de autenticação." });
+    }
+
     if (decoded.role === "VIEWER") {
       return res.status(403).json({ error: "Visualizadores não podem criar ativos." });
     }
 
     const data = req.body;
+    const isPhysicalSpace = !!data.isPhysicalSpace;
     
-    // Validação de integridade do Schema
-    if (!data.name || !data.categoryId || !data.fatherSpaceId) {
-      return res.status(400).json({ error: "Nome, Categoria e Espaço Pai são obrigatórios." });
+    // CORREÇÃO: Categoria só é obrigatória se NÃO for um espaço físico
+    if (!data.name || !data.fatherSpaceId || (!isPhysicalSpace && !data.categoryId)) {
+      return res.status(400).json({ error: "Campos obrigatórios ausentes (Nome, Espaço Pai ou Categoria)." });
     }
 
     const quantity = Math.max(1, parseInt(data.quantity) || 1);
     const createdActives = [];
 
+    let normalizedFileUrl = data.fileUrl;
+    if (Array.isArray(data.fileUrl)) {
+      normalizedFileUrl = data.fileUrl.length > 0 ? data.fileUrl.join(",") : null;
+    }
+
     for (let i = 0; i < quantity; i++) {
       let finalId = "";
       let isUnique = false;
       
-      // Garantia de ID manual único (4 hex chars)
       while (!isUnique) {
         finalId = randomBytes(2).toString('hex').toLowerCase();
         const exists = await db.active.findUnique({ where: { id: finalId } });
@@ -51,34 +61,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           id: finalId,
           name: data.name.trim(),
-          categoryId: data.categoryId,
+          // Se for espaço físico ou string vazia, salva estritamente como NULL no banco
+          categoryId: isPhysicalSpace || !data.categoryId ? null : data.categoryId,
           sku: data.sku || null,
           tag: data.tag || "IN-STOCK",
           manufacturer: data.manufacturer || null,
           model: data.model || null,
-          serialNumber: serialNumber,
+          serialNumber: serialNumber || null,
           fixedValue: parseFloat(data.fixedValue) || 0,
           notes: data.notes || null,
           imageUrl: data.imageUrl || null,
-          fileUrl: data.fileUrl || null,
-          fatherSpaceId: data.fatherSpaceId, // Obrigatório
-          parentId: data.parentId || null,   // Opcional (Hierarquia)
-          isPhysicalSpace: !!data.isPhysicalSpace,
-          createdById: userId,
+          fileUrl: normalizedFileUrl || null, 
+          fatherSpaceId: data.fatherSpaceId, 
+          parentId: data.parentId || null,   
+          isPhysicalSpace: isPhysicalSpace,
+          createdById: String(userId),
         },
       });
       createdActives.push(newActive);
     }
 
-    await createLog(
-      req,
-      userId,
-      "CRIAÇÃO DE ATIVO",
-      `Criou ${quantity} ativo(s): ${data.name}`
-    );
-
+    await createLog(req, String(userId), "CRIAÇÃO DE ATIVO", `Criou ${quantity} ativo(s): ${data.name}`);
     return res.status(201).json(createdActives);
-  } catch {
-    return res.status(500).json({ error: "Erro interno ao criar ativo." });
+
+  } catch (error: unknown) {
+    console.error("❌ Erro na criação de ativo:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return res.status(409).json({ 
+          error: "Dados duplicados!", 
+          details: `Já existe um ativo usando o mesmo SKU ou Número de Série (${error.meta?.target || 'campo único'}).` 
+        });
+      }
+      if (error.code === "P2003") {
+        return res.status(400).json({ 
+          error: "Falha de vínculo (Chave Estrangeira)!", 
+          details: "O Espaço Pai ou a Categoria informada não existem ou foram removidos." 
+        });
+      }
+    };
+
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido no banco de dados.";
+
+    return res.status(500).json({ 
+      error: "Erro interno no servidor ao salvar ativo.", 
+      details: errorMessage
+    });
   }
 }
