@@ -644,6 +644,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       <Image
                         src={selectedViewItem.imageUrl}
                         alt={selectedViewItem.name}
+                        fill
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (

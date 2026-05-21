@@ -142,7 +142,7 @@ export default function SpacePublicView() {
 
         <div className="h-80 bg-zinc-100 dark:bg-zinc-900 relative rounded-b-[3rem] overflow-hidden shadow-2xl">
           {active.imageUrl ? (
-            <Image src={active.imageUrl} className="w-full h-full object-cover" alt="" />
+            <Image src={active.imageUrl} fill className="w-full h-full object-cover" alt="" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-800 bg-zinc-50 dark:bg-zinc-900">
               <PackageOpen size={80} strokeWidth={1} />
@@ -230,7 +230,7 @@ export default function SpacePublicView() {
         <div className="bg-indigo-700 dark:bg-indigo-900 pb-16 pt-12 px-6 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
           {active.imageUrl && (
             <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-30">
-              <Image src={active.imageUrl} alt="" className="w-full h-full object-cover" />
+              <Image src={active.imageUrl} fill alt="" className="w-full h-full object-cover" />
             </div>
           )}
           <div className="relative z-20">
@@ -279,7 +279,7 @@ export default function SpacePublicView() {
                     >
                       <div className="h-16 w-16 rounded-2xl bg-zinc-50 dark:bg-zinc-950 shrink-0 border border-zinc-100 dark:border-white/5 flex items-center justify-center overflow-hidden">
                         {item.image ? (
-                          <Image src={item.image} className="w-full h-full object-cover" alt="" />
+                          <Image src={item.image} fill className="w-full h-full object-cover" alt="" />
                         ) : (
                           <Layers size={24} className="text-zinc-300 dark:text-zinc-700" />
                         )}
@@ -318,7 +318,7 @@ export default function SpacePublicView() {
             </button>
             <div className="h-72 bg-zinc-100 dark:bg-zinc-800 relative">
               {selectedItem.image ? (
-                <Image src={selectedItem.image} className="w-full h-full object-cover" alt="" />
+                <Image src={selectedItem.image} fill className="w-full h-full object-cover" alt="" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-300"><PackageOpen size={80} strokeWidth={1} /></div>
               )}
