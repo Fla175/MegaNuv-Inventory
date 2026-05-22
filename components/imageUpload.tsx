@@ -48,6 +48,22 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (value) {
+      try {
+        await fetch('/api/storage/delete-url', { // Crie esta rota no seu backend
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: value }),
+        });
+      } catch (err) {
+        console.error("Erro ao remover a imagem do servidor", err);
+      }
+    }
+    onChange(null);
+  };
+
   return (
     <div className="mb-6">
       <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block">{label}</label>
@@ -72,7 +88,7 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
               className="w-full h-full object-cover bg-white/ dark:bg-zinc-800"
             />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-               <button type="button" onClick={(e) => { e.stopPropagation(); onChange(null); }} className="bg-white p-2 rounded-xl text-red-500 shadow-lg"><X size={20}/></button>
+               <button type="button" onClick={handleDelete} className="bg-white p-2 rounded-xl text-red-500 shadow-lg"><X size={20}/></button>
             </div>
           </>
         ) : (

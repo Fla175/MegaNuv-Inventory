@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'http',
-        hostname: '10.20.31.142',
+        hostname: '10.20.31.142' || 'inventory.meganuv.com',
         port: '9000',
         pathname: '/**',
       },
