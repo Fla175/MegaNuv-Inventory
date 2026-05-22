@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";
 import { createLog } from "@/lib/logger";
+import { deleteFileFromMinio } from "@/lib/minio";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -25,16 +26,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id } = req.query;
     if (!id || typeof id !== "string") return res.status(400).json({ error: "ID inválido." });
 
-    // Busca o nome para o log antes de apagar
     const space = await db.fatherSpace.findUnique({ where: { id } });
     if (!space) return res.status(404).json({ error: "Espaço não encontrado." });
 
-    // Deleção em cascata: remove todos os ativos pertencentes a este espaço pai
+    const activesToDelete = await db.active.findMany({
+      where: { fatherSpaceId: id },
+      select: { imageUrl: true } 
+    });
+
+    for (const active of activesToDelete) {
+      if (active.imageUrl) {
+        await deleteFileFromMinio(active.imageUrl);
+      }
+    }
+
+    if ((space).imageUrl) { 
+      await deleteFileFromMinio((space).imageUrl);
+    }
+
     await db.active.deleteMany({
       where: { fatherSpaceId: id }
     });
 
-    // Remove também todos os espaços físicos (ativos com isPhysicalSpace) deste espaço pai
     await db.active.deleteMany({
       where: {
         isPhysicalSpace: true,

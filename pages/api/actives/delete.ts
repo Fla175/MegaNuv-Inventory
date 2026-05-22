@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";
 import { createLog } from "@/lib/logger";
+import { deleteFileFromMinio } from "@/lib/minio";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -37,10 +38,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const actives = await db.active.findMany({ 
       where: { id: { in: ids } },
-      select: { id: true, name: true }
+      select: { id: true, name: true, imageUrl: true }
     });
     
     if (actives.length === 0) return res.status(404).json({ error: "Ativo(s) não encontrado(s)." });
+
+    for (const active of actives) {
+      if (active.imageUrl) {
+        await deleteFileFromMinio(active.imageUrl);
+      }
+    }
 
     await db.active.deleteMany({ where: { id: { in: ids } } });
 

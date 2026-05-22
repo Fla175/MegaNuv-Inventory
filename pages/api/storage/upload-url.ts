@@ -7,7 +7,7 @@ import fs from 'fs';
 export const config = { api: { bodyParser: false } };
 
 const minioClient = new Minio.Client({
-  endPoint: '10.20.31.142',
+  endPoint: '10.20.31.142' || 'inventory.meganuv.com',
   port: 9000,
   useSSL: false,
   accessKey: 'minio',
