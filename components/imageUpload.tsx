@@ -67,6 +67,7 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
           <>
             <Image
               src={value}
+              fill
               alt="Preview"
               className="w-full h-full object-cover bg-white/ dark:bg-zinc-800"
             />

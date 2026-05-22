@@ -4,7 +4,8 @@ import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
-  MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, Image as ImageIcon, Boxes
+  MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, LinkIcon, Image as ImageIcon, Boxes,
+  FileText, FileIcon, Tag
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
@@ -14,6 +15,36 @@ import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
 import { useUser } from "@/lib/context/UserContext";
 import Image from "next/image";
+
+const getFileDetails = (url: string) => {
+  // Pega o último segmento da URL (o nome do arquivo) e remove parâmetros
+  const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
+  const displayName = decodeURIComponent(rawFilename);
+  
+  // Extrai a extensão
+  const extMatch = displayName.match(/\.([a-zA-Z0-9]+)$/);
+  const extension = extMatch ? extMatch[1].toLowerCase() : 'link';
+
+  let Icon = LinkIcon;
+  let colorClass = 'text-gray-500';
+  let bgClass = 'bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700';
+
+  if (extension === 'pdf') {
+    Icon = FileText;
+    colorClass = 'text-red-500';
+    bgClass = 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50';
+  } else if (['doc', 'docx'].includes(extension)) {
+    Icon = FileIcon;
+    colorClass = 'text-blue-500';
+    bgClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50';
+  } else if (['png', 'jpg', 'jpeg'].includes(extension)) {
+    Icon = ImageIcon;
+    colorClass = 'text-emerald-500';
+    bgClass = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50';
+  }
+
+  return { displayName, extension, Icon, colorClass, bgClass };
+};
 
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
@@ -237,7 +268,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const handleMoveAction = async (targetSpaceId: string, targetParentId?: string) => {
     if (!movingItem) return;
     setIsMovingLoading(true);
-
+  
     try {
       const isBatch = movingItem.isBatch;
       const payload = isBatch 
@@ -249,16 +280,19 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
+  
       if (res.ok) {
         onRefresh();
         setMovingItem(null);
         if (selectedViewItem) setSelectedViewItem(null);
         if (isBatch) exitSelectionMode();
-        toast.showSuccess(isBatch ? `${selectedItems.size} ativo${selectedItems.size > 1 ? 's' : ''} movido${selectedItems.size > 1 ? 's' : ''} com sucesso.` : 'Ativo movido com sucesso.');
+        toast.showSuccess(isBatch ? `${selectedItems.size} ativo(s) movido(s) com sucesso.` : 'Ativo movido com sucesso.');
+      } else {
+        const errData = await res.json();
+        toast.showError(errData.error || 'Erro ao mover o ativo.');
       }
     } catch {
-      // Erro silencioso
+      toast.showError('Não foi possível conectar ao servidor para mover o ativo.');
     } finally {
       setIsMovingLoading(false);
     }
@@ -291,12 +325,18 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: [item.id] })
           });
+          
           if (res.ok) { 
             onRefresh(); 
             if (selectedViewItem) setSelectedViewItem(null);
             toast.showSuccess('Item excluído com sucesso.');
+          } else {
+            const errData = await res.json();
+            toast.showError(errData.error || 'Erro ao excluir o item.');
           }
-        } catch { toast.showError('Erro ao excluir o item.'); }
+        } catch { 
+          toast.showError('Erro de conexão ao tentar excluir o item.'); 
+        }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -316,12 +356,18 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: Array.from(selectedItems) })
           });
+          
           if (res.ok) { 
             onRefresh(); 
             exitSelectionMode();
             toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
+          } else {
+            const errData = await res.json();
+            toast.showError(errData.error || 'Erro ao excluir os itens em lote.');
           }
-        } catch { toast.showError('Erro ao excluir os itens.'); }
+        } catch { 
+          toast.showError('Erro de conexão ao tentar excluir os itens.'); 
+        }
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
@@ -637,13 +683,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             
             {/* Conteúdo Rolável */}
             <div className="p-6 flex-1 overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-6">
-               
-               <div className="flex-1 space-y-6">
+              
+              <div className="flex-1 space-y-6">
                   <div className="w-full h-48 sm:h-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 overflow-hidden flex items-center justify-center relative group">
                     {selectedViewItem.imageUrl ? (
                       <Image
                         src={selectedViewItem.imageUrl}
                         alt={selectedViewItem.name}
+                        fill
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
@@ -655,10 +702,11 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <InfoItem icon={<Barcode size={16}/>} label="SKU" Class="truncate" value={selectedViewItem.sku || "N/A"} />
-                    <InfoItem icon={<Hash size={16}/>} label="Nº Série" Class="truncate" value={selectedViewItem.serialNumber || "N/A"} />
-                    <InfoItem icon={<MapPin size={16}/>} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
-                    <InfoItem icon={<Barcode size={16}/>} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
+                    <InfoItem icon={<Barcode size={16} />} label="SKU" Class="font-mono truncate" value={selectedViewItem.sku || "N/A"} />
+                    <InfoItem icon={<Hash size={16} />} label="Nº Série" Class="font-mono truncate" value={selectedViewItem.serialNumber || "N/A"} />
+                    <InfoItem icon={<MapPin size={16} />} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
+                    <InfoItem icon={<Barcode size={16} />} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
+                    <InfoItem icon={<Tag size={16} />} label="Categoria" Class="truncate" value={selectedViewItem.categoryId} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
                         <InfoItem icon={<Boxes size={16}/>} label="Ativos" Class="truncate" value={`${selectedViewItem.childCount || 0}`} />
@@ -666,10 +714,55 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       </>
                     )}
                   </div>
-               </div>
 
-               <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
-                 <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 h-full">
+                  {/* --- SEÇÃO DE ARQUIVOS ANEXADOS (NOVO) --- */}
+                  <div className="pt-4 border-t dark:border-white/5">
+                    <h4 className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
+                      Documentos e Anexos
+                    </h4>
+                    
+                    {selectedViewItem.fileUrl && (Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl.length > 0 : true) ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {(Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl : [selectedViewItem.fileUrl]).map((url: string, index: number) => {
+                          const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
+                          
+                          return (
+                            <a 
+                              key={index}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
+                            >
+                              <div className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
+                                <Icon size={18} />
+                              </div>
+                              
+                              <div className="flex flex-col flex-1 overflow-hidden">
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline" title={displayName}>
+                                  {displayName}
+                                </span>
+                                {extension !== 'link' && (
+                                  <span className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}>
+                                    .{extension}
+                                  </span>
+                                )}
+                              </div>
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic pl-1">
+                        Nenhum documento anexado a este ativo.
+                      </p>
+                    )}
+                  </div>
+                  {/* --- FIM DA SEÇÃO DE ARQUIVOS --- */}
+              </div>
+
+              <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
+                <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 h-full">
                     <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
                       <QRCode value={`${window.location.origin}/qrcode/view?id=${selectedViewItem.id}`} size={160} />
                     </div>
@@ -684,8 +777,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     >
                       <Printer size={14}/> Imprimir Etiqueta
                     </button>
-                 </div>
-               </div>
+                </div>
+              </div>
             </div>
 
             <div className="p-4 border-t dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center gap-2 overflow-x-auto custom-scrollbar">
