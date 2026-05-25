@@ -97,6 +97,13 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     setSelectedItems(new Set());
     setSelectedViewItem(null);
   };
+
+  const getCategory = (categoryId: string, categoriesList: any[]) => {
+    
+    const foundCategory = categoriesList.find(cat => cat.id === categoryId);
+    
+    return foundCategory ? foundCategory.name : "Categoria não encontrada";
+  };
   
   // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);

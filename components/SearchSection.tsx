@@ -68,7 +68,7 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           >
             <option value="">Todas as Categorias</option>
             {categories.map(cat => (
-              <option key={cat.id} value={cat.name}>{cat.name}</option>
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
