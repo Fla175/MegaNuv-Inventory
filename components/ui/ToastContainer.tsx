@@ -1,10 +1,10 @@
 // components/ui/ToastContainer.tsx
 import React from 'react';
-import { useToast } from '@/lib/context/ToastContext';
+import { UseToast } from '@/lib/context/ToastContext';
 import Toast from './Toast';
 
 export default function ToastContainer() {
-  const { toasts, removeToast } = useToast();
+  const { toasts, removeToast } = UseToast();
 
   if (toasts.length === 0) return null;
 

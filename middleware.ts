@@ -1,6 +1,7 @@
 // middleware.ts
 import { NextResponse, NextRequest } from "next/server";
 import * as jose from "jose";
+// import { UseToast } from "./lib/context/ToastContext";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -22,6 +23,7 @@ function isPublicPath(pathname: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // const toast = UseToast();
 
   if (pathname === '/api/storage/upload-url') {
     return NextResponse.next();
@@ -52,7 +54,7 @@ export async function middleware(req: NextRequest) {
   //       }
   //     }
   //   } catch (e) {
-  //     console.error("Erro no check de setup:", e);
+  //     toast.showError(`Erro no check de setup: ${e}`);
   //   }
   // }
 

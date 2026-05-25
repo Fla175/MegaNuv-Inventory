@@ -1,7 +1,7 @@
 // components/imageUpload.tsx
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
-import { useToast } from '@/lib/context/ToastContext';
+import { UseToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
 import { deleteFileFromMinio } from '@/lib/minio';
 import db from '@/lib/prisma';
@@ -15,7 +15,7 @@ interface ImageUploadProps {
 export default function ImageUpload({ value, onChange, label = "Imagem" }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toast = useToast();
+  const toast = UseToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

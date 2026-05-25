@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
-import { useToast } from "@/lib/context/ToastContext";
+import { UseToast } from "@/lib/context/ToastContext";
 import ImageUpload from "@/components/imageUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PatternFormat } from 'react-number-format';
@@ -59,7 +59,7 @@ export default function SettingsPage() {
   const { tab } = router.query;
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
-  const toast = useToast();
+  const toast = UseToast();
   const [saving, setSaving] = useState(false);
 
   // Estados de Listagem

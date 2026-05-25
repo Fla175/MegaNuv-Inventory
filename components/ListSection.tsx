@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
-import { useToast } from "../lib/context/ToastContext";
+import { UseToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
@@ -111,7 +111,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   useEscapeKey(exitSelectionMode, isSelectionMode);
 
   /// Toast notifications
-  const toast = useToast();
+  const toast = UseToast();
 
   // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
   useEffect(() => {
@@ -122,7 +122,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         
         // Se a API de categorias falhar explicitamente por falta de permissão
         if (!res.ok) {
-          toast.showError(`Erro ao carregar categorias (Status: ${res.status}). Verifique as permissões de VIEWER no backend.`);
+          toast.showError(`Erro ao carregar categorias (Status: ${res.status}).`);
           return;
         }
 
@@ -131,7 +131,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           setCategories(data);
         }
       } catch (error) {
-        console.error("Erro na rota de categorias:", error);
+        toast.showError(`Erro na rota de listagem de categorias: ${error}.`);
       }
     }
     fetchCategories();

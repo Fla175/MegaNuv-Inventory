@@ -5,7 +5,7 @@ import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Sear
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
-import { useToast } from "@/lib/context/ToastContext";
+import { UseToast } from "@/lib/context/ToastContext";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
@@ -13,7 +13,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const toast = useToast();
+  const toast = UseToast();
   const [savingCategory, setSavingCategory] = useState(false);
   
   useEscapeKey(onClose);
