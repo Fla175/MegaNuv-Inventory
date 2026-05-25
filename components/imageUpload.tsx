@@ -3,6 +3,8 @@ import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
+import { deleteFileFromMinio } from '@/lib/minio';
+import db from '@/lib/prisma';
 
 interface ImageUploadProps {
   value: string | null;
@@ -52,13 +54,14 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     e.stopPropagation();
     if (value) {
       try {
-        await fetch('/api/storage/delete-url', { // Crie esta rota no seu backend
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: value }),
+        const active = await db.active.findUnique({
+          where: { id: String() }
         });
+        if (active) {
+          await deleteFileFromMinio(active?.imageUrl);
+        }
       } catch (err) {
-        console.error("Erro ao remover a imagem do servidor", err);
+        toast.showError(`Erro ao remover a imagem do servidor: ${err}`);
       }
     }
     onChange(null);
