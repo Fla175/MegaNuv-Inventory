@@ -3,8 +3,6 @@ import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
-import { deleteFileFromMinio } from '@/lib/minio';
-import db from '@/lib/prisma';
 
 interface ImageUploadProps {
   value: string | null;
@@ -54,14 +52,20 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     e.stopPropagation();
     if (value) {
       try {
-        const active = await db.active.findUnique({
-          where: { id: String() }
+        // Envia uma requisição DELETE com a URL que está guardada no estado 'value'
+        const res = await fetch('/api/storage/delete-file', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: value }),
         });
-        if (active) {
-          await deleteFileFromMinio(active?.imageUrl);
-        }
+  
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erro ao remover imagem");
+        
+        toast.showSuccess('Imagem removida com sucesso do servidor.');
       } catch (err) {
-        toast.showError(`Erro ao remover a imagem do servidor: ${err}`);
+        const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido.';
+        toast.showError(`Erro ao remover a imagem do servidor: ${errorMessage}`);
       }
     }
     onChange(null);

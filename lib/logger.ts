@@ -4,7 +4,6 @@ import { NextApiRequest } from "next";
 import { UseToast } from "./context/ToastContext";
 
 /**
- * Registra uma ação no banco de dados para auditoria.
  * @param req - Objeto da requisição para extrair IP e UserAgent
  * @param userId - ID do usuário autenticado (viesse do JWT)
  * @param action - Nome da ação (ex: "CREATE_AREA", "UPDATE_ACTIVE")
