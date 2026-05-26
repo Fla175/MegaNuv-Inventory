@@ -3,7 +3,7 @@ import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import { 
-  Moon, Sun, Monitor, Shield, Loader2, Trash2, 
+  Moon, Sun, Monitor, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
   Plus, LayoutDashboard, ChevronRight, 
   CalendarFold, KeyRound, CirclePlus,
@@ -15,6 +15,7 @@ import { UseToast } from "@/lib/context/ToastContext";
 import ImageUpload from "@/components/imageUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PatternFormat } from 'react-number-format';
+import CustomSelect from "@/components/customSelect";
 
 // --- INTERFACES ---
 interface User {
@@ -74,6 +75,15 @@ export default function SettingsPage() {
   const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
+  const [role, setRole] = useState(selectedUser?.role || '');
+
+  useEffect(() => {
+    if (selectedUser) {
+      setRole(selectedUser.role);
+    } else {
+      setRole('');
+    }
+  }, [selectedUser]);
   
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -92,6 +102,13 @@ export default function SettingsPage() {
   const canManageUsers = isDirector || isAdmin || isManager;
   const canSeeLogs = isDirector || isAdmin || isManager;
   const existingDirector = usersList.some(u => u.role === 'DIRECTOR');
+
+  const roleOptions = [
+    {value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500"},
+    {value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500"},
+    {value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500"},
+    ...(user?.isSystem && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
+  ];
 
   // Fechar modais com Esc
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
@@ -567,13 +584,15 @@ export default function SettingsPage() {
               </div>
               {selectedUser?.id !== user.id && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><Shield size={10}/> Nível de Permissão</label>
-                  <select name="role" defaultValue={selectedUser?.role || 'VIEWER'} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold">
-                    <option value="VIEWER">Visualizador</option>
-                    <option value="MANAGER">Gerente</option>
-                    {(isAdmin || isDirector ) && <option value="ADMIN">Administrador</option>}
-                    {(user.isSystem && !existingDirector) && <option value="DIRECTOR">Diretor</option>}
-                  </select>
+                  <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">
+                     Nível de Permissão
+                  </label>
+                  <input type="hidden" name="role" value={role} />
+                  <CustomSelect
+                    options={roleOptions}
+                    value={role}
+                    onChange={(val) => setRole(val as "DIRECTOR" | "ADMIN" | "MANAGER" | "VIEWER")}
+                  />
                 </div>
               )}
             </div>

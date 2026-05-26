@@ -6,15 +6,20 @@ import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { UseToast } from "@/lib/context/ToastContext";
+import CustomSelect from "../customSelect";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const toast = UseToast();
   const [savingCategory, setSavingCategory] = useState(false);
+
+  const statusOptions = [
+    { value: "IN-STOCK", label: "Em Estoque", indicatorColor: "bg-emerald-500" },
+    { value: "IN-USE", label: "Em Uso", indicatorColor: "bg-amber-500" },
+  ];
   
   useEscapeKey(onClose);
   
@@ -36,8 +41,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     locationId: "", 
     locationType: "" as "space" | "active" | "", 
   });
-
-  const tags = ["IN-STOCK", "IN-USE"];
 
   // Busca as Categorias do Banco (Corrigida a dependência para não causar loop)
   useEffect(() => {
@@ -496,28 +499,11 @@ const renderChildren = (parentId: string, depth: number) => {
 
             <div className="relative">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Status Atual</label>
-              <button type="button" onClick={() => setIsStatusOpen(!isStatusOpen)} className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm h-[52px] dark:text-white border-2 border-transparent focus:border-blue-600/30 flex items-center justify-between transition-all">
-                <span className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${formData.tag === 'IN-STOCK' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  {formData.tag === "IN-STOCK" ? "Em Estoque" : "Em Uso"}
-                </span>
-                <ChevronDown className={`shrink-0 transition-transform duration-300 ${isStatusOpen ? 'rotate-180' : ''}`} size={16} />
-              </button>
-              {isStatusOpen && (
-                <>
-                  <div className="absolute z-[600] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                    <div className="p-1">
-                      {tags.map((tag) => (
-                        <button key={tag} type="button" onClick={() => { setFormData(prev => ({ ...prev, tag: tag })); setIsStatusOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 mb-1 last:mb-0 ${formData.tag === tag ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400" : "hover:bg-gray-50 dark:hover:bg-white/5 dark:text-zinc-200"}`}>
-                          <div className={`w-2 h-2 rounded-full ${tag === 'IN-STOCK' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                          <span className="text-sm font-bold">{tag === "IN-STOCK" ? "Em Estoque" : "Em Uso"}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="fixed inset-0 z-[590]" onClick={() => setIsStatusOpen(false)} />
-                </>
-              )}
+              <CustomSelect
+                options={statusOptions}
+                value={formData.tag}
+                onChange={(newValue) => setFormData(prev => ({ ...prev, tag: newValue }))}
+              />
             </div>
           </div>
 

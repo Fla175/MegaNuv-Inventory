@@ -1,6 +1,8 @@
 // components/SearchSection.tsx
-import React, { useState, useEffect } from "react";
-import { Search, Factory, Cpu, LayoutGrid, ChevronDown, Trash } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Search, Factory, Cpu, Trash } from "lucide-react";
+import CustomSelect from "./customSelect";
+import { UseToast } from "@/lib/context/ToastContext";
 
 interface Category {
   id: string;
@@ -24,6 +26,7 @@ interface SearchSectionProps {
 
 export default function SearchSection({ filters, setFilters }: SearchSectionProps) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const toast = UseToast();
   
   useEffect(() => {
     async function fetchCategories() {
@@ -34,20 +37,27 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           setCategories(data);
         }
       } catch {
-        // Erro silencioso - categorias são opcionais
+        toast.showError("Erro na listagem de categorias.");
       }
     }
     fetchCategories();
-  }, []);
+  }, [toast]);
   
   const handleInputChange = (field: keyof SearchFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
+  const categoriesOptions = useMemo(() => {
+    return categories.map((cat) => ({
+      value: cat.id,
+      label: cat.name,
+      indicatorColor: cat.color, 
+    }));
+  }, [categories]);
+
   return (
     <div className="w-full bg-white dark:bg-zinc-900 p-5 sm:p-7 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
-      
-      {/* Linha Principal: Busca Global e Categoria */}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3 relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={18} />
@@ -60,22 +70,15 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
         </div>
 
         <div className="relative">
-          <LayoutGrid className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <select 
-            className="w-full bg-gray-50 dark:bg-zinc-950 p-4 pl-12 rounded-2xl outline-none font-bold text-sm appearance-none dark:text-white cursor-pointer border-2 border-transparent focus:border-blue-600/20"
-            value={filters.category}
-            onChange={(e) => handleInputChange("category", e.target.value)}
-          >
-            <option value="">Todas as Categorias</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+          <CustomSelect 
+            options={categoriesOptions} 
+            value={filters.category} 
+            onChange={(val) => handleInputChange("category", val)} 
+            placeholder="Todas as Categorias" 
+          />
         </div>
       </div>
 
-      {/* Fabricante e Modelo */}
       <div className="grid grid-cols-2 gap-4">
         <div className="relative group">
           <Factory className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={18} />
@@ -98,7 +101,6 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
         </div>
       </div>
 
-      {/* Indicador de Filtros Ativos (Opcional - Visual) */}
       {(filters.query || filters.category || filters.manufacturer || filters.model) && (
         <div className="flex items-center gap-2 pt-2">
           <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 dark:bg-blue-600/10 px-3 py-1 rounded-full">
