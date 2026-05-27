@@ -8,7 +8,7 @@ import db from '@/lib/prisma';
 export const config = { api: { bodyParser: false } };
 
 const minioClient = new Minio.Client({
-  endPoint: '10.20.31.142' || 'inventory.meganuv.com',
+  endPoint: process.env.MINIO_ENDPOINT || '10.20.31.142',
   port: 9000,
   useSSL: false,
   accessKey: 'minio',
@@ -38,8 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const publicUrl = `http://10.20.31.142:9000/${bucketName}/${objectName}`;
-    return res.status(200).json({ publicUrl });
-    return res.status(200).json({ active });
+    return res.status(200).json({ publicUrl, active });
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Unknown error');
     return res.status(500).json({ error: err.message });
