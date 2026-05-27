@@ -1,7 +1,7 @@
 // components/imageUpload.tsx
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
-import { useToast } from '@/lib/context/ToastContext';
+import { UseToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
 
 interface ImageUploadProps {
@@ -13,7 +13,7 @@ interface ImageUploadProps {
 export default function ImageUpload({ value, onChange, label = "Imagem" }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toast = useToast();
+  const toast = UseToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,13 +52,20 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     e.stopPropagation();
     if (value) {
       try {
-        await fetch('/api/storage/delete-url', { // Crie esta rota no seu backend
+        // Envia uma requisição DELETE com a URL que está guardada no estado 'value'
+        const res = await fetch('/api/storage/delete-file', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: value }),
         });
+  
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erro ao remover imagem");
+        
+        toast.showSuccess('Imagem removida com sucesso do servidor.');
       } catch (err) {
-        console.error("Erro ao remover a imagem do servidor", err);
+        const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido.';
+        toast.showError(`Erro ao remover a imagem do servidor: ${errorMessage}`);
       }
     }
     onChange(null);

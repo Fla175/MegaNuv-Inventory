@@ -3,21 +3,22 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** v2.15.5
+**Current Version:** v2.15.10
 
 ## 🚀 Features
 
 * **Role-Based Access Control (RBAC):** Hierarchical permissions for `DIRECTOR`, `ADMIN`, `MANAGER`, and `VIEWER`.
 * **Theme:** Persistent theme selection (Light, Dark, or System).
-* **Inventory Management:** Complete CRUD for items and locations using a nested hierarchy with Father Spaces and Physical Spaces.
+* **Inventory Management:** Complete CRUD for items and locations using a nested hierarchy with Father Spaces, Physical Spaces and Actives.
 * **Category Management:** Dynamic categories (formerly Areas) with 18 pastel color options, managed via database.
-* **Settings Dashboard:** Complete management for Users, Father Spaces, Categories, and Audit Logs.
+* **Settings & Dashboard:** Complete management for Users, Father Spaces, Categories, and Audit Logs.
 * **Audit System:** Global logging of all CRUD operations, logins, and signups with timestamps and user tracking.
 * **Secure Authentication:** JWT-based authentication with secure cookie storage and password hashing via Bcrypt.
 * **Responsive UI:** Fully responsive dashboard built with Tailwind CSS and Lucide icons, optimized for desktop and mobile.
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
-* [<ins>***NEW***</ins>] **Image attachment**: Attachment of until 5 images for a active.
+* **Image attachment**: Attachment of until 5 images for a active.
+* [<ins>***NEW***</ins>] **Custom *Select***: Custom component for Select type Inputs.
 
 ---
 
@@ -78,7 +79,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ---
 
-### 📂 Project Structure
+## 📂 Project Structure
 
 * **/pages/api/** - Backend routes for all resources (users, actives, father-spaces, categories, logs)
 * **/pages/settings.tsx** - Complete settings dashboard with tabs for all resources
@@ -89,15 +90,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ---
 
-### 🛡 API Hierarchy & Security
+## 🛡 User Hierarchy
 
 The system implements a strict permission logic:
 
 * **Director:** Full control over all users, settings, and can delete/edit logs.
 * **Admins:** Full control over all users except *DIRECTOR*, settings, and can delete/edit logs, but can't see the total assets.
-* **Managers:** Can manage *VIEWER* accounts but cannot delete or edit *ADMINS* or the *DIRECTOR* user, can view logs.
-* **Viewers:** Users that only can look the inventory, but can't do any process.
-* **Owners:** Users can always edit their own profile or delete their own account.
+* **Managers:** Can manage *VIEWER* accounts but can't delete or edit *ADMINS* or the *DIRECTOR* user, can view logs, and can't see the total assets.
+* **Viewers:** Users that only can look the inventory, can't do any process, and can't see the individual value of actives.
+* **Owners:** Users can always edit their own profile.
 
 ---
 

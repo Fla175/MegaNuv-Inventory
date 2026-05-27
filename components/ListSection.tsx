@@ -5,11 +5,11 @@ import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
   MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, LinkIcon, Image as ImageIcon, Boxes,
-  FileText, FileIcon, Tag
+  FileText, FileIcon, Tag, Factory, Cpu
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
-import { useToast } from "../lib/context/ToastContext";
+import { UseToast } from "../lib/context/ToastContext";
 import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
@@ -97,6 +97,13 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     setSelectedItems(new Set());
     setSelectedViewItem(null);
   };
+
+  const getCategory = (categoryId: string, categoriesList: any[]) => {
+    
+    const foundCategory = categoriesList.find(cat => cat.id === categoryId);
+    
+    return foundCategory ? foundCategory.name : "Categoria não encontrada";
+  };
   
   // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);
@@ -111,7 +118,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   useEscapeKey(exitSelectionMode, isSelectionMode);
 
   /// Toast notifications
-  const toast = useToast();
+  const toast = UseToast();
 
   // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
   useEffect(() => {
@@ -122,7 +129,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         
         // Se a API de categorias falhar explicitamente por falta de permissão
         if (!res.ok) {
-          toast.showError(`Erro ao carregar categorias (Status: ${res.status}). Verifique as permissões de VIEWER no backend.`);
+          toast.showError(`Erro ao carregar categorias (Status: ${res.status}).`);
           return;
         }
 
@@ -131,7 +138,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           setCategories(data);
         }
       } catch (error) {
-        console.error("Erro na rota de categorias:", error);
+        toast.showError(`Erro na rota de listagem de categorias: ${error}.`);
       }
     }
     fetchCategories();
@@ -706,7 +713,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     <InfoItem icon={<Hash size={16} />} label="Nº Série" Class="font-mono truncate" value={selectedViewItem.serialNumber || "N/A"} />
                     <InfoItem icon={<MapPin size={16} />} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
                     <InfoItem icon={<Barcode size={16} />} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
-                    <InfoItem icon={<Tag size={16} />} label="Categoria" Class="truncate" value={selectedViewItem.categoryId} />
+                    <InfoItem icon={<Factory size={16} />} label="Fabricante" Class="font-mono text-[10px] truncate" value={selectedViewItem.manufacturer} />
+                    <InfoItem icon={<Cpu size={16} />} label="Modelo" Class="font-mono text-[10px] truncate" value={selectedViewItem.model} />
+                    <InfoItem icon={<Tag size={16} />} label="Categoria" Class="truncate" value={getCategory(selectedViewItem.categoryId, categories)} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
                         <InfoItem icon={<Boxes size={16}/>} label="Ativos" Class="truncate" value={`${selectedViewItem.childCount || 0}`} />

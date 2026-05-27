@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import * as Minio from 'minio';
 import formidable from 'formidable';
 import fs from 'fs';
+import db from '@/lib/prisma';
 
 export const config = { api: { bodyParser: false } };
 
@@ -20,6 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const form = formidable({});
   
   try {
+    const active = await db.active.findUnique({
+      where: {id: String() },
+    });
+
     const [, files] = await form.parse(req);
     const file = files.file?.[0];
     if (!file) throw new Error("Arquivo não recebido");
@@ -34,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const publicUrl = `http://10.20.31.142:9000/${bucketName}/${objectName}`;
     return res.status(200).json({ publicUrl });
+    return res.status(200).json({ active });
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Unknown error');
     return res.status(500).json({ error: err.message });

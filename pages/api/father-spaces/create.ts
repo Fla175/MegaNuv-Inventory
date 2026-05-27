@@ -1,5 +1,4 @@
 // pages/api/father-spaces/create.ts
-// pages/api/father-spaces/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import * as jose from "jose";

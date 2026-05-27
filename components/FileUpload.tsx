@@ -1,7 +1,7 @@
 // components/FileUpload.tsx
 import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2, FileText, Link as LinkIcon, Plus, Image as ImageIcon, File as FileIcon } from 'lucide-react';
-import { useToast } from '@/lib/context/ToastContext';
+import { UseToast } from '@/lib/context/ToastContext';
 
 interface FileUploadProps {
   value: string[];
@@ -56,7 +56,7 @@ export default function FileUpload({
   const [loading, setLoading] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toast = useToast();
+  const toast = UseToast();
 
   const currentFiles = Array.isArray(value) ? value : [];
 
