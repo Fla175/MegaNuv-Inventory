@@ -60,7 +60,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           });
         }
       } catch {
-        // Erro silencioso - categorias são opcionais
       } finally {
         if (isMounted) setLoadingCategories(false);
       }
@@ -355,30 +354,25 @@ const renderChildren = (parentId: string, depth: number) => {
     try {
       const isEdit = mode === "edit";
       const url = isEdit ? `/api/actives/update` : `/api/actives/create`;
-      
+
       const response = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      // 1. Lendo o corpo da resposta JSON enviado pela API
       const data = await response.json();
 
-      // 2. Se a API retornou um status de erro (400, 409, 500, etc.)
       if (!response.ok) {
         const apiError = data.error || "Erro ao processar a operação.";
-        // Se houver detalhes extras (ex: qual SKU duplicou), concatena na mensagem
         const apiDetails = data.details ? ` (${data.details})` : "";
         throw new Error(`${apiError}${apiDetails}`);
       }
 
-      // Se deu certo:
       toast.showSuccess(mode === 'edit' ? 'Item atualizado com sucesso.' : 'Item criado com sucesso.');
       onClose();
 
-    } catch (error: unknown) { 
-      // 3. Tipagem limpa e segura usando narrowing (afunilamento de tipo)
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro inesperado ao conectar com o servidor.';
       toast.showError(message);
     }
