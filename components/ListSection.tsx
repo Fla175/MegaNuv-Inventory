@@ -235,15 +235,35 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       const categoryMatch = category === "" || a.categoryId === category || a.category?.name === category || a.category === category;
       const manufacturerMatch = manufacturer === "" || a.manufacturer?.toLowerCase().includes(manufacturer);
       const modelMatch = model === "" || a.model?.toLowerCase().includes(model);
-
       return nameMatch && categoryMatch && manufacturerMatch && modelMatch;
     };
 
     const visibleActiveIds = new Set<string>();
-    
+
+    const addAllDescendants = (startParentId: string) => {
+      const queue = [startParentId];
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+
+        const children = actives.filter(a => a.parentId === currentId);
+
+        children.forEach(child => {
+          if (!visibleActiveIds.has(child.id)) {
+            visibleActiveIds.add(child.id);
+            queue.push(child.id);
+          }
+        });
+      }
+    };
+
     actives.forEach(active => {
       if (matchesDirectly(active)) {
         visibleActiveIds.add(active.id);
+
+        if (active.isPhysicalSpace) {
+          addAllDescendants(active.id);
+        }
+
         let currentParentId = active.parentId;
         while (currentParentId) {
           visibleActiveIds.add(currentParentId);
@@ -270,6 +290,26 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       hasFilters 
     };
   }, [filters, actives, fatherSpaces]);
+
+  useEffect(() => {
+    if (filteredData.hasFilters) {
+      const newExpanded: Record<string, boolean> = {};
+      
+      filteredData.actives.forEach((item) => {
+        const hasMatchingChildren = filteredData.actives.some(
+          (child) => child.parentId === item.id
+        );
+
+        if (hasMatchingChildren) {
+          newExpanded[item.id] = true;
+        }
+      });
+      
+      setExpandedNodes(newExpanded);
+    } else {
+      setExpandedNodes({});
+    }
+  }, [filters, filteredData.hasFilters, filteredData.actives]);
 
   // --- AÇÕES ---
   const handleMoveAction = async (targetSpaceId: string, targetParentId?: string) => {
@@ -388,8 +428,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       return a.parentId === parentId;
     });
 
-    // Só mostra empty-state SE o nível tem filhos OU é um espaço físico que foi expandir E não tem filhos
-    // No nível raiz (level 0), não mostra empty-state se children está vazio (mostra o card do espaço pai)
     const hasChildren = children.length > 0;
     
     if (!hasChildren && level > 0) {
@@ -404,7 +442,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       );
     }
 
-    // Se não há filhos no nível raiz, não renderiza nada (o card do espaço pai cuida de mostrar "Nenhum ativo")
     if (!hasChildren && level === 0) {
       return null;
     }
@@ -604,7 +641,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </div>
               </div>
 
-              {(isExpanded || filteredData.hasFilters) && renderActiveTree(active.id, spaceId, level + 1)}
+              {isExpanded && renderActiveTree(active.id, spaceId, level + 1)}
             </div>
           );
         })}
