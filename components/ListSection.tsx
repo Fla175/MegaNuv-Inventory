@@ -764,45 +764,53 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   {/* --- SEÇÃO DE ARQUIVOS ANEXADOS (NOVO) --- */}
                   <div className="pt-4 border-t dark:border-white/5">
                     <h4 className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
-                      Documentos e Anexos
+                      Documentos & Anexos
                     </h4>
                     
-                    {selectedViewItem.fileUrl && (Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl.length > 0 : true) ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {(Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl : [selectedViewItem.fileUrl]).map((url: string, index: number) => {
-                          const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
-                          
-                          return (
-                            <a 
-                              key={index}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
-                            >
-                              <div className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
-                                <Icon size={18} />
-                              </div>
-                              
-                              <div className="flex flex-col flex-1 overflow-hidden">
-                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline" title={displayName}>
-                                  {displayName}
-                                </span>
-                                {extension !== 'link' && (
-                                  <span className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}>
-                                    .{extension}
+                    {(() => {
+                      const filesArray = typeof selectedViewItem.fileUrl === 'string'
+                        ? selectedViewItem.fileUrl.split(',').map((url: string) => url.trim()).filter(Boolean)
+                        : Array.isArray(selectedViewItem.fileUrl)
+                          ? selectedViewItem.fileUrl.filter(Boolean)
+                          : [];
+
+                      return filesArray.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {filesArray.map((url: string, index: number) => {
+                            const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
+                            
+                            return (
+                              <a 
+                                key={index}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
+                              >
+                                <div className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
+                                  <Icon size={18} />
+                                </div>
+                                
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                  <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline" title={displayName}>
+                                    {displayName}
                                   </span>
-                                )}
-                              </div>
-                            </a>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic pl-1">
-                        Nenhum documento anexado a este ativo.
-                      </p>
-                    )}
+                                  {extension !== 'link' && (
+                                    <span className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}>
+                                      .{extension}
+                                    </span>
+                                  )}
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic pl-1">
+                          Nenhum documento anexado a este ativo.
+                        </p>
+                      );
+                    })()}
                   </div>
                   {/* --- FIM DA SEÇÃO DE ARQUIVOS --- */}
               </div>
