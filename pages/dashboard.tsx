@@ -30,6 +30,7 @@ interface ActiveItem {
   createdAt?: string;
   fromSpaceId?: string;
   toSpaceId?: string;
+  isPhysicalSpace: boolean;
 }
 
 interface CategoryInfo {
@@ -337,16 +338,16 @@ export default function DashboardPage() {
                 selectedAssetsList.map((asset) => (
                   <div key={asset.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-blue-500/20 group transition-all">
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl shadow-sm text-blue-600"><Box size={18}/></div>
+                      <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl shadow-sm text-blue-600">
+                        {asset.isPhysicalSpace === true ? <Layers size={18}/> : <Box size={18}/>}
+                      </div>
                       <div>
                         <h4 className="font-black text-blue-950 dark:text-gray-200 text-sm uppercase">{asset.name}</h4>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Tag: {asset.tag === "IN-USE" ? "Em Uso" : "Em Estoque"}</p>
+                        <div className="flex items-center">
+                          <div className={`rounded-full h-2 w-2 m-1 ${asset.tag === "IN-USE" ? "bg-amber-500" : "bg-emerald-500"}`}></div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Status Atual: <span className={`text-[10px] ${asset.tag === "IN-USE" ? "text-amber-400" : "text-emerald-400"}`}>{asset.tag === "IN-USE" ? "Em Uso" : "Em Estoque"}</span></p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter">
-                         Ver Item
-                      </span>
                     </div>
                   </div>
                 ))
