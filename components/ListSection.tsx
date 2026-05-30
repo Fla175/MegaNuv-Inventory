@@ -420,6 +420,88 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     });
   };
 
+  const excludedMoveIds = useMemo(() => {
+    if (!movingItem) return new Set<string>();
+    const ids = new Set<string>([movingItem.id]);
+    const queue = [movingItem.id];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      actives.forEach(a => {
+        if (a.parentId === currentId) {
+          ids.add(a.id);
+          queue.push(a.id);
+        }
+      });
+    }
+    return ids;
+  }, [movingItem, actives]);
+
+  const renderMoveTree = (parentId: string | null, spaceId: string) => {
+    const children = actives.filter(a => {
+      if (excludedMoveIds.has(a.id)) return false;
+      if (!a.isPhysicalSpace) return false; // Apenas espaços físicos podem receber ativos
+      
+      if (parentId === null) {
+        return a.fatherSpaceId === spaceId && (!a.parentId || a.parentId === "");
+      }
+      return a.parentId === parentId;
+    });
+
+    if (children.length === 0) return null;
+
+    return (
+      <div className="space-y-1 w-full">
+        {children.map(sub => {
+          const isExpanded = moveExpanded[sub.id];
+          const hasSubSpaces = actives.some(a => a.parentId === sub.id && a.isPhysicalSpace && !excludedMoveIds.has(a.id));
+          
+          return (
+            <div key={sub.id} className="w-full flex flex-col">
+              <div className="flex items-center p-0.5 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all group">
+                <button 
+                  onClick={() => handleMoveAction(spaceId, sub.id)} 
+                  className="flex-1 flex items-center gap-3 p-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-xl transition-all text-left min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50 transition-colors">
+                    <MapPin size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-xs font-black text-zinc-600 dark:text-zinc-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 uppercase truncate w-full">
+                      {sub.name}
+                    </span>
+                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                      Espaço Físico
+                    </span>
+                  </div>
+                </button>
+
+                {hasSubSpaces && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMoveExpanded(p => ({ ...p, [sub.id]: !p[sub.id] }));
+                    }} 
+                    className="p-3 mr-1 text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all shrink-0"
+                  >
+                    <ChevronRight size={16} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Recuo hierárquico com linha guia visual */}
+              {isExpanded && (
+                <div className="border-l dark:border-white/5 ml-5 pl-2 mt-1 space-y-1">
+                  {renderMoveTree(sub.id, spaceId)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // --- RENDERIZAÇÃO DA ÁRVORE ---
   const renderActiveTree = (parentId: string | null, spaceId: string, level: number = 0) => {
     const children = filteredData.actives.filter(a => {
@@ -928,7 +1010,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
               <div className="p-4 max-h-[50vh] overflow-y-auto space-y-3 custom-scrollbar">
                 {fatherSpaces.map(space => {
                     const isExpanded = moveExpanded[space.id];
-                    const subActives = actives.filter(a => a.fatherSpaceId === space.id && a.isPhysicalSpace && a.id !== movingItem.id);
+                    
+                    // Verifica se existem ativos físicos de nível superior vinculados diretamente a este Espaço Pai
+                    const hasTopLevelActives = actives.some(a => 
+                      a.fatherSpaceId === space.id && 
+                      a.isPhysicalSpace && 
+                      (!a.parentId || a.parentId === "") &&
+                      !excludedMoveIds.has(a.id)
+                    );
 
                     return (
                         <div key={space.id} className="border dark:border-white/5 rounded-2xl overflow-hidden bg-zinc-50 dark:bg-zinc-950/50">
@@ -945,7 +1034,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                                   </span>
                                 </button>
 
-                                {subActives.length > 0 && (
+                                {hasTopLevelActives && (
                                   <button 
                                     onClick={() => setMoveExpanded(p => ({ ...p, [space.id]: !p[space.id] }))} 
                                     className="p-4 mr-1 text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
@@ -955,27 +1044,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                                 )}
                             </div>
 
-                            {isExpanded && subActives.length > 0 && (
+                            {isExpanded && hasTopLevelActives && (
                                 <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900 pl-4">
-                                    {subActives.map(sub => (
-                                        <button 
-                                          key={sub.id} 
-                                          onClick={() => handleMoveAction(space.id, sub.id)} 
-                                          className="w-full flex items-center gap-3 p-3 pl-4 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-xl transition-all group"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                                                <MapPin size={14} className="text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-                                            </div>
-                                            <div className="flex flex-col items-start">
-                                              <span className="text-xs font-black text-zinc-600 dark:text-zinc-300 group-hover:text-emerald-600 uppercase">
-                                                {sub.name}
-                                              </span>
-                                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
-                                                Espaço Físico
-                                              </span>
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {renderMoveTree(null, space.id)}
                                 </div>
                             )}
                         </div>

@@ -148,7 +148,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
 
       return (
-        <div className={`${indentClass} w-full flex flex-col`}>
+        <div className={`${indentClass} flex flex-col`}>
           {children.map((child: any) => {
             const grandChildren = getDirectChildren(child.id);
             const hasGrandChildren = grandChildren.length > 0;
@@ -228,7 +228,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
               <Search size={14} className="text-gray-400 ml-2" />
               <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+            <div className="max-h-72 overflow-y-auto overflow-x-hidden custom-scrollbar">
               {searchTerm ? (
                 filteredAll.length > 0 ? (
                   <div>
