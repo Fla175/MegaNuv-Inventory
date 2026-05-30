@@ -761,7 +761,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     )}
                   </div>
 
-                  {/* --- SEÇÃO DE ARQUIVOS ANEXADOS (NOVO) --- */}
                   <div className="pt-4 border-t dark:border-white/5">
                     <h4 className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
                       Documentos & Anexos

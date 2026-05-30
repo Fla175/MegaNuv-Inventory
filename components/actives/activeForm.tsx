@@ -20,7 +20,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     { value: "IN-STOCK", label: "Em Estoque", indicatorColor: "bg-emerald-500" },
     { value: "IN-USE", label: "Em Uso", indicatorColor: "bg-amber-500" },
   ];
-  
   useEscapeKey(onClose);
   
   const [formData, setFormData] = useState({
@@ -42,7 +41,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     locationType: "" as "space" | "active" | "", 
   });
 
-  // Busca as Categorias do Banco (Corrigida a dependência para não causar loop)
+  // Busca as Categorias do Banco
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
@@ -51,7 +50,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         const data = await res.json();
         if (res.ok && isMounted) {
           setCategories(data);
-          // Atualiza via callback (prev) para não perder outros dados que o usuário já mexeu
           setFormData(prev => {
             if (mode === 'create' && data.length > 0 && !prev.categoryId) {
               return { ...prev, categoryId: data[0].id };
@@ -71,14 +69,12 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   // Carrega os dados iniciais com segurança
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      // Suporta tanto campos simples (fatherSpaceId/parentId) quanto objetos aninhados (fatherSpace.id/parent.id)
-      // Se tem parentId → está dentro de um espaço físico (active), senão está em pai (space)
       const locId = initialData.parentId || initialData.parent?.id 
         ? initialData.parentId || initialData.parent.id 
         : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
+      
       const locType = initialData.parentId || initialData.parent?.id ? "active" : "space";
 
-      // Converte serialNumber (string) para array de serialNumbers
       const serialArray = mode === "clone" 
         ? Array(initialData.quantity || 1).fill("")
         : (initialData.serialNumber 
@@ -109,26 +105,21 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
+    
     const selectedOption = options.find((opt: any) => opt.id === value);
-    
-    const parentSpaces = options.filter((opt: any) => opt.type === 'space');
-    const physicalSpaces = options.filter((opt: any) => opt.type === 'active');
-    
-    const filteredParents = parentSpaces.filter((opt: any) => 
-      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
-const filteredAll = useMemo(() => {
+    const rootElements = useMemo(() => {
+      return options.filter((opt: any) => !opt.parentId);
+    }, [options]);
+
+    const filteredAll = useMemo(() => {
        if (!searchTerm) return [];
        const term = searchTerm.toLowerCase();
-       return [
-         ...parentSpaces.filter((opt: any) => opt.name.toLowerCase().includes(term)),
-         ...physicalSpaces.filter((opt: any) => opt.name.toLowerCase().includes(term))
-       ];
-     }, [searchTerm, parentSpaces, physicalSpaces]);
-    
+       return options.filter((opt: any) => opt.name.toLowerCase().includes(term));
+    }, [searchTerm, options]);
+
     const getDirectChildren = (parentId: string) => {
-      return physicalSpaces.filter((opt: any) => opt.parentId === parentId);
+      return options.filter((opt: any) => opt.parentId === parentId);
     };
 
     const getAllDescendants = (parentId: string): string[] => {
@@ -149,50 +140,71 @@ const filteredAll = useMemo(() => {
       setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-const renderChildren = (parentId: string, depth: number) => {
+    const renderChildren = (parentId: string, depth: number) => {
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
+    
+      const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
 
-      return children.map((child: any) => {
-        const grandChildren = getDirectChildren(child.id);
-        const hasGrandChildren = grandChildren.length > 0;
-        const isExpanded = expandedSpaces[child.id];
+      return (
+        <div className={`${indentClass} w-full flex flex-col`}>
+          {children.map((child: any) => {
+            const grandChildren = getDirectChildren(child.id);
+            const hasGrandChildren = grandChildren.length > 0;
+            const isExpanded = expandedSpaces[child.id];
+            const isSpace = child.type === 'space';
+    
+            return (
+              <div key={child.id} className="w-full flex flex-col">
+                <div 
+                  className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
+                    isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
+                  }`}
+                >
+                  <button 
+                    type="button" 
+                    onClick={() => { onChange(child.id, child.type); setIsOpen(false); setSearchTerm(""); }} 
+                    className="flex-1 text-left py-3 px-3 min-w-0"
+                  >
+                    <div className="flex items-center gap-2 w-full min-w-0">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
 
-        const indentStyle = depth > 0 ? { marginLeft: `${depth * 24}px` } : {};
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="text-xs font-bold dark:text-zinc-200 truncate">{child.name}</span>
+                        <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
+                          {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
+                        </span>
+                      </div>
         
-        return (
-          <div key={child.id} className={depth > 0 ? "pl-2 border-l-2 dark:border-white/5" : ""} style={indentStyle}>
-            <div className={`flex items-center border-b dark:border-white/5`}>
-              <button 
-                type="button" 
-                onClick={() => { onChange(child.id, 'active'); setIsOpen(false); setSearchTerm(""); }} 
-                className={`flex-1 text-left px-2 py-3 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full bg-emerald-500 shrink-0`} />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold dark:text-zinc-200">{child.name}</span>
-                    <span className="text-[8px] uppercase font-black text-gray-400">Espaço Físico</span>
-                  </div>
+                      {hasGrandChildren && (
+                        <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                          isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
+                        }`}>
+                          {grandChildren.length}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  
                   {hasGrandChildren && (
-                    <span className="ml-auto text-[8px] font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">{grandChildren.length}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => toggleExpand(child.id)}
+                      className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
+                        isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                      }`}
+                    >
+                      <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
                   )}
                 </div>
-              </button>
-              {hasGrandChildren && (
-                <button 
-                  type="button"
-                  onClick={() => toggleExpand(child.id)}
-                  className="px-3 py-3 mr-1 hover:bg-emerald-50 dark:hover:bg-emerald-600/10 transition-colors rounded-2xl"
-                >
-                  <ChevronDown size={14} className={`text-emerald-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-              )}
-            </div>
-            {hasGrandChildren && isExpanded && renderChildren(child.id, depth + 1)}
-          </div>
-        );
-      });
+                
+                {hasGrandChildren && isExpanded && renderChildren(child.id, depth + 1)}
+              </div>
+            );
+          })}
+        </div>
+      );
     };
 
     return (
@@ -208,6 +220,7 @@ const renderChildren = (parentId: string, depth: number) => {
           </div>
           <ChevronDown className={`shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} size={16} />
         </button>
+        
         {isOpen && (
           <div className="absolute z-[600] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden">
             <div className="p-2 border-b dark:border-white/5 flex items-center gap-2">
@@ -215,7 +228,6 @@ const renderChildren = (parentId: string, depth: number) => {
               <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
             <div className="max-h-72 overflow-y-auto custom-scrollbar">
-              {/* Espaços Pai com hierarquia */}
               {searchTerm ? (
                 filteredAll.length > 0 ? (
                   <div>
@@ -224,14 +236,14 @@ const renderChildren = (parentId: string, depth: number) => {
                         <button
                           type="button"
                           onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }}
-                          className="w-full text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                          className="w-full text-left px-3 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full ${opt.type === 'space' ? 'bg-blue-500' : 'bg-emerald-500'} shrink-0`} />
                             <div className="flex flex-col">
                               <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
                               <span className="text-[8px] uppercase font-black text-gray-400">
-                                {opt.type === 'space' ? 'PAI' : 'FÍSICO'}
+                                {opt.type === 'space' ? 'ESP. PAI' : 'ESP. FÍSICO'}
                               </span>
                             </div>
                           </div>
@@ -244,46 +256,58 @@ const renderChildren = (parentId: string, depth: number) => {
                 )
               ) : (
                 <div>
-                  {filteredParents.length > 0 && filteredParents.map((space: any) => {
-                    const descendantsCount = getDescendantsCount(space.id);
-                    const isExpanded = expandedSpaces[space.id];
-                    
+                  {rootElements.length > 0 && rootElements.map((item: any) => {
+                    const descendantsCount = getDescendantsCount(item.id);
+                    const isExpanded = expandedSpaces[item.id];
+                    const isSpace = item.type === 'space';
+
                     return (
-                      <div key={space.id}>
-                        <div className="flex items-center border-b dark:border-white/5">
+                      <div key={item.id} className="w-full flex flex-col">
+                        <div className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
+                          isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
+                        }`}>
                           <button 
                             type="button" 
-                            onClick={() => { onChange(space.id, 'space'); setIsOpen(false); setSearchTerm(""); }} 
-                            className="flex-1 text-left px-2 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
+                            onClick={() => { onChange(item.id, item.type); setIsOpen(false); setSearchTerm(""); }} 
+                            className="flex-1 text-left py-3 px-3 min-w-0"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold dark:text-zinc-200">{space.name}</span>
-                                <span className="text-[8px] uppercase font-black text-gray-400">Espaço Pai</span>
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                              
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className="text-sm font-bold dark:text-zinc-200 truncate">{item.name}</span>
+                                <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
+                                  {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
+                                </span>
                               </div>
+
                               {descendantsCount > 0 && (
-                                <span className="ml-auto text-[8px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{descendantsCount}</span>
+                                <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                                  isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
+                                }`}>{descendantsCount}</span>
                               )}
                             </div>
                           </button>
+
                           {descendantsCount > 0 && (
                             <button 
-                              type="button"
-                              onClick={() => toggleExpand(space.id)}
-                              className="px-3 py-3 mr-1 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors rounded-2xl"
+                              type="button" 
+                              onClick={() => toggleExpand(item.id)}
+                              className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
+                                isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                              }`}
                             >
-                              <ChevronDown size={14} className={`text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
                             </button>
                           )}
                         </div>
-                        {/* Descendentes recursivos */}
-                        {descendantsCount > 0 && isExpanded && renderChildren(space.id, 1)}
+
+                        {descendantsCount > 0 && isExpanded && renderChildren(item.id, 1)}
                       </div>
                     );
                   })}
                   
-                  {filteredParents.length === 0 && (
+                  {rootElements.length === 0 && (
                     <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
                   )}
                 </div>
@@ -319,17 +343,13 @@ const renderChildren = (parentId: string, depth: number) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Na edição, preservar localização original se não foi alterada
     let finalFatherSpaceId: string;
     let finalParentId: string | null;
     
     if (mode === "edit" && initialData) {
-      // Preservar caminho original
       finalFatherSpaceId = initialData.fatherSpaceId;
       finalParentId = initialData.parentId || null;
     } else {
-      // Para criação ou clone, calcular normalmente
       finalFatherSpaceId = formData.locationId;
       finalParentId = null;
       
@@ -360,7 +380,6 @@ const renderChildren = (parentId: string, depth: number) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -369,9 +388,8 @@ const renderChildren = (parentId: string, depth: number) => {
         throw new Error(`${apiError}${apiDetails}`);
       }
 
-      toast.showSuccess(mode === 'edit' ? 'Item atualizado com sucesso.' : 'Item criado com sucesso.');
+      toast.showSuccess(mode === 'edit' ? 'Item updated successfully.' : 'Item created successfully.');
       onClose();
-
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro inesperado ao conectar com o servidor.';
       toast.showError(message);
@@ -479,7 +497,7 @@ const renderChildren = (parentId: string, depth: number) => {
                         {category.name}
                       </button>
                     );
-                })}
+                  })}
                 </div>
               )}
           </div>
@@ -487,7 +505,6 @@ const renderChildren = (parentId: string, depth: number) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Nome do Registro</label>
-              {/* CORREÇÃO DO STALE STATE ABAIXO (Usando prev => ...) */}
               <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData(prev => ({...prev, name: e.target.value}))} />
             </div>
 
@@ -505,10 +522,10 @@ const renderChildren = (parentId: string, depth: number) => {
             <div className="relative">
               <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
               <SearchableSelect 
-      options={[
-        ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
-        ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || null }))
-      ]}
+                options={[
+                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
+                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || c.fatherSpaceId || null }))
+                ]}
                 value={formData.locationId}
                 onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
                 placeholder="Selecione local..."
@@ -588,9 +605,7 @@ const renderChildren = (parentId: string, depth: number) => {
           <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border dark:border-white/10">
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between">
               <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase italic">Nova Categoria</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors">
-                <X size={20} />
-              </button>
+              <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
               <div>
