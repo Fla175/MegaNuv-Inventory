@@ -4,12 +4,13 @@ import { useRouter } from "next/router";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import {
-  Layers, Loader2, AlertCircle, PackageOpen, CornerDownRight,
-  DollarSign, X, FileText, Info, PackageX, Hash, 
-  Boxes, Tag, ExternalLink, User, Calendar
+  Layers, Loader2, AlertCircle, PackageOpen, CornerDownRight, 
+  DollarSign, X, Info, PackageX, Hash, 
+  Boxes, Tag, FileText, FileImage, File, ExternalLink, 
+  User, Calendar, Box, ChevronDown
 } from "lucide-react";
 
-interface AssetItem {
+interface AssetActive {
   id: string;
   name: string;
   manufacturer?: string;
@@ -19,24 +20,25 @@ interface AssetItem {
   image?: string;
   tag: string;
   fileUrl?: string;
-  category?: string;
+  category: string;
   createdBy?: Date;
   createdAt?: string;
   isPhysicalSpace?: boolean | number;
+  depth?: number;
 }
 
 interface Section {
   id: string;
   name: string;
   fixedValue?: number;
-  items: AssetItem[];
+  actives: AssetActive[];
 }
 
 interface ViewData {
   root: {
     id: string;
     name: string;
-    category?: string;
+    category: string;
     imageUrl?: string;
     image?: string;
     fixedValue?: number;
@@ -56,11 +58,11 @@ interface ViewData {
 export default function SpacePublicView() {
   const router = useRouter();
   const { id } = router.query;
-  
   const [data, setData] = useState<ViewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<AssetItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<AssetActive | null>(null);
+  const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -84,21 +86,46 @@ export default function SpacePublicView() {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
+  const parseFileUrls = (fileUrlString?: string | null): string[] => {
+    if (!fileUrlString) return [];
+    try {
+      const parsed = JSON.parse(fileUrlString);
+      if (Array.isArray(parsed)) return parsed.map((u: string) => u.trim()).filter(Boolean);
+    } catch {
+    }
+    return fileUrlString
+      .split(',')
+      .map((url: string) => url.trim())
+      .filter(Boolean);
+  };
+
+  const getFileDetails = (url: string) => {
+    const extension = url.split('.').pop()?.toLowerCase() || '';
+    switch (extension) {
+      case 'pdf':
+        return { icon: FileText, bgColor: 'bg-red-600 hover:bg-red-700' };
+      case 'doc':
+      case 'docx':
+        return { icon: File, bgColor: 'bg-blue-600 hover:bg-blue-700' };
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return { icon: FileImage, bgColor: 'bg-emerald-600 hover:bg-emerald-700' };
+      default:
+        return { icon: File, bgColor: 'bg-indigo-600 hover:bg-indigo-700' };
+    }
+  };
+
   const getCreatorName = (creator: unknown): string => {
     if (!creator) return 'Sistema';
     if (typeof creator === 'string') return creator;
     
-    // Verifica se é um objeto e se a propriedade 'name' existe nele
     if (typeof creator === 'object' && 'name' in creator) {
-      // Fazemos uma asserção segura para ler o valor de 'name'
       const nameValue = (creator as { name: unknown }).name;
-      
-      // Mantém o exato comportamento original: se 'name' for um valor válido (truthy)
       if (nameValue) {
         return String(nameValue);
       }
     }
-    
     return 'Sistema';
   };
 
@@ -118,14 +145,9 @@ export default function SpacePublicView() {
   );
 
   const active = data.root;
+  const sections: Section[] = data.sections || [];
 
-  /**
-   * LÓGICA DE DETECÇÃO REFORÇADA
-   * 1. Se existir um array de 'sections' com conteúdo, é um espaço.
-   * 2. Se isPhysicalSpace for true OU 1, é um espaço.
-   * 3. Caso contrário, é um ativo individual.
-   */
-  const hasSubItems = data.sections && data.sections.length > 0 && data.sections.some(s => s.items.length > 0);
+  const hasSubItems = sections.length > 0 && sections.some(s => s.actives.length > 0);
   const isPhysicalSpace = active.isPhysicalSpace === true || active.isPhysicalSpace === 1 || hasSubItems;
 
   // ==========================================
@@ -199,13 +221,27 @@ export default function SpacePublicView() {
             </div>
           </div>
 
-          {active.fileUrl && (
-            <a href={active.fileUrl} target="_blank" rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white py-5 rounded-[2rem] font-black text-xs uppercase shadow-2xl"
-            >
-              <FileText size={20} /> Visualizar Documentação PDF
-              <ExternalLink size={14} className="opacity-50" />
-            </a>
+          {active.fileUrl && parseFileUrls(active.fileUrl).length > 0 && (
+            <div className="space-y-3 w-full">
+              <p className="text-[9px] font-black text-zinc-400 uppercase italic tracking-wider mb-1">
+                Documentos & Anexos ({parseFileUrls(active.fileUrl).length})
+              </p>
+              {parseFileUrls(active.fileUrl).map((url: string, index: number) => {
+                const { icon: Icon, bgColor } = getFileDetails(url);
+                return (
+                  <a
+                    key={index}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-full flex items-center justify-center gap-3 text-white py-4 rounded-[1.5rem] font-black text-xs uppercase shadow-lg transition-colors ${bgColor}`}
+                  >
+                    <Icon size={18} /> Documento #{index + 1}
+                    <ExternalLink size={12} className="opacity-50" />
+                  </a>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -215,14 +251,103 @@ export default function SpacePublicView() {
   // ==========================================
   // MODO 2: VISUALIZAÇÃO DE ESPAÇO (LISTAGEM)
   // ==========================================
-  const sections: Section[] = data.sections || [];
-  const totalAssets = sections.reduce((acc, sec) => acc + (sec.items?.length || 0), 0);
+  const totalAssets = sections.reduce((acc, sec) => acc + (sec.actives?.length || 0), 0);
   const totalValue = (active.fixedValue || 0) + sections.reduce((acc, sec) => acc + (sec.fixedValue || 0), 0);
+
+  const toggleExpand = (id: string) => {
+    setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const getDirectChildren = (parentId: string) => {
+    const sec = sections.find(s => s.id === parentId);
+    return sec ? sec.actives || [] : [];
+  };
+
+  const renderChildren = (parentId: string, depth: number) => {
+    const children = getDirectChildren(parentId);
+    if (children.length === 0) return null;
+
+    const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
+
+    return (
+      <div className={`${indentClass} w-full flex flex-col`}>
+        {children.map((item) => {
+          const grandChildren = getDirectChildren(item.id);
+          const hasGrandChildren = grandChildren.length > 0;
+          const isExpanded = expandedSpaces[item.id];
+          const isSpace = !!item.isPhysicalSpace;
+
+          return (
+            <div key={item.id} className="w-full flex flex-col">
+              <div className="w-full flex items-center justify-between border-b dark:border-white/5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(item)}
+                  className="flex-1 text-left p-5 flex items-center gap-4 group min-w-0"
+                >
+                  {depth > 0 && (
+                    <div className="text-zinc-300 dark:text-zinc-700 flex items-center -ml-2 mr-1 shrink-0">
+                      <CornerDownRight size={14} className="shrink-0" />
+                    </div>
+                  )}
+
+                  <div className={`h-11 w-11 rounded-xl shrink-0 border flex items-center justify-center overflow-hidden ${
+                    isSpace
+                      ? "bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-950/30 dark:border-amber-900/30 dark:text-amber-400"
+                      : "bg-zinc-50 border-zinc-100 text-zinc-400 dark:bg-zinc-950 dark:border-white/5 dark:text-zinc-600"
+                  }`}>
+                    {isSpace ? <Layers size={20} /> : <Box size={20} />}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-black text-zinc-800 dark:text-zinc-100 text-xs uppercase truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {item.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">
+                        {item.category || "Geral"}
+                      </span>
+                      {isSpace && (
+                        <span className="text-[8px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          Espaço Físico
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 ml-2">
+                    <span
+                      className="text-[9px] font-mono font-black text-zinc-400 bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 px-2 py-1 rounded-lg"
+                      style={depth > 0 && !hasGrandChildren ? { marginRight: `${depth * 0.75}rem` } : undefined}
+                    >
+                      #{item.tag}
+                    </span>
+                  </div>
+                </button>
+
+                {hasGrandChildren && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(item.id)}
+                    className="shrink-0 p-3 mr-3 transition-colors rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  >
+                    <ChevronDown size={16} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {hasGrandChildren && isExpanded && renderChildren(item.id, depth + 1)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <>
       <Head>
-        <title>{active.name} | Inventário</title>
+        <title>{active.name}</title>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </Head>
 
@@ -235,7 +360,7 @@ export default function SpacePublicView() {
           )}
           <div className="relative z-20">
             <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-widest mb-3 inline-block">
-              {active.category || 'Infraestrutura'}
+              {active.category}
             </span>
             <h1 className="text-4xl font-black text-white leading-none mb-6 tracking-tighter uppercase italic">
               {active.name}
@@ -243,7 +368,7 @@ export default function SpacePublicView() {
             <div className="flex flex-wrap gap-2">
                 <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2">
                     <Boxes size={14} className="text-indigo-200"/>
-                    <span className="text-xs font-black text-white">{totalAssets} Itens</span>
+                    <span className="text-xs font-black text-white">{totalAssets} Itens vinculados</span>
                 </div>
                 {totalValue > 0 && (
                     <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2">
@@ -256,49 +381,10 @@ export default function SpacePublicView() {
         </div>
 
         <div className="max-w-xl mx-auto px-4 -mt-8 space-y-6 relative z-30">
-          {totalAssets > 0 ? (
-            sections.map((section, index) => (
-              <div key={section.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms` }}>
-                {section.id !== active.id && (
-                  <div className="flex items-center gap-2 mb-3 ml-2 mt-10">
-                    <CornerDownRight size={16} className="text-indigo-400" />
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-zinc-800 px-3 py-1 rounded-lg text-zinc-500 border border-zinc-200 dark:border-white/5">
-                      {section.name}
-                    </span>
-                  </div>
-                )}
-
-                <div className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-xl overflow-hidden">
-                  {section.items.map((item, idx) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      className={`w-full text-left p-5 flex gap-5 active:bg-zinc-50 dark:active:bg-zinc-800 ${
-                        idx !== section.items.length - 1 ? "border-b border-zinc-100 dark:border-white/5" : ""
-                      }`}
-                    >
-                      <div className="h-16 w-16 rounded-2xl bg-zinc-50 dark:bg-zinc-950 shrink-0 border border-zinc-100 dark:border-white/5 flex items-center justify-center overflow-hidden">
-                        {item.image ? (
-                          <Image src={item.image} fill className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <Layers size={24} className="text-zinc-300 dark:text-zinc-700" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1 flex flex-col justify-center">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-black text-zinc-800 dark:text-zinc-100 text-sm truncate uppercase tracking-tight">
-                            {item.name}
-                          </h3>
-                        </div>
-                        <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1 uppercase">
-                          {item.manufacturer || "Genérico"} {item.model && `• ${item.model}`}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
+          {getDirectChildren(active.id).length > 0 ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-xl overflow-hidden animate-in fade-in duration-300">
+              {renderChildren(active.id, 0)}
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-zinc-900 rounded-[3rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800">
               <PackageX size={64} className="text-zinc-200 dark:text-zinc-800 mb-4" />
@@ -308,7 +394,6 @@ export default function SpacePublicView() {
         </div>
       </div>
 
-      {/* MODAL DE DETALHES (SUB-ITENS) */}
       {selectedItem && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-md" onClick={() => setSelectedItem(null)} />
@@ -319,8 +404,14 @@ export default function SpacePublicView() {
             <div className="h-72 bg-zinc-100 dark:bg-zinc-800 relative">
               {selectedItem.image ? (
                 <Image src={selectedItem.image} fill className="w-full h-full object-cover" alt="" />
+              ) : selectedItem.isPhysicalSpace ? (
+                <div className="w-full h-full flex items-center justify-center text-amber-500 bg-amber-50/50 dark:bg-amber-950/10">
+                  <Layers size={80} strokeWidth={1} />
+                </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-300"><PackageOpen size={80} strokeWidth={1} /></div>
+                <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-700">
+                  <PackageOpen size={80} strokeWidth={1} />
+                </div>
               )}
             </div>
             <div className="px-10 pb-12 -mt-10 relative z-10 bg-white dark:bg-zinc-900 rounded-t-[3rem]">
@@ -347,11 +438,26 @@ export default function SpacePublicView() {
                   </div>
                 </div>
               </div>
-              {selectedItem.fileUrl && (
-                <a href={selectedItem.fileUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black text-xs uppercase">
-                  <FileText size={20} /> Ver PDF
-                  <ExternalLink size={14} className="opacity-50" />
-                </a>
+              {selectedItem.fileUrl && parseFileUrls(selectedItem.fileUrl).length > 0 && (
+                <div className="space-y-2 w-full mt-4">
+                  <p className="text-[9px] font-black text-zinc-400 uppercase italic tracking-wider">
+                    Documentos do Item ({parseFileUrls(selectedItem.fileUrl).length})
+                  </p>
+                  <div className="max-h-40 overflow-y-auto pr-1 space-y-2">
+                    {parseFileUrls(selectedItem.fileUrl).map((url, index) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white py-4 rounded-[1.2rem] font-black text-xs uppercase hover:bg-indigo-700 transition-colors"
+                      >
+                        <FileText size={18} /> Ver Documento #{index + 1}
+                        <ExternalLink size={12} className="opacity-50" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
