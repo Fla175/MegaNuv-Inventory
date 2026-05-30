@@ -8,6 +8,29 @@ import { createLog } from "@/lib/logger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+async function checkExistingSerialNumbers(serialNumbers: string[]): Promise<string[]> {
+  const validSerials = serialNumbers
+    .map((sn) => sn?.trim())
+    .filter((sn) => sn && sn !== "");
+
+  if (validSerials.length === 0) return [];
+
+  const existingActives = await db.active.findMany({
+    where: {
+      serialNumber: {
+        in: validSerials,
+      },
+    },
+    select: {
+      serialNumber: true,
+    },
+  });
+
+  return existingActives
+    .map((active) => active.serialNumber)
+    .filter((sn): sn is string => sn !== null);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
 
@@ -32,9 +55,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const data = req.body;
     const isPhysicalSpace = !!data.isPhysicalSpace;
     
-    // CORREÇÃO: Categoria só é obrigatória se NÃO for um espaço físico
     if (!data.name || !data.fatherSpaceId || (!isPhysicalSpace && !data.categoryId)) {
       return res.status(400).json({ error: "Campos obrigatórios ausentes (Nome, Espaço Pai ou Categoria)." });
+    }
+
+    const serialNumbersToCheck = Array.isArray(data.serialNumbers) ? data.serialNumbers : [];
+    if (serialNumbersToCheck.length > 0) {
+      const conflictingSerials = await checkExistingSerialNumbers(serialNumbersToCheck);
+      
+      if (conflictingSerials.length > 0) {
+        return res.status(409).json({
+          error: "Número de série já cadastrado.",
+          details: `Os seguintes números de série já estão em uso no sistema: ${conflictingSerials.join(", ")}`
+        });
+      }
     }
 
     const quantity = Math.max(1, parseInt(data.quantity) || 1);
@@ -61,13 +95,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           id: finalId,
           name: data.name.trim(),
-          // Se for espaço físico ou string vazia, salva estritamente como NULL no banco
-          categoryId: isPhysicalSpace || !data.categoryId ? null : data.categoryId,
+          categoryId: data.categoryId,
           sku: data.sku || null,
           tag: data.tag || "IN-STOCK",
           manufacturer: data.manufacturer || null,
           model: data.model || null,
-          serialNumber: serialNumber || null,
+          serialNumber: serialNumber.trim() || null,
           fixedValue: parseFloat(data.fixedValue) || 0,
           notes: data.notes || null,
           imageUrl: data.imageUrl || null,
@@ -102,7 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
-      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido no banco de dados.";
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido no banco de dados.";
 
     return res.status(500).json({ 
       error: "Erro interno no servidor ao salvar ativo.", 

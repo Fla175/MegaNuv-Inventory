@@ -36,7 +36,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!name) return res.status(400).json({ error: "O nome da categoria é obrigatório." });
 
-    // 4. COR AUTOMÁTICA (primeira cor disponível)
     const existingColors = await prisma.category.findMany({
       select: { color: true },
       where: { color: { not: null } }
@@ -51,12 +50,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // 5. EXECUÇÃO
     const newCategory = await prisma.category.create({
       data: { name, color: assignedColor }
     });
 
-    // 5. REGISTRO DE AUDITORIA
     await createLog(
       req, 
       decoded.userId, 
