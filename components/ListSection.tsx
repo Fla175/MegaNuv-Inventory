@@ -452,9 +452,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         {children.map((active) => {
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
-          
-          // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
-          const a = categories.find(ar => ar.id === active.categoryId);
+          const categoryObj = categories.find(ar => ar.id === active.categoryId);
+          const categoryName = categoryObj ? categoryObj.name : "Sem Categoria";
 
           const isSelected = selectedItems.has(active.id);
           
@@ -606,16 +605,16 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                         <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getItemColors(true, hasSubItems).text}`}>Espaço Físico</p>
                       }
                       
-                      {a && (
+                      {active.categoryId && (
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{ 
-                            color: getCategoryColor(a.id, categories), 
-                            backgroundColor: `${getCategoryColor(a.id, categories)}15`, 
-                            borderColor: `${getCategoryColor(a.id, categories)}40` 
+                            color: getCategoryColor(active.categoryId), 
+                            backgroundColor: `${getCategoryColor(active.categoryId)}15`, 
+                            borderColor: `${getCategoryColor(active.categoryId)}40` 
                           }}
                         >
-                          {a.name}
+                          {categoryName}
                         </p>
                       )}
 
