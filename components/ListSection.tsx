@@ -756,7 +756,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
                         <InfoItem icon={<Boxes size={16}/>} label="Ativos" Class="truncate" value={`${selectedViewItem.childCount || 0}`} />
-                        <InfoItem icon={<Layers size={16}/>} label="Espaços Filhos" Class="truncate" value={`${selectedViewItem.subSpaceCount || 0}`} />
+                        <InfoItem icon={<Layers size={16}/>} label="Espaços Físicos" Class="truncate" value={`${selectedViewItem.subSpaceCount || 0}`} />
                       </>
                     )}
                   </div>
