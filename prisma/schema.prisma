@@ -85,7 +85,7 @@ model Active {
   sku             String?
   manufacturer    String?
   model           String?
-  serialNumber    String?
+  serialNumber    String?     @unique
   fixedValue      Float       @default(0)
   fatherSpaceId   String
   parentId        String?
