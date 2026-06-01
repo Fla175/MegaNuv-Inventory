@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** v2.15.10
+**Current Version:** v2.15.21
 
 ## 🚀 Features
 
@@ -18,6 +18,7 @@
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
 * **Image attachment**: Attachment of until 5 images for a active.
+* **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * [<ins>***NEW***</ins>] **Custom *Select***: Custom component for Select type Inputs.
 
 ---

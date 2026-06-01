@@ -235,15 +235,35 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       const categoryMatch = category === "" || a.categoryId === category || a.category?.name === category || a.category === category;
       const manufacturerMatch = manufacturer === "" || a.manufacturer?.toLowerCase().includes(manufacturer);
       const modelMatch = model === "" || a.model?.toLowerCase().includes(model);
-
       return nameMatch && categoryMatch && manufacturerMatch && modelMatch;
     };
 
     const visibleActiveIds = new Set<string>();
-    
+
+    const addAllDescendants = (startParentId: string) => {
+      const queue = [startParentId];
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+
+        const children = actives.filter(a => a.parentId === currentId);
+
+        children.forEach(child => {
+          if (!visibleActiveIds.has(child.id)) {
+            visibleActiveIds.add(child.id);
+            queue.push(child.id);
+          }
+        });
+      }
+    };
+
     actives.forEach(active => {
       if (matchesDirectly(active)) {
         visibleActiveIds.add(active.id);
+
+        if (active.isPhysicalSpace) {
+          addAllDescendants(active.id);
+        }
+
         let currentParentId = active.parentId;
         while (currentParentId) {
           visibleActiveIds.add(currentParentId);
@@ -270,6 +290,26 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       hasFilters 
     };
   }, [filters, actives, fatherSpaces]);
+
+  useEffect(() => {
+    if (filteredData.hasFilters) {
+      const newExpanded: Record<string, boolean> = {};
+      
+      filteredData.actives.forEach((item) => {
+        const hasMatchingChildren = filteredData.actives.some(
+          (child) => child.parentId === item.id
+        );
+
+        if (hasMatchingChildren) {
+          newExpanded[item.id] = true;
+        }
+      });
+      
+      setExpandedNodes(newExpanded);
+    } else {
+      setExpandedNodes({});
+    }
+  }, [filters, filteredData.hasFilters, filteredData.actives]);
 
   // --- AÇÕES ---
   const handleMoveAction = async (targetSpaceId: string, targetParentId?: string) => {
@@ -380,6 +420,88 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     });
   };
 
+  const excludedMoveIds = useMemo(() => {
+    if (!movingItem) return new Set<string>();
+    const ids = new Set<string>([movingItem.id]);
+    const queue = [movingItem.id];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      actives.forEach(a => {
+        if (a.parentId === currentId) {
+          ids.add(a.id);
+          queue.push(a.id);
+        }
+      });
+    }
+    return ids;
+  }, [movingItem, actives]);
+
+  const renderMoveTree = (parentId: string | null, spaceId: string) => {
+    const children = actives.filter(a => {
+      if (excludedMoveIds.has(a.id)) return false;
+      if (!a.isPhysicalSpace) return false; // Apenas espaços físicos podem receber ativos
+      
+      if (parentId === null) {
+        return a.fatherSpaceId === spaceId && (!a.parentId || a.parentId === "");
+      }
+      return a.parentId === parentId;
+    });
+
+    if (children.length === 0) return null;
+
+    return (
+      <div className="space-y-1 w-full">
+        {children.map(sub => {
+          const isExpanded = moveExpanded[sub.id];
+          const hasSubSpaces = actives.some(a => a.parentId === sub.id && a.isPhysicalSpace && !excludedMoveIds.has(a.id));
+          
+          return (
+            <div key={sub.id} className="w-full flex flex-col">
+              <div className="flex items-center p-0.5 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all group">
+                <button 
+                  onClick={() => handleMoveAction(spaceId, sub.id)} 
+                  className="flex-1 flex items-center gap-3 p-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-xl transition-all text-left min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50 transition-colors">
+                    <MapPin size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-xs font-black text-zinc-600 dark:text-zinc-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 uppercase truncate w-full">
+                      {sub.name}
+                    </span>
+                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                      Espaço Físico
+                    </span>
+                  </div>
+                </button>
+
+                {hasSubSpaces && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMoveExpanded(p => ({ ...p, [sub.id]: !p[sub.id] }));
+                    }} 
+                    className="p-3 mr-1 text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all shrink-0"
+                  >
+                    <ChevronRight size={16} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Recuo hierárquico com linha guia visual */}
+              {isExpanded && (
+                <div className="border-l dark:border-white/5 ml-5 pl-2 mt-1 space-y-1">
+                  {renderMoveTree(sub.id, spaceId)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // --- RENDERIZAÇÃO DA ÁRVORE ---
   const renderActiveTree = (parentId: string | null, spaceId: string, level: number = 0) => {
     const children = filteredData.actives.filter(a => {
@@ -388,8 +510,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       return a.parentId === parentId;
     });
 
-    // Só mostra empty-state SE o nível tem filhos OU é um espaço físico que foi expandir E não tem filhos
-    // No nível raiz (level 0), não mostra empty-state se children está vazio (mostra o card do espaço pai)
     const hasChildren = children.length > 0;
     
     if (!hasChildren && level > 0) {
@@ -404,7 +524,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       );
     }
 
-    // Se não há filhos no nível raiz, não renderiza nada (o card do espaço pai cuida de mostrar "Nenhum ativo")
     if (!hasChildren && level === 0) {
       return null;
     }
@@ -415,9 +534,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         {children.map((active) => {
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
-          
-          // SOLUÇÃO: Pega a categoria diretamente do backend (se o include estiver ativo) OU busca da nossa lista pelo ID!
-          const a = categories.find(ar => ar.id === active.categoryId);
+          const categoryObj = categories.find(ar => ar.id === active.categoryId);
+          const categoryName = categoryObj ? categoryObj.name : "Sem Categoria";
 
           const isSelected = selectedItems.has(active.id);
           
@@ -569,16 +687,16 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                         <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getItemColors(true, hasSubItems).text}`}>Espaço Físico</p>
                       }
                       
-                      {a && (
+                      {active.categoryId && (
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{ 
-                            color: getCategoryColor(a.id, categories), 
-                            backgroundColor: `${getCategoryColor(a.id, categories)}15`, 
-                            borderColor: `${getCategoryColor(a.id, categories)}40` 
+                            color: getCategoryColor(active.categoryId), 
+                            backgroundColor: `${getCategoryColor(active.categoryId)}15`, 
+                            borderColor: `${getCategoryColor(active.categoryId)}40` 
                           }}
                         >
-                          {a.name}
+                          {categoryName}
                         </p>
                       )}
 
@@ -604,7 +722,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </div>
               </div>
 
-              {(isExpanded || filteredData.hasFilters) && renderActiveTree(active.id, spaceId, level + 1)}
+              {isExpanded && renderActiveTree(active.id, spaceId, level + 1)}
             </div>
           );
         })}
@@ -719,53 +837,60 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
                         <InfoItem icon={<Boxes size={16}/>} label="Ativos" Class="truncate" value={`${selectedViewItem.childCount || 0}`} />
-                        <InfoItem icon={<Layers size={16}/>} label="Espaços Filhos" Class="truncate" value={`${selectedViewItem.subSpaceCount || 0}`} />
+                        <InfoItem icon={<Layers size={16}/>} label="Espaços Físicos" Class="truncate" value={`${selectedViewItem.subSpaceCount || 0}`} />
                       </>
                     )}
                   </div>
 
-                  {/* --- SEÇÃO DE ARQUIVOS ANEXADOS (NOVO) --- */}
                   <div className="pt-4 border-t dark:border-white/5">
                     <h4 className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
-                      Documentos e Anexos
+                      Documentos & Anexos
                     </h4>
                     
-                    {selectedViewItem.fileUrl && (Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl.length > 0 : true) ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {(Array.isArray(selectedViewItem.fileUrl) ? selectedViewItem.fileUrl : [selectedViewItem.fileUrl]).map((url: string, index: number) => {
-                          const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
-                          
-                          return (
-                            <a 
-                              key={index}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
-                            >
-                              <div className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
-                                <Icon size={18} />
-                              </div>
-                              
-                              <div className="flex flex-col flex-1 overflow-hidden">
-                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline" title={displayName}>
-                                  {displayName}
-                                </span>
-                                {extension !== 'link' && (
-                                  <span className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}>
-                                    .{extension}
+                    {(() => {
+                      const filesArray = typeof selectedViewItem.fileUrl === 'string'
+                        ? selectedViewItem.fileUrl.split(',').map((url: string) => url.trim()).filter(Boolean)
+                        : Array.isArray(selectedViewItem.fileUrl)
+                          ? selectedViewItem.fileUrl.filter(Boolean)
+                          : [];
+
+                      return filesArray.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {filesArray.map((url: string, index: number) => {
+                            const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
+                            
+                            return (
+                              <a 
+                                key={index}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
+                              >
+                                <div className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
+                                  <Icon size={18} />
+                                </div>
+                                
+                                <div className="flex flex-col flex-1 overflow-hidden">
+                                  <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline" title={displayName}>
+                                    {displayName}
                                   </span>
-                                )}
-                              </div>
-                            </a>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic pl-1">
-                        Nenhum documento anexado a este ativo.
-                      </p>
-                    )}
+                                  {extension !== 'link' && (
+                                    <span className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}>
+                                      .{extension}
+                                    </span>
+                                  )}
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 italic pl-1">
+                          Nenhum documento anexado a este ativo.
+                        </p>
+                      );
+                    })()}
                   </div>
                   {/* --- FIM DA SEÇÃO DE ARQUIVOS --- */}
               </div>
@@ -885,7 +1010,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
               <div className="p-4 max-h-[50vh] overflow-y-auto space-y-3 custom-scrollbar">
                 {fatherSpaces.map(space => {
                     const isExpanded = moveExpanded[space.id];
-                    const subActives = actives.filter(a => a.fatherSpaceId === space.id && a.isPhysicalSpace && a.id !== movingItem.id);
+                    
+                    // Verifica se existem ativos físicos de nível superior vinculados diretamente a este Espaço Pai
+                    const hasTopLevelActives = actives.some(a => 
+                      a.fatherSpaceId === space.id && 
+                      a.isPhysicalSpace && 
+                      (!a.parentId || a.parentId === "") &&
+                      !excludedMoveIds.has(a.id)
+                    );
 
                     return (
                         <div key={space.id} className="border dark:border-white/5 rounded-2xl overflow-hidden bg-zinc-50 dark:bg-zinc-950/50">
@@ -902,7 +1034,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                                   </span>
                                 </button>
 
-                                {subActives.length > 0 && (
+                                {hasTopLevelActives && (
                                   <button 
                                     onClick={() => setMoveExpanded(p => ({ ...p, [space.id]: !p[space.id] }))} 
                                     className="p-4 mr-1 text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
@@ -912,27 +1044,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                                 )}
                             </div>
 
-                            {isExpanded && subActives.length > 0 && (
+                            {isExpanded && hasTopLevelActives && (
                                 <div className="border-t dark:border-white/5 p-2 space-y-1 bg-white dark:bg-zinc-900 pl-4">
-                                    {subActives.map(sub => (
-                                        <button 
-                                          key={sub.id} 
-                                          onClick={() => handleMoveAction(space.id, sub.id)} 
-                                          className="w-full flex items-center gap-3 p-3 pl-4 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-xl transition-all group"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                                                <MapPin size={14} className="text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-                                            </div>
-                                            <div className="flex flex-col items-start">
-                                              <span className="text-xs font-black text-zinc-600 dark:text-zinc-300 group-hover:text-emerald-600 uppercase">
-                                                {sub.name}
-                                              </span>
-                                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
-                                                Espaço Físico
-                                              </span>
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {renderMoveTree(null, space.id)}
                                 </div>
                             )}
                         </div>

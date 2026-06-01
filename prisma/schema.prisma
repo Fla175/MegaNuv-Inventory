@@ -81,17 +81,17 @@ model FatherSpace {
 model Active {
   id              String      @id
   name            String
-  categoryId      String?
+  categoryId      String
   sku             String?
   manufacturer    String?
   model           String?
-  serialNumber    String?
+  serialNumber    String?     @unique
   fixedValue      Float       @default(0)
+  fatherSpaceId   String
   parentId        String?
   isPhysicalSpace Boolean
   tag             String      @default("IN-STOCK")
   notes           String?     @db.Text
-  fatherSpaceId   String
   createdById     String?
   imageUrl        String?
   fileUrl         String?     @db.Text

@@ -8,7 +8,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
-  // Autenticação JWT
   const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Sessão expirada." });
 
@@ -18,13 +17,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const decoded = payload as { role: string };
     if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
 
-    // 1. Estatísticas de Ativos e Valor
     const activeStats = await prisma.active.aggregate({
       _sum: { fixedValue: true },
       _count: { id: true }
     });
 
-    // 2. Busca todas as categorias para garantir que as vazias também apareçam
     const allCategoriesList = await prisma.category.findMany({
       select: { id: true, name: true, color: true }
     });
@@ -33,25 +30,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const totalActives = activeStats._count.id || 0;
     const totalCategories = allCategoriesList.length;
 
-    // 3. Contagem de Espaços
     const totalFatherSpaces = await prisma.fatherSpace.count();
     const totalPhysicalSpaces = await prisma.active.count({ where: { isPhysicalSpace: true } });
     const totalSpaces = totalFatherSpaces + totalPhysicalSpaces;
 
-    // 4. Ativos agrupados por Categoria
     const allActives = await prisma.active.findMany({
-      where: { isPhysicalSpace: false },
       select: {
         id: true,
         name: true,
         tag: true,
+        isPhysicalSpace: true,
         category: {
           select: { name: true, color: true }
         }
       }
     });
 
-    // Agrupa os ativos pelo nome da categoria
     const assetsByCategory = allActives.reduce<Record<string, typeof allActives>>((acc, active) => {
       const categoryName = active.category?.name || 'OUTROS';
       if (!acc[categoryName]) acc[categoryName] = [];
@@ -59,7 +53,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return acc;
     }, {});
 
-    // 5. Listagens Recentes de Ativos Criados
     const rawRecentActives = await prisma.active.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
@@ -73,13 +66,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Mapeia os ativos recentes convertendo a data para string ISO
     const recentActives = rawRecentActives.map(ativo => ({
       ...ativo,
       createdAt: ativo.createdAt ? ativo.createdAt.toISOString() : undefined
     }));
 
-    // 6. Consulta real no histórico de movimentações da nova tabela 'Movement'
     const movementsHistory = await prisma.movement.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
@@ -96,17 +87,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Mapeia o histórico para manter o mesmo contrato exato esperado pelo Front-end
-    const recentMovements = movementsHistory.map(mov => ({
-      imageUrl: mov.active?.imageUrl || null,
-      id: mov.active?.id,
-      name: mov.active?.name,
-      tag: mov.active?.tag,
-      category: mov.active?.category || null,
-      updatedAt: mov.createdAt ? mov.createdAt.toISOString() : undefined,
-      fromSpaceId: mov.fromSpaceId,
-      toSpaceId: mov.toSpaceId,
-    }));
+    const spaceIds = new Set<string>();
+    movementsHistory.forEach(mov => {
+      if (mov.fromSpaceId) spaceIds.add(mov.fromSpaceId);
+      if (mov.toSpaceId) spaceIds.add(mov.toSpaceId);
+    });
+    const uniqueSpaceIds = Array.from(spaceIds);
+
+    const [fatherSpacesDb, physicalSpacesDb] = await Promise.all([
+      prisma.fatherSpace.findMany({
+        where: { id: { in: uniqueSpaceIds } },
+        select: { id: true, name: true }
+      }),
+      prisma.active.findMany({
+        where: { 
+          id: { in: uniqueSpaceIds },
+          isPhysicalSpace: true
+        },
+        select: { id: true, name: true }
+      })
+    ]);
+
+    const spaceNameMap = new Map<string, string>();
+    fatherSpacesDb.forEach(space => spaceNameMap.set(space.id, space.name));
+    physicalSpacesDb.forEach(space => spaceNameMap.set(space.id, space.name));
+
+    const recentMovements = movementsHistory.map(mov => {
+      const fromName = spaceNameMap.get(mov.fromSpaceId) || `Espaço (${mov.fromSpaceId.substring(0, 5)}...)`;
+      const toName = spaceNameMap.get(mov.toSpaceId) || `Espaço (${mov.toSpaceId.substring(0, 5)}...)`;
+
+      return {
+        imageUrl: mov.active?.imageUrl || null,
+        id: mov.active?.id,
+        name: mov.active?.name,
+        tag: mov.active?.tag,
+        category: mov.active?.category || null,
+        updatedAt: mov.createdAt ? mov.createdAt.toISOString() : undefined,
+        fromSpaceId: fromName,
+        toSpaceId: toName,
+      };
+    });
     
     return res.status(200).json({
       totalValue: totalValue,

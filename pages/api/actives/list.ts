@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const formatted = actives.map(item => ({
       ...item,
-      childrenCount: item._count.children,
+      childrenCount: item._count?.children || 0,
       _count: undefined
     }));
 

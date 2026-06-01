@@ -1,7 +1,6 @@
 // lib/logger.ts
 import prisma from "./prisma";
 import { NextApiRequest } from "next";
-import { UseToast } from "./context/ToastContext";
 
 /**
  * @param req - Objeto da requisição para extrair IP e UserAgent
@@ -30,8 +29,6 @@ export async function createLog(
       },
     });
   } catch (err) {
-    const toast = UseToast();
-    toast.showError(`Erro crítico de log: ${err}`);
-
+    console.error(`Erro crítico de log: ${err}`);
   }
 }

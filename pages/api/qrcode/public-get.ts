@@ -2,56 +2,75 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
-interface SectionItem {
+interface SectionActive {
   id: string;
   name: string;
   imageUrl?: string | null;
-  createdBy?: { name: string | null } | string | null;
+  sku?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  tag?: string | null;
+  fileUrl?: string | null;
+  isPhysicalSpace?: boolean;
+  category?: string;
+  createdAt?: Date | string;
+  depth: number;
 }
 
 interface Section {
   id: string;
   name: string;
-  items: SectionItem[];
+  actives: SectionActive[];
 }
 
-// Função auxiliar para buscar filhos recursivamente e montar as seções
-async function buildHierarchy(id: string, name: string, isFirstLevel = false) {
+async function buildHierarchy(id: string, name: string, isFirstLevel = false, currentDepth = 0) {
   const active = await prisma.active.findUnique({
     where: { id },
     include: {
       children: {
-        include: { createdBy: { select: { name: true } } }
+        include: {
+          createdBy: { select: { name: true } },
+          category: { select: { name: true } },
+        },
       },
-      createdBy: { select: { name: true } }
+      createdBy: { select: { name: true } },
+      category: { select: { name: true } },
     }
   });
 
   if (!active) return [];
 
   let sections: Section[] = [];
-  
-  // Itens que NÃO são espaços (ativos puros) nesta seção
-  const assetsOnly = active.children.filter(c => !c.isPhysicalSpace);
-  // Itens que SÃO espaços (sub-espaços)
-  const subSpaces = active.children.filter(c => c.isPhysicalSpace);
 
-  // Adiciona a seção atual se ela tiver ativos ou se for o nível raiz
-  if (assetsOnly.length > 0 || isFirstLevel) {
+  const allAssets = active.children;
+  const physicalSpaces = active.children.filter(c => c.isPhysicalSpace);
+
+  if (allAssets.length > 0 || isFirstLevel) {
     sections.push({
       id: active.id,
       name: isFirstLevel ? "Conteúdo Principal" : `Dentro de: ${active.name}`,
-      items: assetsOnly.map(a => ({
-        ...a,
-        image: a.imageUrl,
-        createdBy: a.createdBy?.name || "Sistema"
+      // 👇 Injeta a profundidade correta (depth) em cada ativo desta seção
+      actives: allAssets.map(a => ({
+        id: a.id,
+        name: a.name,
+        imageUrl: a.imageUrl,
+        sku: a.sku,
+        manufacturer: a.manufacturer,
+        model: a.model,
+        serialNumber: a.serialNumber,
+        tag: a.tag,
+        fileUrl: a.fileUrl,
+        isPhysicalSpace: !!a.isPhysicalSpace,
+        category: a.category?.name,
+        createdAt: a.createdAt,
+        depth: currentDepth,
       }))
     });
   }
 
-  // Para cada sub-espaço, chamamos a função recursivamente para trazer os itens DELES
-  for (const space of subSpaces) {
-    const subSections = await buildHierarchy(space.id, space.name);
+  for (const space of physicalSpaces) {
+    const subSections = await buildHierarchy(space.id, space.name, false, currentDepth + 1);
     sections = [...sections, ...subSections];
   }
 
@@ -63,10 +82,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!id || typeof id !== 'string') return res.status(400).json({ message: 'ID inválido' });
 
   try {
-    // 1. Tenta buscar na tabela ACTIVE (o caso do seu Gabinete/SDKNGAMK)
     const rootActive = await prisma.active.findUnique({
       where: { id },
-      include: { createdBy: { select: { name: true } } }
+      include: {
+        createdBy: { select: { name: true } },
+        category: { select: { name: true } },
+      },
     });
 
     if (rootActive) {
@@ -78,7 +99,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           root: {
             ...rootActive,
             isPhysicalSpace: true,
-            createdBy: rootActive.createdBy?.name || "Sistema"
+            category: rootActive.category?.name,
+            createdBy: rootActive.createdBy?.name || "Desconhecido",
           },
           sections: allSections
         });
@@ -86,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Se for ativo individual
       return res.status(200).json({
-        root: { ...rootActive, isPhysicalSpace: false, createdBy: rootActive.createdBy?.name || "Sistema" },
+        root: { ...rootActive, isPhysicalSpace: false, createdBy: rootActive.createdBy?.name || "Desconhecido" },
         sections: []
       });
     }

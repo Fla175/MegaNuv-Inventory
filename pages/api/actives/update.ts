@@ -26,6 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? data.serialNumbers.filter((s: string) => s && s.trim()).join(', ')  // Join multiple serials
       : data.serialNumber || data.serialNumbers?.[0] || null;
 
+    const fileUrlValue = Array.isArray(data.fileUrl)
+      ? data.fileUrl.filter((u: string) => u && u.trim()).join(',')
+      : data.fileUrl !== undefined ? data.fileUrl : undefined;
+
     const updated = await db.active.update({
       where: { id },
       data: {
@@ -39,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         tag: data.tag,
         notes: data.notes,
         imageUrl: data.imageUrl,
+        fileUrl: fileUrlValue,
         isPhysicalSpace: data.isPhysicalSpace,
         fatherSpaceId: data.fatherSpaceId,
         parentId: data.parentId || null,
