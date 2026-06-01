@@ -31,7 +31,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { id, name, color } = req.body;
 
-    if (!id) return res.status(400).json({ error: "O ID da área é obrigatório." });
+    if (!id) return res.status(400).json({ error: "O ID da categoria é obrigatório." });
+
+    if (name) {
+      const nameAlreadyExists = await prisma.category.findFirst({
+        where: { 
+          name: name,
+          id: { not: id }
+        }
+      });
+
+      if (nameAlreadyExists) {
+        return res.status(400).json({ error: "Já existe uma categoria registrada com este nome." });
+      }
+    }
 
     // 1. Executa o Update
     const updatedCategory = await prisma.category.update({
@@ -57,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "Categoria não encontrada." });
     }
     
-    const message = error instanceof Error ? error.message : 'Erro interno ao atualizar área.';
+    const message = error instanceof Error ? error.message : 'Erro interno ao atualizar categoria.';
     return res.status(500).json({ error: message });
   }
 }

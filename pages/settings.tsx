@@ -197,14 +197,40 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+
       if (res.ok) {
         setIsCategoryModalOpen(false);
         fetchData('/api/categories/list', setCategoriesList);
+        toast.showSuccess('Categoria salva com sucesso!');
+      } else {
+        const errorData = await res.json();
+        toast.showError(errorData.error || 'Erro ao salvar: este nome pode já estar em uso.');
       }
-    } finally { setSaving(false); }
+    } catch {
+      toast.showError('Erro de conexão com o servidor ao salvar categoria.');
+    } finally { 
+      setSaving(false); 
+    }
   };
 
   const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
+    if (type === 'category' && id) {
+      try {
+        const checkRes = await fetch(`/api/categories/check-assets?id=${id}`);
+        if (checkRes.ok) {
+          const { hasAssets } = await checkRes.json();
+          
+          if (hasAssets) {
+            toast.showError('Não é possível excluir esta categoria pois existem ativos vinculados a ela.');
+            return;
+          }
+        }
+      } catch {
+        toast.showError('Erro ao verificar dependências da categoria.');
+        return;
+      }
+    }
+
     const dialogConfig: Record<string, { title: string; message: string; variant: 'danger' }> = {
       user: { 
         title: 'Confirmar Exclusão de Usuário', 
@@ -227,7 +253,7 @@ export default function SettingsPage() {
         variant: 'danger' 
       },
     };
-    
+
     const config = dialogConfig[type];
     
     setConfirmDialog({
@@ -244,6 +270,7 @@ export default function SettingsPage() {
           else if (type === 'logs') endpoint = `/api/logs/clear`;
 
           const res = await fetch(endpoint, { method: 'DELETE' });
+          
           if (res.ok) {
             if (type === 'user' && id === user?.id) window.location.href = '/login';
             else if (activeTab === 'users') fetchData('/api/users', setUsersList);
@@ -251,9 +278,15 @@ export default function SettingsPage() {
             else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
             else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
             toast.showSuccess('Exclusão realizada com sucesso.');
+          } else {
+            const errorData = await res.json();
+            toast.showError(errorData.error || 'Erro ao realizar a exclusão.');
           }
-          } catch { /* erro silencioso */ }
-         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        } catch { 
+          toast.showError('Erro de conexão com o servidor ao tentar excluir.');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
     });
   };

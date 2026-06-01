@@ -36,6 +36,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!name) return res.status(400).json({ error: "O nome da categoria é obrigatório." });
 
+    const nameAlreadyExists = await prisma.category.findFirst({
+      where: { 
+        name: name
+      }
+    });
+
+    if (nameAlreadyExists) {
+      return res.status(400).json({ error: "Já existe uma categoria registrada com este nome." });
+    }
+
     const existingColors = await prisma.category.findMany({
       select: { color: true },
       where: { color: { not: null } }
@@ -58,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       req, 
       decoded.userId, 
       "CRIAÇÃO DE CATEGORIA",
-      `Criou a Categoria: ${name} (${assignedColor || 'sem cor definida'})`
+      `Criou a Categoria: ${name} (${assignedColor})`
     );
 
     return res.status(201).json(newCategory);

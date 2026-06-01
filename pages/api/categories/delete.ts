@@ -52,7 +52,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ message: "Área removida com sucesso." });
   
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro ao remover área. Verifique se existem ativos vinculados a ela.';
+    // Verifica se é erro de violação de chave estrangeira (P2003) no Prisma
+    const err = error as { code?: string };
+    if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2003') {
+      return res.status(400).json({ error: "Não é possível excluir esta categoria pois existem ativos ou registros vinculados a ela." });
+    }
+
+    // Se for erro de validação JWT
+    if (error instanceof jose.errors.JWTInvalid) {
+      return res.status(401).json({ error: "Token inválido." });
+    }
+
+    // Outros erros
+    const message = error instanceof Error ? error.message : 'Erro interno ao excluir categoria.';
     return res.status(500).json({ error: message });
   }
 }
