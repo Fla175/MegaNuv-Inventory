@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const [movementPage, setMovementPage] = useState(1);
   const itemsPerPage = 10;
 
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
 
   useEffect(() => {
     async function fetchStats() {
@@ -87,7 +87,8 @@ export default function DashboardPage() {
       }
     }
     fetchStats();
-  }, []);
+    refreshUser();
+  }, [refreshUser]);
   const isDirector = user?.role === "DIRECTOR";
 
   const sortedCreations = useMemo(() => {

@@ -83,7 +83,8 @@ export default function SettingsPage() {
     } else {
       setRole('');
     }
-  }, [selectedUser]);
+    refreshUser();
+  }, [selectedUser, refreshUser]);
   
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
