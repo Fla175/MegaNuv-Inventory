@@ -2,11 +2,11 @@
 import * as Minio from 'minio';
 
 export const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
+  endPoint: process.env.MINIO_ENDPOINT || '178.95.47.68',
   port: Number(process.env.MINIO_PORT) || 9001,
   useSSL: process.env.MINIO_USE_SSL === 'false',
-  accessKey: process.env.MINIO_ACCESS_KEY || 'minio',
-  secretKey: process.env.MINIO_SECRET_KEY || '123asd!@#',
+  accessKey: process.env.MINIO_ACCESS_KEY || 'admin',
+  secretKey: process.env.MINIO_SECRET_KEY || 'MinIo2026%',
 });
 
 export const BUCKET_NAME = 'inventory';
