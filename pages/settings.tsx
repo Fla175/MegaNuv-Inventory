@@ -477,7 +477,7 @@ export default function SettingsPage() {
                             <div>
                               <div className="absolute top-0 right-2 p-2 text-blue-500/10 group-hover:scale-125 transition-transform duration-500"><LayoutDashboard size={60} /></div>
                               <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
-                              <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem observações.'}</p>
+                              <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem notas.'}</p>
                             </div>
                           </div>
                           <div className="flex gap-3 mt-6">
@@ -665,7 +665,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-6 mb-10">
               <input name="name" placeholder="Nome do Local" defaultValue={selectedSpace?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-              <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Observações..."></textarea>
+              <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Notas..."></textarea>
               <ImageUpload 
                 value={spaceImageUrl || selectedSpace?.imageUrl || null} 
                 onChange={(url) => setSpaceImageUrl(url)} 

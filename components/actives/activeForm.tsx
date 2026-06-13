@@ -587,7 +587,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Observações Adicionais</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Notas</label>
             <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData(prev => ({...prev, notes: e.target.value}))} />
           </div>
         </form>
