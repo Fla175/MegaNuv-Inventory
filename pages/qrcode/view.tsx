@@ -5,9 +5,9 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import {
   Layers, Loader2, AlertCircle, PackageOpen, CornerDownRight, 
-  DollarSign, X, Info, PackageX, Hash, 
-  Boxes, Tag, FileText, FileImage, File, ExternalLink, 
-  User, Calendar, Box, ChevronDown
+  DollarSign, X, PackageX, Hash, 
+  Boxes, FileText, FileImage, File, ExternalLink, 
+  User, Box, ChevronDown, Factory
 } from "lucide-react";
 
 interface AssetActive {
@@ -25,6 +25,7 @@ interface AssetActive {
   createdAt?: string;
   isPhysicalSpace?: boolean | number;
   depth?: number;
+  notes?: string;
 }
 
 interface Section {
@@ -51,6 +52,7 @@ interface ViewData {
     fileUrl?: string;
     createdBy?: Date;
     createdAt?: string;
+    notes?: string;
   };
   sections: Section[];
 }
@@ -147,110 +149,6 @@ export default function SpacePublicView() {
   const active = data.root;
   const sections: Section[] = data.sections || [];
 
-  const hasSubItems = sections.length > 0 && sections.some(s => s.actives.length > 0);
-  const isPhysicalSpace = active.isPhysicalSpace === true || active.isPhysicalSpace === 1 || hasSubItems;
-
-  // ==========================================
-  // MODO 1: VISUALIZAÇÃO DE ATIVO (INDIVIDUAL)
-  // ==========================================
-  if (!isPhysicalSpace) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 font-sans pb-16">
-        <Head>
-          <title>{active.name} | Especificações</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        </Head>
-
-        <div className="h-80 bg-zinc-100 dark:bg-zinc-900 relative rounded-b-[3rem] overflow-hidden shadow-2xl">
-          {active.imageUrl ? (
-            <Image src={active.imageUrl} fill className="w-full h-full object-cover" alt="" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-              <PackageOpen size={80} strokeWidth={1} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-zinc-950 via-transparent to-transparent opacity-90" />
-        </div>
-
-        <div className="px-6 -mt-16 relative z-10 max-w-xl mx-auto">
-          <div className="flex items-center gap-2 mb-3">
-            <Tag size={12} className="text-indigo-500" />
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded bg-white/50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 uppercase backdrop-blur-md ${
-              active.tag === "IN-STOCK" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
-            }`}>
-              {active.tag === "IN-STOCK" ? "Em Estoque" : "Em Operação"}
-            </span>
-          </div>
-
-          <h1 className="text-4xl font-black text-zinc-900 dark:text-white leading-none uppercase italic tracking-tighter mb-2">
-            {active.name}
-          </h1>
-          <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mb-8 uppercase tracking-widest">
-            {active.manufacturer || "Genérico"} {active.model && `• ${active.model}`}
-          </p>
-
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-zinc-50 dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-100 dark:border-white/5 shadow-sm">
-              <p className="text-[9px] font-black text-zinc-400 uppercase mb-1 flex items-center gap-1.5 italic">
-                <Hash size={12}/> Identificador SKU
-              </p>
-              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{active.sku || 'N/A'}</p>
-            </div>
-
-            <div className="bg-zinc-50 dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-100 dark:border-white/5 shadow-sm">
-              <p className="text-[9px] font-black text-zinc-400 uppercase mb-1 flex items-center gap-1.5 italic">
-                <User size={12}/> Criado por
-              </p>
-              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{getCreatorName(active.createdBy)}</p>
-            </div>
-
-            <div className="bg-zinc-50 dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-100 dark:border-white/5 shadow-sm col-span-2 flex justify-between items-center">
-               <div>
-                  <p className="text-[9px] font-black text-zinc-400 uppercase mb-1 flex items-center gap-1.5 italic">
-                    <Info size={12}/> Número de Série
-                  </p>
-                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase">{active.serialNumber || 'N/A'}</p>
-               </div>
-               <div className="text-right">
-                  <p className="text-[9px] font-black text-zinc-400 uppercase mb-1 flex items-center gap-1.5 italic justify-end">
-                    <Calendar size={12}/> Cadastro
-                  </p>
-                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{formatDate(active.createdAt)}</p>
-               </div>
-            </div>
-          </div>
-
-          {active.fileUrl && parseFileUrls(active.fileUrl).length > 0 && (
-            <div className="space-y-3 w-full">
-              <p className="text-[9px] font-black text-zinc-400 uppercase italic tracking-wider mb-1">
-                Documentos & Anexos ({parseFileUrls(active.fileUrl).length})
-              </p>
-              {parseFileUrls(active.fileUrl).map((url: string, index: number) => {
-                const { icon: Icon, bgColor } = getFileDetails(url);
-                return (
-                  <a
-                    key={index}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`w-full flex items-center justify-center gap-3 text-white py-4 rounded-[1.5rem] font-black text-xs uppercase shadow-lg transition-colors ${bgColor}`}
-                  >
-                    <Icon size={18} /> Documento #{index + 1}
-                    <ExternalLink size={12} className="opacity-50" />
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // MODO 2: VISUALIZAÇÃO DE ESPAÇO (LISTAGEM)
-  // ==========================================
   const totalAssets = sections.reduce((acc, sec) => acc + (sec.actives?.length || 0), 0);
   const totalValue = (active.fixedValue || 0) + sections.reduce((acc, sec) => acc + (sec.fixedValue || 0), 0);
 
@@ -280,6 +178,12 @@ export default function SpacePublicView() {
           return (
             <div key={item.id} className="w-full flex flex-col">
               <div className="w-full flex items-center justify-between border-b dark:border-white/5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                {depth > 0 && (
+                  <div className="text-zinc-300 dark:text-zinc-700 flex items-center -ml-2 mr-1 shrink-0">
+                    <CornerDownRight size={14} className="shrink-0" />
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setSelectedItem(item)}
@@ -291,13 +195,28 @@ export default function SpacePublicView() {
                     </div>
                   )}
 
-                  <div className={`h-11 w-11 rounded-xl shrink-0 border flex items-center justify-center overflow-hidden ${
-                    isSpace
-                      ? "bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-950/30 dark:border-amber-900/30 dark:text-amber-400"
-                      : "bg-zinc-50 border-zinc-100 text-zinc-400 dark:bg-zinc-950 dark:border-white/5 dark:text-zinc-600"
-                  }`}>
-                    {isSpace ? <Layers size={20} /> : <Box size={20} />}
-                  </div>
+                  {isSpace && hasGrandChildren ? (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(item.id);
+                      }}
+                      className="h-11 w-11 rounded-xl shrink-0 border flex items-center justify-center overflow-hidden bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-950/30 dark:border-amber-900/30 dark:text-amber-400 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+                      title="Expandir/Recolher Espaço"
+                    >
+                      <Layers size={20} />
+                    </div>
+                  ) : (
+                    <div className={`h-11 w-11 rounded-xl shrink-0 border flex items-center justify-center overflow-hidden ${
+                      isSpace
+                        ? "bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-950/30 dark:border-amber-900/30 dark:text-amber-400"
+                        : "bg-zinc-50 border-zinc-100 text-zinc-400 dark:bg-zinc-950 dark:border-white/5 dark:text-zinc-600"
+                    }`}>
+                      {isSpace ? <Layers size={20} /> : <Box size={20} />}
+                    </div>
+                  )}
 
                   <div className="min-w-0 flex-1">
                     <h3 className="font-black text-zinc-800 dark:text-zinc-100 text-xs uppercase truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
@@ -359,13 +278,20 @@ export default function SpacePublicView() {
             </div>
           )}
           <div className="relative z-20">
-            <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-widest mb-3 inline-block">
-              {active.category}
-            </span>
-            <h1 className="text-4xl font-black text-white leading-none mb-6 tracking-tighter uppercase italic">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-widest inline-block">
+                {active.category || 'Geral'}
+              </span>
+              <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded bg-indigo-950/40 border border-white/10 text-indigo-100 inline-block">
+                #{active.tag || 'S/T'}
+              </span>
+            </div>
+            
+            <h1 className="text-4xl font-black text-white leading-none mb-1 tracking-tighter uppercase italic">
               {active.name}
             </h1>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex flex-wrap gap-2 mt-4">
                 <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2">
                     <Boxes size={14} className="text-indigo-200"/>
                     <span className="text-xs font-black text-white">{totalAssets} Itens vinculados</span>
@@ -381,16 +307,103 @@ export default function SpacePublicView() {
         </div>
 
         <div className="max-w-xl mx-auto px-4 -mt-8 space-y-6 relative z-30">
-          {getDirectChildren(active.id).length > 0 ? (
-            <div className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-xl overflow-hidden animate-in fade-in duration-300">
-              {renderChildren(active.id, 0)}
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-xl border border-zinc-100 dark:border-white/5 space-y-4">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] italic flex items-center gap-2 mb-4">
+              <FileText size={14} className="text-indigo-500"/> Dados do Ativo
+            </h2>
+
+            {(active.manufacturer || active.model) && (
+              <div>
+                <div className={`grid ${(active.manufacturer && active.model) ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+                  <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-2xl border border-zinc-100 dark:border-white/5">
+                    <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic"><Factory size={10} className="inline mr-1"/> Fabricante</p>
+                    <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{active.manufacturer || 'Genérico'}</p>
+                  </div>
+                  {active.model && (
+                    <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-2xl border border-zinc-100 dark:border-white/5">
+                      <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic">Modelo</p>
+                      <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{active.model}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-2xl border border-zinc-100 dark:border-white/5">
+                <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic"><Hash size={10} className="inline mr-1"/> SKU</p>
+                <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{active.sku || 'N/A'}</p>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-2xl border border-zinc-100 dark:border-white/5">
+                <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic">Nº de Série</p>
+                <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">{active.serialNumber || 'N/A'}</p>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-2xl border border-zinc-100 dark:border-white/5 col-span-2 flex justify-between items-center">
+                <div>
+                  <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic"><User size={10} className="inline mr-1"/> Cadastrado por</p>
+                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{getCreatorName(active.createdBy)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-black text-zinc-400 uppercase mb-0.5 italic">Data de Registro</p>
+                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{formatDate(active.createdAt)}</p>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-zinc-900 rounded-[3rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800">
-              <PackageX size={64} className="text-zinc-200 dark:text-zinc-800 mb-4" />
-              <h2 className="text-xs font-black text-zinc-400 uppercase tracking-[0.3em]">Espaço Vazio</h2>
-            </div>
-          )}
+
+            {active.notes && (
+              <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-white/5 col-span-2">
+                <p className="text-[9px] font-black text-zinc-400 uppercase mb-1 italic flex items-center gap-1">
+                  Nota
+                </p>
+                <p className="text-xs font-medium text-zinc-600 dark:text-zinc-300 whitespace-pre-line leading-relaxed">
+                  {active.notes}
+                </p>
+              </div>
+            )}
+
+            {active.fileUrl && parseFileUrls(active.fileUrl).length > 0 && (
+              <div className="space-y-2 pt-4 mt-2 border-t border-dashed border-zinc-100 dark:border-white/5">
+                <p className="text-[9px] font-black text-zinc-400 uppercase italic tracking-wider">
+                  Documentos Anexados ({parseFileUrls(active.fileUrl).length})
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {parseFileUrls(active.fileUrl).map((url, index) => {
+                    const { icon: FileIcon, bgColor } = getFileDetails(url);
+                    return (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-white font-black text-xs uppercase transition-colors ${bgColor}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <FileIcon size={14} /> Abrir Documento #{index + 1}
+                        </span>
+                        <ExternalLink size={12} className="opacity-60" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] italic flex items-center gap-2 mb-3 pl-4">
+              <Layers size={14} className="text-indigo-500"/> Ativos Vinculados
+            </h2>
+            {getDirectChildren(active.id).length > 0 ? (
+              <div className="bg-white dark:bg-zinc-900 rounded-[2rem] shadow-xl overflow-hidden animate-in fade-in duration-300">
+                {renderChildren(active.id, 0)}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-zinc-900 rounded-[3rem] border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                <PackageX size={44} className="text-zinc-200 dark:text-zinc-800 mb-2" />
+                <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.3em]">Nenhum ativo vinculado</h2>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -441,21 +454,25 @@ export default function SpacePublicView() {
               {selectedItem.fileUrl && parseFileUrls(selectedItem.fileUrl).length > 0 && (
                 <div className="space-y-2 w-full mt-4">
                   <p className="text-[9px] font-black text-zinc-400 uppercase italic tracking-wider">
-                    Documentos do Item ({parseFileUrls(selectedItem.fileUrl).length})
+                    Documentos Anexados ({parseFileUrls(selectedItem.fileUrl).length})
                   </p>
                   <div className="max-h-40 overflow-y-auto pr-1 space-y-2">
-                    {parseFileUrls(selectedItem.fileUrl).map((url, index) => (
-                      <a
-                        key={index}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-3 bg-indigo-600 text-white py-4 rounded-[1.2rem] font-black text-xs uppercase hover:bg-indigo-700 transition-colors"
-                      >
-                        <FileText size={18} /> Ver Documento #{index + 1}
-                        <ExternalLink size={12} className="opacity-50" />
-                      </a>
-                    ))}
+                    {parseFileUrls(selectedItem.fileUrl).map((url, index) => {
+                      const { icon: FileIcon, bgColor } = getFileDetails(url);
+
+                      return (
+                        <a
+                          key={index}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`w-full flex items-center justify-center gap-3 text-white py-4 rounded-[1.2rem] font-black text-xs uppercase transition-colors ${bgColor}`}
+                        >
+                          <FileIcon size={18} /> Ver Documento #{index + 1}
+                          <ExternalLink size={12} className="opacity-50" />
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}
