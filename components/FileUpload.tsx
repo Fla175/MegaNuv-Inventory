@@ -70,9 +70,38 @@ export default function FileUpload({
     setLinkInput('');
   };
 
-  const handleRemoveFile = (indexToRemove: number) => {
-    const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
-    onChange(newFiles);
+  const handleRemoveFile = async (indexToRemove: number) => {
+    const fileUrl = currentFiles[indexToRemove];
+
+    try {
+      setLoading(true);
+
+      // Faz a chamada para a sua API existente usando o método DELETE
+      const res = await fetch('/api/storage/delete-url', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: fileUrl }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao remover o arquivo do servidor.');
+      }
+
+      // Se a exclusão no MinIO deu certo, atualiza o estado local
+      const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
+      onChange(newFiles);
+      toast.showSuccess('Arquivo removido com sucesso.');
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao tentar remover o arquivo.';
+      toast.showError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,6 +237,7 @@ export default function FileUpload({
                 <button 
                   type="button" 
                   onClick={() => handleRemoveFile(index)}
+                  disabled={loading}
                   className={`p-1.5 ml-2 rounded-lg text-gray-400 ${ ['.doc', '.docx'].includes(fileExtension) ? "hover:bg-blue-100 hover:text-blue-500" : ['.png', '.jpg', '.jpeg'].includes(fileExtension) ? "hover:bg-emerald-100 hover:text-emerald-500" : "hover:bg-red-100 hover:text-red-500" } transition-colors shrink-0`}
                   title="Remover arquivo"
                 >
