@@ -831,8 +831,10 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     <InfoItem icon={<Hash size={16} />} label="Nº Série" Class="font-mono truncate" value={selectedViewItem.serialNumber || "N/A"} />
                     <InfoItem icon={<MapPin size={16} />} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
                     <InfoItem icon={<Barcode size={16} />} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
-                    <InfoItem icon={<Factory size={16} />} label="Fabricante" Class="font-mono text-[10px] truncate" value={selectedViewItem.manufacturer} />
-                    <InfoItem icon={<Cpu size={16} />} label="Modelo" Class="font-mono text-[10px] truncate" value={selectedViewItem.model} />
+                    <InfoItem icon={<Factory size={16} />} label="Fabricante" Class="font-mono text-[10px] truncate" value={selectedViewItem.manufacturer || "Genérico"} />
+                    {selectedViewItem.model && (
+                      <InfoItem icon={<Cpu size={16} />} label="Modelo" Class="font-mono text-[10px] truncate" value={selectedViewItem.model} />
+                    )}
                     <InfoItem icon={<Tag size={16} />} label="Categoria" Class="truncate" value={getCategory(selectedViewItem.categoryId, categories)} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
