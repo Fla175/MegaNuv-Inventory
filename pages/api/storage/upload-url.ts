@@ -11,8 +11,8 @@ const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT || '178.95.47.68',
   port: 9000,
   useSSL: false,
-  accessKey: 'admin',
-  secretKey: 'MinIo2026%',
+  accessKey: 'inventory-backend',
+  secretKey: 'MinIoBackend2026Secure',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

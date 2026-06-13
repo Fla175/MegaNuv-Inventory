@@ -53,7 +53,7 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     if (value) {
       try {
         // Envia uma requisição DELETE com a URL que está guardada no estado 'value'
-        const res = await fetch('/api/storage/delete-file', {
+        const res = await fetch('/api/storage/delete-url', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: value }),
