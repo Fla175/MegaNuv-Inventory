@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'Content-Type': file.mimetype || 'application/octet-stream',
     });
 
-    const publicUrl = `http://178.95.47.68:9000/${bucketName}/${objectName}`;
+    const publicUrl = `http://minio.meganuv.com/${bucketName}/${objectName}`;
     return res.status(200).json({ publicUrl, active });
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Unknown error');
