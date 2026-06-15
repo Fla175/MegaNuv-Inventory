@@ -85,6 +85,21 @@ export default function SettingsPage() {
     }
     refreshUser();
   }, [selectedUser, refreshUser]);
+
+  useEscapeKey(() => {
+    if (confirmDialog.isOpen) {
+      setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    if (selectedSpace) {
+      setSelectedSpace(null);
+    }
+
+    if (isSpaceModalOpen) {
+      setIsSpaceModalOpen(false);
+    }
+  });
   
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{

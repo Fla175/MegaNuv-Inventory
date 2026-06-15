@@ -42,6 +42,17 @@ export default function GestaoAtivosPage() {
     refreshUser();
   }, [refreshUser]);
 
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isFormOpen) {
+        setIsFormOpen(false);
+        loadData();
+      }
+    };
+    window.addEventListener("keydown", handleEscapeKey);
+    return () => window.removeEventListener("keydown", handleEscapeKey);
+  }, [isFormOpen]);
+
   const [filters, setFilters] = useState({
     query: "",
     searchCategory: "",
