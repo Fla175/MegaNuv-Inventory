@@ -11,8 +11,8 @@ const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT || '178.95.47.68',
   port: 9000,
   useSSL: false,
-  accessKey: 'admin',
-  secretKey: 'MinIo2026%',
+  accessKey: 'inventory-backend',
+  secretKey: 'MinIoBackend2026Secure',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'Content-Type': file.mimetype || 'application/octet-stream',
     });
 
-    const publicUrl = `http://178.95.47.68:9000/${bucketName}/${objectName}`;
+    const publicUrl = `http://minio.meganuv.com/${bucketName}/${objectName}`;
     return res.status(200).json({ publicUrl, active });
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error('Unknown error');

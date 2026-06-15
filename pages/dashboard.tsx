@@ -89,6 +89,17 @@ export default function DashboardPage() {
     fetchStats();
     refreshUser();
   }, [refreshUser]);
+
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && selectedCategory) {
+        setSelectedCategory(null);
+      }
+    };
+    window.addEventListener("keydown", handleEscapeKey);
+    return () => window.removeEventListener("keydown", handleEscapeKey);
+  }, [selectedCategory]);
+
   const isDirector = user?.role === "DIRECTOR";
 
   const sortedCreations = useMemo(() => {

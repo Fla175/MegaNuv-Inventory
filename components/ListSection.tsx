@@ -98,6 +98,110 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     setSelectedViewItem(null);
   };
 
+  const executeIframePrint = (item: any) => {
+    // 1. Cria um iframe invisível no documento
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+  
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+  
+    // 2. Monta a URL do QR Code igual à que você usa no componente original
+    const qrCodeUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/qrcode/view?id=${item.id}`;
+  
+    // 3. Escreve um HTML isolado e limpo com estilos dedicados à impressão mobile/desktop
+    doc.open();
+    doc.write(`
+      <html>
+        <head>
+          <title>Imprimir Etiqueta</title>
+          <style>
+            @page {
+              size: auto;
+              margin: 0mm;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff !important;
+              color: #000000 !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              width: 100vw;
+            }
+            .print-label {
+              background: #ffffff !important;
+              color: #000000 !important;
+              border: none !important;
+              padding: 24px;
+              text-align: center;
+              box-sizing: border-box;
+              max-width: 90%;
+            }
+            .qrcode-wrapper {
+              background: #ffffff !important;
+              padding: 12px;
+              border-radius: 12px;
+              display: inline-block;
+              margin-bottom: 16px;
+            }
+            .title {
+              font-size: 18px;
+              font-weight: 900;
+              text-transform: uppercase;
+              margin: 0 0 6px 0;
+              line-height: 1.2;
+            }
+            .info-text {
+              font-size: 10px;
+              font-family: monospace;
+              color: #444444;
+              margin: 4px 0 0 0;
+              text-transform: uppercase;
+            }
+          </style>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        </head>
+        <body>
+          <div class="print-label">
+            <div class="qrcode-wrapper" id="qrcode-canvas"></div>
+            <h4 class="title">${item.name}</h4>
+            <p class="info-text">ID: ${item.id.slice(0, 8).toUpperCase()}</p>
+            ${item.serialNumber ? `<p class="info-text">SN: ${item.serialNumber}</p>` : ''}
+            ${item.sku ? `<p class="info-text">SKU: ${item.sku}</p>` : ''}
+          </div>
+  
+          <script>
+            new QRCode(document.getElementById("qrcode-canvas"), {
+              text: "${qrCodeUrl}",
+              width: 180,
+              height: 180,
+              colorDark : "#000000",
+              colorLight : "#ffffff",
+              correctLevel : QRCode.CorrectLevel.H
+            });
+
+            window.onload = function() {
+              setTimeout(() => {
+                window.focus();
+                window.print();
+                setTimeout(() => { window.frameElement.remove(); }, 500);
+              }, 550);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
+  };
+
   const getCategory = (categoryId: string, categoriesList: any[]) => {
     
     const foundCategory = categoriesList.find(cat => cat.id === categoryId);
@@ -831,8 +935,10 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     <InfoItem icon={<Hash size={16} />} label="Nº Série" Class="font-mono truncate" value={selectedViewItem.serialNumber || "N/A"} />
                     <InfoItem icon={<MapPin size={16} />} label="Localização" Class="truncate" value={selectedViewItem.parentId ? actives.find(a => a.id === selectedViewItem.parentId)?.name || selectedViewItem.fatherSpace?.name : fatherSpaces.find(s => s.id === selectedViewItem.fatherSpaceId)?.name} />
                     <InfoItem icon={<Barcode size={16} />} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={selectedViewItem.id} />
-                    <InfoItem icon={<Factory size={16} />} label="Fabricante" Class="font-mono text-[10px] truncate" value={selectedViewItem.manufacturer} />
-                    <InfoItem icon={<Cpu size={16} />} label="Modelo" Class="font-mono text-[10px] truncate" value={selectedViewItem.model} />
+                    <InfoItem icon={<Factory size={16} />} label="Fabricante" Class="font-mono text-[10px] truncate" value={selectedViewItem.manufacturer || "Genérico"} />
+                    {selectedViewItem.model && (
+                      <InfoItem icon={<Cpu size={16} />} label="Modelo" Class="font-mono text-[10px] truncate" value={selectedViewItem.model} />
+                    )}
                     <InfoItem icon={<Tag size={16} />} label="Categoria" Class="truncate" value={getCategory(selectedViewItem.categoryId, categories)} />
                     {(selectedViewItem.isPhysicalSpace || selectedViewItem.hasSubItems) && (
                       <>
@@ -900,13 +1006,10 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
                       <QRCode value={`${window.location.origin}/qrcode/view?id=${selectedViewItem.id}`} size={160} />
                     </div>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter mb-4 text-center">QR Code de Identificação</p>
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter mb-4 text-center">QR Code</p>
                     
                     <button 
-                      onClick={() => {
-                        setSelectedPrintItem(selectedViewItem);
-                        setSelectedViewItem(false);
-                      }} 
+                      onClick={() => executeIframePrint(selectedViewItem)}
                       className="w-full py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors"
                     >
                       <Printer size={14}/> Imprimir Etiqueta
@@ -917,7 +1020,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
 
             <div className="p-4 border-t dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center gap-2 overflow-x-auto custom-scrollbar">
                <button onClick={() => { setSelectedViewItem(false); onEdit(selectedViewItem, 'edit'); }} className="flex-1 sm:flex-none px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
-                 <Pencil size={16}/> <span className="hidden sm:inline">Editar Registro</span>
+                 <Pencil size={16}/> <span className="hidden sm:inline">Editar</span>
                </button>
 
                <button onClick={() => {setMovingItem(selectedViewItem); setSelectedViewItem(false);}} className="flex-1 sm:flex-none px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
@@ -941,22 +1044,19 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
 
       {/* --- MODAL DE IMPRESSÃO --- */}
       {selectedPrintItem && (
-        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md print:absolute print:inset-0 print:bg-white print:z-[9999] print:p-0 print:backdrop-blur-none">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl p-6 print:w-auto print:max-w-none print:border-none print:shadow-none print:rounded-none print:p-0" id="qrcode-print-container">
-              
-              {/* CABEÇALHO - Escondido na impressão */}
+        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md print:relative print:w-full print:h-auto print:bg-white print:z-[9999] print:p-0 print:backdrop-blur-none">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl p-6 print:w-full print:max-w-none print:border-none print:shadow-none print:rounded-none print:p-0" id="qrcode-print-container">
+
               <div className="flex justify-between items-center mb-6 print:hidden">
                 <h3 className="font-black uppercase text-sm dark:text-white">Imprimir Etiqueta</h3>
                 <button onClick={() => setSelectedPrintItem(null)} className="text-zinc-400 hover:text-red-500 transition-colors">
                   <X size={20}/>
                 </button>
               </div>
-              
-              {/* ÁREA DA ETIQUETA - O que realmente será impresso */}
+
               <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-label">
-                
-                {/* Fundo branco forçado para garantir a leitura do QR Code */}
-                <div className="bg-white p-3 rounded-xl border-2 border-zinc-100 shadow-sm">
+
+                <div className="bg-white p-3">
                   <QRCode
                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qrcode/view?id=${selectedPrintItem.id}`}
                     size={180}
@@ -978,9 +1078,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </div>
               </div>
 
-              {/* BOTÃO DE AÇÃO - Escondido na impressão */}
               <button 
-                onClick={() => window.print()} 
+                onClick={() => executeIframePrint(selectedPrintItem)}
                 className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white p-3 rounded-xl font-bold uppercase text-xs flex justify-center items-center gap-2 print:hidden"
               >
                 <Printer size={20} /> 
@@ -1072,7 +1171,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 const subSpaceCount = actives.filter(a => a.parentId === contextMenu.item.id && a.isPhysicalSpace).length;
                 setSelectedViewItem({ ...contextMenu.item, hasSubItems: actives.some(a => a.parentId === contextMenu.item.id), childCount, subSpaceCount });
               }} onClose={() => setContextMenu(null)} />
-          <ContextBtn icon={<Pencil size={16}/>} label="Editar Registro" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
+          <ContextBtn icon={<Pencil size={16}/>} label="Editar Ativo" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Move size={16}/>} label="Mover para outro local" onClick={() => setMovingItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Copy size={16}/>} label="Clonar Ativo" onClick={() => handleCloneClick(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Printer size={16}/>} label="Imprimir Etiqueta" onClick={() => setSelectedPrintItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
@@ -1084,59 +1183,71 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
 
       <style jsx global>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #qrcode-print-label,
-          #qrcode-print-label * {
-            visibility: visible !important;
-          }
-          #qrcode-print-label {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: white !important;
-            border: 2px solid black !important;
-            border-radius: 8px !important;
-            margin: 0 !important;
-            padding: 16px !important;
-            box-shadow: none !important;
-          }
-          #qrcode-print-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: white !important;
-            z-index: 9999 !important;
-          }
-          #qrcode-print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: white !important;
-            color: black !important;
-            border: 2px solid black !important;
-            border-radius: 8px !important;
-            margin: 0 !important;
-            padding: 16px !important;
-            box-shadow: none !important;
-          }
-          #qrcode-print-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: white !important;
-            z-index: 9999 !important;
-          }
           @page {
             size: auto;
-            margin: 0;
+            margin: 0mm !important;
+          }
+
+          body * {
+            display: none !important;
+          }
+
+          html, body {
+            color-scheme: light !important;
+            visibility: hidden !important;
+            height: 100% !important;
+            max-height: 100vh !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+
+          #qrcode-print-container,
+          #qrcode-print-container * {
+            visibility: visible !important;
+            background-color: white !important;
+            color: black !important;
+          }
+
+          #qrcode-print-container svg {
+            width: 180px !important;
+            height: 180px !important;
+            display: block !important;
+            background: white !important;
+          }
+          #qrcode-print-container svg path {
+            fill: #000000 !important;
+          }
+          #qrcode-print-container svg rect {
+            fill: #ffffff !important;
+          }
+
+          #qrcode-print-container {
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: white !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            z-index: 99999 !important;
+          }
+
+          #qrcode-print-label {
+            background: white !important;
+            color: black !important;
+            border: none !important;
+            padding: 16px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            page-break-after: avoid !important;
+            max-width: 90% !important;
           }
         }
       `}</style>

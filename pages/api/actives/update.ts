@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await createLog(
       req,
-      String(decoded.id),
+      decoded.userId,
       "EDIÇÃO DE ATIVO",
       `Editou o Ativo ${id}`
     );
