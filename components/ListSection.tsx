@@ -1020,7 +1020,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
 
             <div className="p-4 border-t dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center gap-2 overflow-x-auto custom-scrollbar">
                <button onClick={() => { setSelectedViewItem(false); onEdit(selectedViewItem, 'edit'); }} className="flex-1 sm:flex-none px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
-                 <Pencil size={16}/> <span className="hidden sm:inline">Editar Registro</span>
+                 <Pencil size={16}/> <span className="hidden sm:inline">Editar</span>
                </button>
 
                <button onClick={() => {setMovingItem(selectedViewItem); setSelectedViewItem(false);}} className="flex-1 sm:flex-none px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
@@ -1171,7 +1171,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 const subSpaceCount = actives.filter(a => a.parentId === contextMenu.item.id && a.isPhysicalSpace).length;
                 setSelectedViewItem({ ...contextMenu.item, hasSubItems: actives.some(a => a.parentId === contextMenu.item.id), childCount, subSpaceCount });
               }} onClose={() => setContextMenu(null)} />
-          <ContextBtn icon={<Pencil size={16}/>} label="Editar Registro" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
+          <ContextBtn icon={<Pencil size={16}/>} label="Editar Ativo" onClick={() => onEdit(contextMenu.item, 'edit')} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Move size={16}/>} label="Mover para outro local" onClick={() => setMovingItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Copy size={16}/>} label="Clonar Ativo" onClick={() => handleCloneClick(contextMenu.item)} onClose={() => setContextMenu(null)} />
           <ContextBtn icon={<Printer size={16}/>} label="Imprimir Etiqueta" onClick={() => setSelectedPrintItem(contextMenu.item)} onClose={() => setContextMenu(null)} />
