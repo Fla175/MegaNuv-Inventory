@@ -42,7 +42,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     locationType: "" as "space" | "active" | "", 
   });
 
-  // Busca as Categorias do Banco
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
@@ -67,7 +66,6 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     return () => { isMounted = false; };
   }, [mode]);
 
-  // Carrega os dados iniciais com segurança
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
       const locId = initialData.parentId || initialData.parent?.id 
@@ -82,6 +80,12 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
           ? (typeof initialData.serialNumber === 'string' ? initialData.serialNumber.split(',').map((s: string) => s.trim()) : [initialData.serialNumber])
           : Array(initialData.quantity || 1).fill(""));
 
+      const fileUrlArray = initialData.fileUrl
+        ? (typeof initialData.fileUrl === 'string'
+          ? initialData.fileUrl.split(',').map((u: string) => u.trim()).filter(Boolean)
+          : Array.isArray(initialData.fileUrl) ? initialData.fileUrl : [initialData.fileUrl])
+        : [];
+
       setFormData(prev => ({
         ...prev,
         ...initialData,
@@ -91,6 +95,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         locationType: locType,
         id: mode === "clone" ? undefined : initialData.id,
         serialNumbers: serialArray,
+        fileUrl: fileUrlArray,
       }));
     }
   }, [initialData, mode]);
