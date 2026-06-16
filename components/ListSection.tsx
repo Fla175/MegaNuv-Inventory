@@ -1001,20 +1001,46 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   {/* --- FIM DA SEÇÃO DE ARQUIVOS --- */}
               </div>
 
+              {/* Coluna Lateral Direita */}
               <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
-                <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 h-full">
-                    <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
-                      <QRCode value={`${window.location.origin}/qrcode/view?id=${selectedViewItem.id}`} size={160} />
-                    </div>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter mb-4 text-center">QR Code</p>
-                    
-                    <button 
-                      onClick={() => executeIframePrint(selectedViewItem)}
-                      className="w-full py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <Printer size={14}/> Imprimir Etiqueta
-                    </button>
+                
+                {/* 1. Bloco do QR Code */}
+                {selectedViewItem.isPhysicalSpace && (
+                  <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5">
+                      <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
+                        <QRCode value={`${window.location.origin}/qrcode/view?id=${selectedViewItem.id}`} size={160} />
+                      </div>
+                      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter mb-4 text-center">QR Code</p>
+                      
+                      <button 
+                        onClick={() => executeIframePrint(selectedViewItem)}
+                        className="w-full py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Printer size={14}/> Imprimir Etiqueta
+                      </button>
+                  </div>
+                )}
+
+                {/* 2. Bloco de Notas */}
+                <div className="flex flex-col p-5 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 flex-1 min-h-[160px]">
+                  <div className="flex items-center gap-2 mb-3 text-gray-400 dark:text-zinc-500">
+                    <FileText size={14} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest">
+                      Notas
+                    </h4>
+                  </div>
+
+                  <div className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed overflow-y-auto custom-scrollbar flex-1 w-full whitespace-pre-wrap md:max-h-none">
+                    {selectedViewItem.notes ? (
+                      selectedViewItem.notes
+                    ) : (
+                      <p className="italic text-zinc-400 dark:text-zinc-500 font-medium pl-1">
+                        Nenhuma observação registrada para este ativo.
+                      </p>
+                    )}
+                  </div>
                 </div>
+
               </div>
             </div>
 

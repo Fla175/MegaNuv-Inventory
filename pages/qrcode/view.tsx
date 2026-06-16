@@ -7,7 +7,7 @@ import {
   Layers, Loader2, AlertCircle, PackageOpen, CornerDownRight, 
   DollarSign, X, PackageX, Hash, 
   Boxes, FileText, FileImage, File, ExternalLink, 
-  User, Box, ChevronDown, Factory
+  User, Box, ChevronDown, Factory, Ban
 } from "lucide-react";
 
 interface AssetActive {
@@ -152,6 +152,14 @@ export default function SpacePublicView() {
   const totalAssets = sections.reduce((acc, sec) => acc + (sec.actives?.length || 0), 0);
   const totalValue = (active.fixedValue || 0) + sections.reduce((acc, sec) => acc + (sec.fixedValue || 0), 0);
 
+  if (!active.isPhysicalSpace) return (
+    <div className="h-screen flex flex-col items-center justify-center p-8 text-center bg-zinc-50 dark:bg-zinc-950 cursor-not-allowed">
+      <Ban size={48} className="text-red-500 mb-4" />
+      <h1 className="text-xl font-black text-zinc-800 dark:text-zinc-200 uppercase italic tracking-tighter">Acesso proibido</h1>
+      <p className="text-xs text-zinc-500 mt-2 font-medium">Ativos comuns não podem ser escaneados.</p>
+    </div>
+  );
+
   const toggleExpand = (id: string) => {
     setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -283,7 +291,7 @@ export default function SpacePublicView() {
                 {active.category || 'Geral'}
               </span>
               <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded bg-indigo-950/40 border border-white/10 text-indigo-100 inline-block">
-                #{active.tag || 'S/T'}
+                #{active.tag}
               </span>
             </div>
             
@@ -294,7 +302,7 @@ export default function SpacePublicView() {
             <div className="flex flex-wrap gap-2 mt-4">
                 <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2">
                     <Boxes size={14} className="text-indigo-200"/>
-                    <span className="text-xs font-black text-white">{totalAssets} Itens vinculados</span>
+                    <span className="text-xs font-black text-white">{totalAssets} Ativos Vinculados</span>
                 </div>
                 {totalValue > 0 && (
                     <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2">
