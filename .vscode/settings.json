@@ -1,3 +1,8 @@
 {
-  "todo-tree.tree.scanMode": "workspace"
+  "todo-tree.tree.scanMode": "workspace",
+  "css.customData": [],
+  "scss.validate": true,
+  "css.validate": true,
+  "tailwindCSS.experimental.configFile": null,
+  "postcss.validate": false,
 }
