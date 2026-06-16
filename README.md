@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** v2.15.21
+**Current Version:** *v2.18.6*
 
 ## 🚀 Features
 
@@ -19,7 +19,8 @@
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
 * **Image attachment**: Attachment of until 5 images for a active.
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
-* [<ins>***NEW***</ins>] **Custom *Select***: Custom component for Select type Inputs.
+* **Custom *Select***: Custom component for Select type Inputs.
+* [<ins>***NEW***</ins>] ***`ESC`* Key**: ***`ESC`*** key closes open modals.
 
 ---
 
@@ -28,7 +29,6 @@
 * **Framework:** [Next.js](https://nextjs.org/) (Pages Router, v15)
 * **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/) (v6)
 * **Styling:** [Tailwind CSS](https://tailwindcss.com) (v4)
-* **Framework:** [Next.js](https://nextjs.org/) (Pages Router)
 * **Database:** [MariaDB](https://mariadb.org) with [Prisma ORM](https://www.prisma.io/)
 * **Icons:** [Lucide React](https://lucide.dev)
 * **Authentication:** JSON Web Tokens (JWT) with jose & BcryptJS
@@ -50,7 +50,7 @@
 
 1. **Clone the repository:**
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Fla175/MegaNuv-Inventory.git
 cd inventory
 ```
 
@@ -76,7 +76,7 @@ npx prisma generate
 yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) (or the **dns / ip** you've setted) with your browser to see the result.
 
 ---
 
@@ -87,7 +87,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 * **/lib/context/** - React Context API for global user state management
 * **/lib/types.ts** - Centralized TypeScript interfaces
 * **/prisma/** - Database schema and migration files
-* **/components/** - Reusable UI components (Layout, ListSection, SearchSection, activeForm)
+* **/components/** - Reusable UI components (*Layout, ListSection, SearchSection, activeForm*)
 
 ---
 
