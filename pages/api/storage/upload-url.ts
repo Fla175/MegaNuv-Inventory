@@ -10,9 +10,9 @@ export const config = { api: { bodyParser: false } };
 const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT || '178.95.47.68',
   port: 9000,
-  useSSL: false,
-  accessKey: 'inventory-backend',
-  secretKey: 'MinIoBackend2026Secure',
+  useSSL: process.env.MINIO_USE_SSL !== 'false',
+  accessKey: process.env.MINIO_ACCESS_KEY || 'inventory-backend',
+  secretKey: process.env.MINIO_SECRET_KEY || 'MinIoBackend2026Secure',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
