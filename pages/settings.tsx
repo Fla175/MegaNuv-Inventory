@@ -16,6 +16,7 @@ import ImageUpload from "@/components/imageUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PatternFormat } from 'react-number-format';
 import CustomSelect from "@/components/customSelect";
+import { toLocalMediaUrl } from "@/lib/mediaUrl";
 
 // --- INTERFACES ---
 interface User {
@@ -682,8 +683,8 @@ export default function SettingsPage() {
               <input name="name" placeholder="Nome do Local" defaultValue={selectedSpace?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
               <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Notas..."></textarea>
               <ImageUpload 
-                value={spaceImageUrl || selectedSpace?.imageUrl || null} 
-                onChange={(url) => setSpaceImageUrl(url)} 
+                value={toLocalMediaUrl(spaceImageUrl || selectedSpace?.imageUrl)} 
+                onChange={(url) => setSpaceImageUrl(url)}
                 label="Imagem do Espaço" 
               />
               <div className="grid grid-cols-2 gap-4">

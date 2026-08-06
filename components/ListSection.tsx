@@ -15,6 +15,7 @@ import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
 import { useUser } from "@/lib/context/UserContext";
 import Image from "next/image";
+import { toLocalMediaUrl } from "@/lib/mediaUrl";
 
 const getFileDetails = (url: string) => {
   // Pega o último segmento da URL (o nome do arquivo) e remove parâmetros
@@ -871,7 +872,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   <div className="w-full h-48 sm:h-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 overflow-hidden flex items-center justify-center relative group">
                     {selectedViewItem.imageUrl ? (
                       <Image
-                        src={selectedViewItem.imageUrl}
+                        src={toLocalMediaUrl(selectedViewItem.imageUrl)}
                         alt={selectedViewItem.name}
                         fill
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -922,7 +923,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                             return (
                               <a 
                                 key={index}
-                                href={url}
+                                href={toLocalMediaUrl(url)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
