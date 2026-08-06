@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
+import { toLocalMediaUrl } from "@/lib/mediaUrl";
 
 interface ImageUploadProps {
   value: string | null;
@@ -89,7 +90,7 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
         ) : value ? (
           <>
             <Image
-              src={value}
+              src={toLocalMediaUrl(value)}
               fill
               alt="Preview"
               className="w-full h-full object-cover bg-white/ dark:bg-zinc-800"

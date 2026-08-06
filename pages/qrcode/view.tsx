@@ -280,11 +280,17 @@ export default function SpacePublicView() {
 
       <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 pb-16 font-sans">
         <div className="bg-indigo-700 dark:bg-indigo-900 pb-16 pt-12 px-6 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
-          {active.imageUrl && (
-            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-30">
-              <Image src={active.imageUrl} fill alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
+        {active.imageUrl && (
+          <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-30">
+            <Image 
+              src={active.imageUrl}
+              fill 
+              unoptimized 
+              alt="" 
+              className="w-full h-full object-cover" 
+            />
+          </div>
+        )}
           <div className="relative z-20">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-widest inline-block">
@@ -424,7 +430,13 @@ export default function SpacePublicView() {
             </button>
             <div className="h-72 bg-zinc-100 dark:bg-zinc-800 relative">
               {selectedItem.image ? (
-                <Image src={selectedItem.image} fill className="w-full h-full object-cover" alt="" />
+                <Image 
+                  src={selectedItem.image} 
+                  fill 
+                  unoptimized 
+                  className="w-full h-full object-cover" 
+                  alt="" 
+                />
               ) : selectedItem.isPhysicalSpace ? (
                 <div className="w-full h-full flex items-center justify-center text-amber-500 bg-amber-50/50 dark:bg-amber-950/10">
                   <Layers size={80} strokeWidth={1} />
