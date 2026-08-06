@@ -9,6 +9,20 @@ const JWT_SECRET = process.env.JWT_SECRET;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT" && req.method !== "PATCH") return res.status(405).end();
 
+  function cleanSerialNumber(input: string | string[] | null | undefined): string | null {
+    if (!input) return null;
+  
+    const serials = Array.isArray(input) ? input : [input];
+  
+    const validSerials = serials
+      .map((sn) => (typeof sn === 'string' ? sn.trim() : ''))
+      .filter((sn) => sn.length > 0);
+  
+    if (validSerials.length === 0) return null;
+  
+    return validSerials.join(', ');
+  }
+
   try {
     const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Não autorizado" });
@@ -21,10 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { id, ...data } = req.body;
     if (!id) return res.status(400).json({ error: "ID obrigatório" });
 
-    // Handle serialNumbers array (single or multiple)
-    const serialNumberValue = Array.isArray(data.serialNumbers) 
-      ? data.serialNumbers.filter((s: string) => s && s.trim()).join(', ')  // Join multiple serials
-      : data.serialNumber || data.serialNumbers?.[0] || null;
+    const rawSerialNumber = data.serialNumbers ?? data.serialNumber;
+    const serialNumberValue = cleanSerialNumber(rawSerialNumber);
 
     const fileUrlValue = Array.isArray(data.fileUrl)
       ? data.fileUrl.filter((u: string) => u && u.trim()).join(',')
