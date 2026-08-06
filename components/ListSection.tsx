@@ -77,15 +77,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
   
-  const toggleItemSelection = (id: string) => {
-    setSelectedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  
   const activateSelectionMode = (itemId: string) => {
     setIsSelectionMode(true);
     setSelectedItems(new Set([itemId]));
@@ -679,59 +670,22 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             return ids;
           };
           
-          const handleCheckboxChange = async (checked: boolean) => {
-            if (checked) {
-              if (active.isPhysicalSpace) {
-                const childIds = getAllChildIds(active.id);
-                setSelectedItems(prev => {
-                  const next = new Set(prev);
-                  next.add(active.id);
-                  childIds.forEach(id => next.add(id));
-                  return next;
-                });
+          const handleCheckboxChange = (checked: boolean) => {
+            const childIds = active.isPhysicalSpace ? getAllChildIds(active.id) : [];
+          
+            setSelectedItems(prev => {
+              const next = new Set(prev);
+          
+              if (checked) {
+                next.add(active.id);
+                childIds.forEach(id => next.add(id));
               } else {
-                setSelectedItems(prev => {
-                  const next = new Set(prev);
-                  next.add(active.id);
-                  return next;
-                });
-              }
-            } else if (!checked && active.isPhysicalSpace) {
-              const childIds = getAllChildIds(active.id);
-              setSelectedItems(prev => {
-                const next = new Set(prev);
                 next.delete(active.id);
                 childIds.forEach(id => next.delete(id));
-                return next;
-              });
-            } else if (!checked && active.parentId) {
-              if (!active.isPhysicalSpace && active.parentId) {
-                const parent = actives.find(a => a.id === active.parentId);
-                if (parent && parent.parentId) {
-                  try {
-                    await fetch('/api/actives/move', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        id: active.id,
-                        newFatherSpaceId: active.fatherSpaceId,
-                        newParentId: parent.parentId
-                      }),
-                    });
-                    onRefresh();
-                } catch {
-                  // Erro silencioso - fallback para toggle normal
-                }
-                }
               }
-              setSelectedItems(prev => {
-                const next = new Set(prev);
-                next.delete(active.id);
-                return next;
-              });
-            } else {
-              toggleItemSelection(active.id);
-            }
+          
+              return next;
+            });
           };
           
           return (
