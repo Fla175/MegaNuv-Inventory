@@ -1,6 +1,8 @@
 // pages/api/qrcode/public-get.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { minioPublicClient, BUCKET_NAME } from '@/lib/minio';
+import { getMinioKeyFromUrl } from '@/lib/mediaUrl';
 
 interface SectionActive {
   id: string;
@@ -24,7 +26,32 @@ interface Section {
   actives: SectionActive[];
 }
 
-async function buildHierarchy(id: string, name: string, isFirstLevel = false, currentDepth = 0) {
+// Helpers para pré-assinatura de URLs privadas no MinIO
+const signMedia = async (url: string | null | undefined): Promise<string | null> => {
+  if (!url) return null;
+  const key = getMinioKeyFromUrl(url);
+  if (!key) return url;
+  try {
+    return await minioPublicClient.presignedGetObject(BUCKET_NAME, key, 3600);
+  } catch {
+    return url;
+  }
+};
+
+const signFileUrl = async (fileUrl: string | null | undefined): Promise<string | null> => {
+  if (!fileUrl) return null;
+  let urls: string[];
+  try {
+    const parsed = JSON.parse(fileUrl);
+    urls = Array.isArray(parsed) ? parsed.map(String) : fileUrl.split(',').map(s => s.trim()).filter(Boolean);
+  } catch {
+    urls = fileUrl.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  const signed = await Promise.all(urls.map(u => signMedia(u)));
+  return signed.filter((u): u is string => u !== null).join(',');
+};
+
+async function buildHierarchy(id: string, name: string, isFirstLevel = false, currentDepth = 0): Promise<Section[]> {
   const active = await prisma.active.findUnique({
     where: { id },
     include: {
@@ -47,25 +74,29 @@ async function buildHierarchy(id: string, name: string, isFirstLevel = false, cu
   const physicalSpaces = active.children.filter(c => c.isPhysicalSpace);
 
   if (allAssets.length > 0 || isFirstLevel) {
-    sections.push({
-      id: active.id,
-      name: isFirstLevel ? "Conteúdo Principal" : `Dentro de: ${active.name}`,
-      // 👇 Injeta a profundidade correta (depth) em cada ativo desta seção
-      actives: allAssets.map(a => ({
+    // Mapeia e assina as URLs de cada ativo de forma assíncrona
+    const signedActives: SectionActive[] = await Promise.all(
+      allAssets.map(async (a) => ({
         id: a.id,
         name: a.name,
-        imageUrl: a.imageUrl,
+        imageUrl: await signMedia(a.imageUrl),
         sku: a.sku,
         manufacturer: a.manufacturer,
         model: a.model,
         serialNumber: a.serialNumber,
         tag: a.tag,
-        fileUrl: a.fileUrl,
+        fileUrl: await signFileUrl(a.fileUrl),
         isPhysicalSpace: !!a.isPhysicalSpace,
         category: a.category?.name,
         createdAt: a.createdAt,
         depth: currentDepth,
       }))
+    );
+
+    sections.push({
+      id: active.id,
+      name: isFirstLevel ? "Conteúdo Principal" : `Dentro de: ${active.name}`,
+      actives: signedActives
     });
   }
 
@@ -93,14 +124,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (rootActive) {
       const isSpace = rootActive.isPhysicalSpace === true;
 
+      // Assina imagens e documentos do ativo raiz
+      const signedRoot = {
+        ...rootActive,
+        imageUrl: await signMedia(rootActive.imageUrl),
+        fileUrl: await signFileUrl(rootActive.fileUrl),
+        createdBy: rootActive.createdBy?.name || "Desconhecido",
+        category: rootActive.category?.name,
+      };
+
       if (isSpace) {
         const allSections = await buildHierarchy(id, rootActive.name, true);
         return res.status(200).json({
           root: {
-            ...rootActive,
+            ...signedRoot,
             isPhysicalSpace: true,
-            category: rootActive.category?.name,
-            createdBy: rootActive.createdBy?.name || "Desconhecido",
           },
           sections: allSections
         });
@@ -108,7 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Se for ativo individual
       return res.status(200).json({
-        root: { ...rootActive, isPhysicalSpace: false, createdBy: rootActive.createdBy?.name || "Desconhecido" },
+        root: { ...signedRoot, isPhysicalSpace: false },
         sections: []
       });
     }
