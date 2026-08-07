@@ -1,11 +1,10 @@
-// components/ListSection.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
   Pencil, Trash2, Copy, Printer, Move, Eye, 
   MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, LinkIcon, Image as ImageIcon, Boxes,
-  FileText, FileIcon, Tag, Factory, Cpu
+  FileText, FileIcon, Tag, Factory, Cpu, Loader2, Search, ChevronDown
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
@@ -18,11 +17,9 @@ import Image from "next/image";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
 
 const getFileDetails = (url: string) => {
-  // Pega o último segmento da URL (o nome do arquivo) e remove parâmetros
   const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
   const displayName = decodeURIComponent(rawFilename);
   
-  // Extrai a extensão
   const extMatch = displayName.match(/\.([a-zA-Z0-9]+)$/);
   const extension = extMatch ? extMatch[1].toLowerCase() : 'link';
 
@@ -47,10 +44,237 @@ const getFileDetails = (url: string) => {
   return { displayName, extension, Icon, colorClass, bgClass };
 };
 
+function SearchableSelect({ options, value, onChange, placeholder }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
+  
+  const selectedOption = options.find((opt: any) => opt.id === value);
+
+  const rootElements = useMemo(() => {
+    return options.filter((opt: any) => !opt.parentId);
+  }, [options]);
+
+  const filteredAll = useMemo(() => {
+     if (!searchTerm) return [];
+     const term = searchTerm.toLowerCase();
+     return options.filter((opt: any) => opt.name.toLowerCase().includes(term));
+  }, [searchTerm, options]);
+
+  const getDirectChildren = (parentId: string) => {
+    return options.filter((opt: any) => opt.parentId === parentId);
+  };
+
+  const getAllDescendants = (parentId: string): string[] => {
+    const directChildren = getDirectChildren(parentId);
+    let descendants: string[] = [];
+    for (const child of directChildren) {
+      descendants.push(child.id);
+      descendants = descendants.concat(getAllDescendants(child.id));
+    }
+    return descendants;
+  };
+
+  const getDescendantsCount = (parentId: string) => {
+    return getAllDescendants(parentId).length;
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const renderChildren = (parentId: string, depth: number) => {
+    const children = getDirectChildren(parentId);
+    if (children.length === 0) return null;
+  
+    const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
+
+    return (
+      <div className={`${indentClass} flex flex-col`}>
+        {children.map((child: any) => {
+          const grandChildren = getDirectChildren(child.id);
+          const hasGrandChildren = grandChildren.length > 0;
+          const isExpanded = expandedSpaces[child.id];
+          const isSpace = child.type === 'space' || child.type === 'default';
+  
+          return (
+            <div key={child.id} className="w-full flex flex-col">
+              <div 
+                className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
+                  isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
+                }`}
+              >
+                <button 
+                  type="button" 
+                  onClick={() => { onChange(child.id, child.type); setIsOpen(false); setSearchTerm(""); }} 
+                  className="flex-1 text-left py-3 px-3 min-w-0"
+                >
+                  <div className="flex items-center gap-2 w-full min-w-0">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="text-xs font-bold dark:text-zinc-200 truncate">{child.name}</span>
+                      {child.type !== 'default' && (
+                        <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
+                          {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
+                        </span>
+                      )}
+                    </div>
+      
+                    {hasGrandChildren && (
+                      <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                        isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
+                      }`}>
+                        {grandChildren.length}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                
+                {hasGrandChildren && (
+                  <button 
+                    type="button" 
+                    onClick={() => toggleExpand(child.id)}
+                    className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
+                      isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                    }`}
+                  >
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+              
+              {hasGrandChildren && isExpanded && renderChildren(child.id, depth + 1)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-xs h-[52px] text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-amber-500 flex items-center justify-between transition-all">
+        <div className="flex items-center gap-2 overflow-hidden">
+          {selectedOption ? (
+            <>
+              {selectedOption.type !== 'default' && (
+                <span className={`shrink-0 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase ${selectedOption.type === 'space' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40'}`}>
+                  {selectedOption.type === 'space' ? 'PAI' : 'FÍSICO'}
+                </span>
+              )}
+              <span className="truncate">{selectedOption.name}</span>
+            </>
+          ) : <span className="text-zinc-400">{placeholder}</span>}
+        </div>
+        <ChevronDown className={`shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} size={16} />
+      </button>
+      
+      {isOpen && (
+        <div className="absolute z-[1000] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-2 border-b dark:border-zinc-800 flex items-center gap-2">
+            <Search size={14} className="text-zinc-400 ml-2" />
+            <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar local..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          <div className="max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar">
+            {searchTerm ? (
+              filteredAll.length > 0 ? (
+                <div>
+                  {filteredAll.map((opt: any) => (
+                    <div key={opt.id} className="border-b dark:border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }}
+                        className="w-full text-left px-3 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${opt.type === 'space' || opt.type === 'default' ? 'bg-blue-500' : 'bg-emerald-500'} shrink-0`} />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
+                            {opt.type !== 'default' && (
+                              <span className="text-[8px] uppercase font-black text-gray-400">
+                                {opt.type === 'space' ? 'ESP. PAI' : 'ESP. FÍSICO'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-[10px] font-black text-zinc-400 uppercase">Nenhum local encontrado</div>
+              )
+            ) : (
+              <div>
+                {rootElements.length > 0 && rootElements.map((item: any) => {
+                  const descendantsCount = getDescendantsCount(item.id);
+                  const isExpanded = expandedSpaces[item.id];
+                  const isSpace = item.type === 'space' || item.type === 'default';
+
+                  return (
+                    <div key={item.id} className="w-full flex flex-col">
+                      <div className={`w-full flex items-center justify-between border-b dark:border-zinc-800 transition-colors ${
+                        isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
+                      }`}>
+                        <button 
+                          type="button" 
+                          onClick={() => { onChange(item.id, item.type); setIsOpen(false); setSearchTerm(""); }} 
+                          className="flex-1 text-left py-3 px-3 min-w-0"
+                        >
+                          <div className="flex items-center gap-2 w-full min-w-0">
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                            
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-sm font-bold dark:text-zinc-200 truncate">{item.name}</span>
+                              {item.type !== 'default' && (
+                                <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
+                                  {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
+                                </span>
+                              )}
+                            </div>
+
+                            {descendantsCount > 0 && (
+                              <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                                isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
+                              }`}>{descendantsCount}</span>
+                            )}
+                          </div>
+                        </button>
+
+                        {descendantsCount > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => toggleExpand(item.id)}
+                            className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
+                              isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                            }`}
+                          >
+                            <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                        )}
+                      </div>
+
+                      {descendantsCount > 0 && isExpanded && renderChildren(item.id, 1)}
+                    </div>
+                  );
+                })}
+                
+                {rootElements.length === 0 && (
+                  <div className="p-4 text-center text-[10px] font-black text-zinc-400 uppercase">Nenhum local encontrado</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {isOpen && <div className="fixed inset-0 z-[990]" onClick={() => setIsOpen(false)} />}
+    </div>
+  );
+}
+
 function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpaces }: ListSectionProps) {
   const isMobile = useIsMobile();
-
-  // Permissão de visualização dos preços individuais dos produtos.
   const { user } = useUser();
   const isViewer = user?.role === 'VIEWER';
   
@@ -59,7 +283,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [longPressItem, setLongPressItem] = useState<string | null>(null);
   
-  // --- ESTADOS ---
+  // --- ESTADOS DE CONTROLE ---
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, item: any, isPhysicalSpace: boolean, selectedCount?: number } | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedPrintItem, setSelectedPrintItem] = useState<any | null>(null);
@@ -67,8 +291,14 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const [movingItem, setMovingItem] = useState<any | null>(null);
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({}); 
   const [isMovingLoading, setIsMovingLoading] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
+  // --- ESTADOS DE SELEÇÃO E CLONAGEM ---
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isCloneBatchOpen, setIsCloneBatchOpen] = useState(false);
+  const [cloneQuantity, setCloneQuantity] = useState<number>(1);
+  const [cloneDestinationSpaceId, setCloneDestinationSpaceId] = useState<string>("");
+  const [isCloning, setIsCloning] = useState(false);
+
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -77,11 +307,26 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     variant: 'danger' | 'warning' | 'info';
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
+
+  const cloneLocationOptions = useMemo(() => {
+    return [
+      { id: "", name: "Manter no espaço original de cada um", type: "default", parentId: null },
+      ...fatherSpaces.map(s => ({ id: s.id, name: s.name, type: "space", parentId: null })),
+      ...actives
+        .filter(a => a.isPhysicalSpace)
+        .map(a => ({
+          id: a.id,
+          name: a.name,
+          type: "active",
+          parentId: a.parentId || a.fatherSpaceId || null
+        }))
+    ];
+  }, [fatherSpaces, actives]);
   
   const activateSelectionMode = (itemId: string) => {
     setIsSelectionMode(true);
     setSelectedItems(new Set([itemId]));
-    setContextMenu(null); // FECHA menu ao ativar seleção
+    setContextMenu(null);
   };
   
   const exitSelectionMode = () => {
@@ -91,7 +336,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   };
 
   const executeIframePrint = (item: any) => {
-    // 1. Cria um iframe invisível no documento
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.width = '0';
@@ -102,61 +346,38 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
   
-    // 2. Monta a URL do QR Code igual à que você usa no componente original
     const qrCodeUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/qrcode/view?id=${item.id}`;
   
-    // 3. Escreve um HTML isolado e limpo com estilos dedicados à impressão mobile/desktop
     doc.open();
     doc.write(`
       <html>
         <head>
           <title>Imprimir Etiqueta</title>
           <style>
-            @page {
-              size: auto;
-              margin: 0mm;
-            }
+            @page { size: auto; margin: 0mm; }
             html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff !important;
-              color: #000000 !important;
+              margin: 0; padding: 0;
+              background: #ffffff !important; color: #000000 !important;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              width: 100vw;
+              display: flex; justify-content: center; align-items: center;
+              min-height: 100vh; width: 100vw;
             }
             .print-label {
-              background: #ffffff !important;
-              color: #000000 !important;
-              border: none !important;
-              padding: 24px;
-              text-align: center;
-              box-sizing: border-box;
-              max-width: 90%;
+              background: #ffffff !important; color: #000000 !important;
+              border: none !important; padding: 24px; text-align: center;
+              box-sizing: border-box; max-width: 90%;
             }
             .qrcode-wrapper {
-              background: #ffffff !important;
-              padding: 12px;
-              border-radius: 12px;
-              display: inline-block;
-              margin-bottom: 16px;
+              background: #ffffff !important; padding: 12px;
+              border-radius: 12px; display: inline-block; margin-bottom: 16px;
             }
             .title {
-              font-size: 18px;
-              font-weight: 900;
-              text-transform: uppercase;
-              margin: 0 0 6px 0;
-              line-height: 1.2;
+              font-size: 18px; font-weight: 900; text-transform: uppercase;
+              margin: 0 0 6px 0; line-height: 1.2;
             }
             .info-text {
-              font-size: 10px;
-              font-family: monospace;
-              color: #444444;
-              margin: 4px 0 0 0;
-              text-transform: uppercase;
+              font-size: 10px; font-family: monospace; color: #444444;
+              margin: 4px 0 0 0; text-transform: uppercase;
             }
           </style>
           <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -195,40 +416,30 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   };
 
   const getCategory = (categoryId: string, categoriesList: any[]) => {
-    
     const foundCategory = categoriesList.find(cat => cat.id === categoryId);
-    
     return foundCategory ? foundCategory.name : "Categoria não encontrada";
   };
   
-  // ESTADO NOVO: Guardar as categorias para cruzar com o categoryId dos ativos
   const [categories, setCategories] = useState<any[]>([]);
-  
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Fechar modais com Esc
   useEscapeKey(() => setSelectedViewItem(null), !!selectedViewItem);
   useEscapeKey(() => setSelectedPrintItem(null), !!selectedPrintItem);
   useEscapeKey(() => setMovingItem(null), !!movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
   useEscapeKey(exitSelectionMode, isSelectionMode);
 
-  /// Toast notifications
   const toast = UseToast();
 
-  // --- BUSCA DE CATEGORIAS PARA MAPEAMENTO ---
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories/list');
-        
-        // Se a API de categorias falhar explicitamente por falta de permissão
         if (!res.ok) {
           toast.showError(`Erro ao carregar categorias (Status: ${res.status}).`);
           return;
         }
-
         const data = await res.json();
         if (res.ok && isMounted) {
           setCategories(data);
@@ -241,12 +452,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     return () => { isMounted = false; };
   }, [toast]);
 
-  // --- DESCOBRIR BLOQUEIO DE DADOS PARA VIEWER ---
   useEffect(() => {
-    // Se o usuário é um Viewer e os dados cruciais vieram vazios da página pai
     if (isViewer && fatherSpaces.length === 0 && actives.length === 0) {
-      
-      // Criamos uma função rápida para testar o status real das rotas e jogar no Toast
       const testBackendPermissions = async () => {
         try {
           const [resSpaces, resActives] = await Promise.all([
@@ -255,11 +462,8 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           ]);
 
           if (!resSpaces.ok || !resActives.ok) {
-            const spaceStatus = resSpaces.status;
-            const activeStatus = resActives.status;
-            
             toast.showError(
-              `Bloqueio detectado! A Listagem de espaços Pai retornou Status ${spaceStatus} e a Listagem de Ativos retornou Status ${activeStatus}.`
+              `Bloqueio detectado! A Listagem de espaços Pai retornou Status ${resSpaces.status} e a Listagem de Ativos retornou Status ${resActives.status}.`
             );
           }
         } catch {
@@ -271,7 +475,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     }
   }, [isViewer, fatherSpaces, actives, toast]);
 
-  // --- FECHAMENTO E POSICIONAMENTO DO MENU ---
   useEffect(() => {
     if (!contextMenu) return;
     
@@ -298,7 +501,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     e.preventDefault();
     e.stopPropagation();
 
-    if (isMobile) return; // EVITA context menu no mobile
+    if (isMobile) return;
     if (isBaseCompletelyEmpty || hasNoResultsFromFilter) return;
 
     const menuWidth = 256; 
@@ -313,7 +516,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     setContextMenu({ x, y, item, isPhysicalSpace });
   };
 
-  // --- LÓGICA DE FILTRO ---
   const filteredData = useMemo(() => {
     const query = filters.query?.toLowerCase() || "";
     const category = filters.category || "";
@@ -340,7 +542,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       const queue = [startParentId];
       while (queue.length > 0) {
         const currentId = queue.shift();
-
         const children = actives.filter(a => a.parentId === currentId);
 
         children.forEach(child => {
@@ -442,13 +643,11 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   };
 
   const handleCloneClick = (item: any) => {
-    // Preserva o caminho original do ativo para o formulário de clone
     onClone({ 
       ...item, 
       id: undefined, 
       serialNumber: "", 
       quantity: 1,
-      // Preservar localização original
       fatherSpaceId: item.fatherSpaceId,
       parentId: item.parentId 
     });
@@ -483,6 +682,49 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     });
+  };
+
+  const handleBatchClone = async () => {
+    if (selectedItems.size === 0) return;
+  
+    try {
+      setIsCloning(true);
+  
+      // Converte a seleção do padrão ActiveForm (space:ID ou active:ID)
+      let destSpaceId: string | undefined = undefined;
+      if (cloneDestinationSpaceId) {
+        const [id] = cloneDestinationSpaceId.split(":");
+        // Envia destinationSpaceId se for selecionado um Espaço Pai ou Espaço Físico
+        destSpaceId = id;
+      }
+  
+      const response = await fetch('/api/actives/clone-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activeIds: Array.from(selectedItems),
+          quantity: cloneQuantity,
+          destinationSpaceId: destSpaceId,
+        }),
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao clonar em lote');
+      }
+  
+      toast.showSuccess(`${data.count} ativo(s) clonado(s) com sucesso!`);
+      setIsCloneBatchOpen(false);
+      exitSelectionMode();
+      onRefresh();
+  
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar clonagem';
+      toast.showError(msg);
+    } finally {
+      setIsCloning(false);
+    }
   };
   
   const handleBatchDelete = async () => {
@@ -536,7 +778,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const renderMoveTree = (parentId: string | null, spaceId: string) => {
     const children = actives.filter(a => {
       if (excludedMoveIds.has(a.id)) return false;
-      if (!a.isPhysicalSpace) return false; // Apenas espaços físicos podem receber ativos
+      if (!a.isPhysicalSpace) return false;
       
       if (parentId === null) {
         return a.fatherSpaceId === spaceId && (!a.parentId || a.parentId === "");
@@ -585,7 +827,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 )}
               </div>
 
-              {/* Recuo hierárquico com linha guia visual */}
               {isExpanded && (
                 <div className="border-l dark:border-white/5 ml-5 pl-2 mt-1 space-y-1">
                   {renderMoveTree(sub.id, spaceId)}
@@ -598,7 +839,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     );
   };
 
-  // --- RENDERIZAÇÃO DA ÁRVORE ---
   const renderActiveTree = (parentId: string | null, spaceId: string, level: number = 0) => {
     const children = filteredData.actives.filter(a => {
       const isTopLevel = !a.parentId || a.parentId === "";
@@ -844,12 +1084,10 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         </div>
       </div>
 
-      {/* --- MODAL VIEW REDESENHADO --- */}
+      {/* --- MODAL DETALHES --- */}
       {selectedViewItem && (
         <div className="fixed inset-0 z-[800] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-3xl rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-            
-            {/* Cabeçalho */}
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-white/[0.02] shrink-0">
                <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-2xl ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).bg} ${getItemColors(selectedViewItem.isPhysicalSpace, selectedViewItem.hasSubItems).text}`}>
@@ -865,9 +1103,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                <button onClick={() => setSelectedViewItem(null)} className="p-3 text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"><X/></button>
             </div>
             
-            {/* Conteúdo Rolável */}
             <div className="p-6 flex-1 overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-6">
-              
               <div className="flex-1 space-y-6">
                   <div className="w-full h-48 sm:h-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 overflow-hidden flex items-center justify-center relative group">
                     {selectedViewItem.imageUrl ? (
@@ -953,13 +1189,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       );
                     })()}
                   </div>
-                  {/* --- FIM DA SEÇÃO DE ARQUIVOS --- */}
               </div>
 
-              {/* Coluna Lateral Direita */}
               <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
-                
-                {/* 1. Bloco do QR Code */}
                 {selectedViewItem.isPhysicalSpace && (
                   <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5">
                       <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
@@ -976,7 +1208,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   </div>
                 )}
 
-                {/* 2. Bloco de Notas */}
                 <div className="flex flex-col p-5 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5 flex-1 min-h-[160px]">
                   <div className="flex items-center gap-2 mb-3 text-gray-400 dark:text-zinc-500">
                     <FileText size={14} />
@@ -995,7 +1226,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
 
@@ -1012,7 +1242,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   <Copy size={16}/> <span className="hidden sm:inline">Clonar</span>
                </button>
 
-
                <div className="hidden sm:block flex-1"></div>
 
                <button onClick={() => {handleDelete(selectedViewItem); setSelectedViewItem(false);}} className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
@@ -1027,7 +1256,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       {selectedPrintItem && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-md print:relative print:w-full print:h-auto print:bg-white print:z-[9999] print:p-0 print:backdrop-blur-none">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] border dark:border-white/10 overflow-hidden shadow-2xl p-6 print:w-full print:max-w-none print:border-none print:shadow-none print:rounded-none print:p-0" id="qrcode-print-container">
-
               <div className="flex justify-between items-center mb-6 print:hidden">
                 <h3 className="font-black uppercase text-sm dark:text-white">Imprimir Etiqueta</h3>
                 <button onClick={() => setSelectedPrintItem(null)} className="text-zinc-400 hover:text-red-500 transition-colors">
@@ -1036,7 +1264,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
               </div>
 
               <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-label">
-
                 <div className="bg-white p-3">
                   <QRCode
                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qrcode/view?id=${selectedPrintItem.id}`}
@@ -1090,8 +1317,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
               <div className="p-4 max-h-[50vh] overflow-y-auto space-y-3 custom-scrollbar">
                 {fatherSpaces.map(space => {
                     const isExpanded = moveExpanded[space.id];
-                    
-                    // Verifica se existem ativos físicos de nível superior vinculados diretamente a este Espaço Pai
                     const hasTopLevelActives = actives.some(a => 
                       a.fatherSpaceId === space.id && 
                       a.isPhysicalSpace && 
@@ -1137,6 +1362,89 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         </div>
       )}
 
+      {/* --- MODAL DE CLONAGEM EM LOTE --- */}
+      {isCloneBatchOpen && (
+        <div className="fixed inset-0 z-[900] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-5">
+            
+            <div className="flex items-center justify-between border-b dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 dark:bg-amber-950/50 text-amber-600 rounded-xl">
+                  <Copy size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase text-zinc-900 dark:text-white">Clonar Ativos</h3>
+                  <p className="text-[10px] text-zinc-400 font-medium">{selectedItems.size} ativo(s) selecionado(s)</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsCloneBatchOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5">
+                Quantidade de cópias por ativo
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={cloneQuantity}
+                onChange={(e) => setCloneQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+              <span className="text-[12px] text-zinc-400 mt-1 block">
+                Total a ser criado: <strong>{selectedItems.size * cloneQuantity} novos ativos</strong>.
+              </span>
+            </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5">
+                  Localização
+                </label>
+                <SearchableSelect 
+                  options={cloneLocationOptions}
+                  value={cloneDestinationSpaceId}
+                  onChange={(id: string) => setCloneDestinationSpaceId(id)}
+                  placeholder="Selecione o espaço de destino..."
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setIsCloneBatchOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 uppercase"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isCloning}
+                onClick={handleBatchClone}
+                className="flex items-center gap-2 px-5 py-2.5 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 active:scale-95 rounded-xl transition-all shadow-lg shadow-amber-600/20 disabled:opacity-50"
+              >
+                {isCloning ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Clonando...
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} /> Confirmar Clonagem
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* --- MENU DE CONTEXTO --- */}
       {contextMenu && (
         <div 
@@ -1162,77 +1470,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         </div>
       )}
 
-      <style jsx global>{`
-        @media print {
-          @page {
-            size: auto;
-            margin: 0mm !important;
-          }
-
-          body * {
-            display: none !important;
-          }
-
-          html, body {
-            color-scheme: light !important;
-            visibility: hidden !important;
-            height: 100% !important;
-            max-height: 100vh !important;
-            overflow: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-          }
-
-          #qrcode-print-container,
-          #qrcode-print-container * {
-            visibility: visible !important;
-            background-color: white !important;
-            color: black !important;
-          }
-
-          #qrcode-print-container svg {
-            width: 180px !important;
-            height: 180px !important;
-            display: block !important;
-            background: white !important;
-          }
-          #qrcode-print-container svg path {
-            fill: #000000 !important;
-          }
-          #qrcode-print-container svg rect {
-            fill: #ffffff !important;
-          }
-
-          #qrcode-print-container {
-            position: relative !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: white !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            z-index: 99999 !important;
-          }
-
-          #qrcode-print-label {
-            background: white !important;
-            color: black !important;
-            border: none !important;
-            padding: 16px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-            page-break-after: avoid !important;
-            max-width: 90% !important;
-          }
-        }
-      `}</style>
-
       {/* --- BARRA INFERIOR (DESKTOP) / CONTEXTMENU SELETOR MÚLTIPLO (MOBILE) --- */}
       {isSelectionMode && selectedItems.size > 0 && (
         isMobile ? (
@@ -1250,18 +1487,23 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                   name: `${selectedItems.size} ativos`,
                   isBatch: true 
                 });
-                setContextMenu(null);
               }} 
               className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-gray-600 dark:text-zinc-400 hover:bg-blue-50 dark:hover:bg-white/5 hover:text-blue-600 dark:hover:text-white"
             >
-              <Move size={16} /> Mover Ativos
+              <Move size={16} /> Mover Ativo{selectedItems.size > 1 && "s"}
+            </button>
+            <button
+              onClick={() => setIsCloneBatchOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+            >
+              <Copy size={16} /> Clonar Ativo{selectedItems.size > 1 && "s"}
             </button>
             <div className="mt-1 pt-1 border-t dark:border-white/5">
               <button 
                 onClick={() => handleBatchDelete()} 
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-[10px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
               >
-                <Trash2 size={16} /> Deletar Ativos
+                <Trash2 size={16} /> Deletar Ativo{selectedItems.size > 1 && "s"}
               </button>
             </div>
           </div>
@@ -1280,6 +1522,12 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                 </button>
               </div>
               <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsCloneBatchOpen(true)}
+                  className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl font-black uppercase text-[10px] flex items-center gap-2"
+                >
+                  <Copy size={16} /> Clonar em Lote
+                </button>
                 <button 
                   onClick={() => {
                     setMovingItem({ 
