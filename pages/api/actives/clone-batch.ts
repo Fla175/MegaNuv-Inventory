@@ -69,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         newActivesData.push({
           id: await generateUniqueHexId(prisma.active),
           name: active.name,
-          sku: null,
+          sku: active.sku,
           serialNumber: null, 
           fatherSpaceId: targetFatherSpaceId,
           parentId: targetParentId,
