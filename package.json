@@ -1,6 +1,6 @@
 {
   "name": "inventory-meganuv",
-  "version": "2.21.1",
+  "version": "2.21.2",
   "private": true,
   "scripts": {
     "dev": "cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../",
