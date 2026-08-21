@@ -16,6 +16,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [newCategoryName, setNewCategoryName] = useState("");
   const toast = UseToast();
   const [savingCategory, setSavingCategory] = useState(false);
+  const [applyToSimilar, setApplyToSimilar] = useState(false);
 
   const statusOptions = [
     { value: "IN-STOCK", label: "Em Estoque", indicatorColor: "bg-emerald-500" },
@@ -374,7 +375,8 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       serialNumbers: formData.serialNumbers, 
       isPhysicalSpace: !!formData.isPhysicalSpace,
       fatherSpaceId: finalFatherSpaceId,
-      parentId: finalParentId
+      parentId: finalParentId,
+      applyToSimilar,
     };
 
     try {
@@ -596,6 +598,22 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData(prev => ({...prev, notes: e.target.value}))} />
           </div>
         </form>
+
+        {mode === "edit" && (
+          <div className="px-6 pb-2">
+            <label className="flex items-center gap-3 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 cursor-pointer transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              <input 
+                type="checkbox" 
+                checked={applyToSimilar}
+                onChange={(e) => setApplyToSimilar(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+              <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-tight">
+                Aplicar as alterações para todos os ativos semelhantes
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="p-6 border-t dark:border-white/5 shrink-0 bg-white dark:bg-zinc-900">
           <button type="submit" onClick={handleSubmit} className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all ${mode === 'clone' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : mode === 'edit' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'} text-white`}>
