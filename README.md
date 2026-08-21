@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** *v2.18.6*
+**Current Version:** *v2.21.5*
 
 ## 🚀 Features
 
@@ -17,10 +17,12 @@
 * **Responsive UI:** Fully responsive dashboard built with Tailwind CSS and Lucide icons, optimized for desktop and mobile.
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
-* **Image attachment**: Attachment of until 5 images for a active.
+* **Image Attachment**: Attachment of until 5 images for a active.
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * **Custom *Select***: Custom component for Select type Inputs.
-* [<ins>***NEW***</ins>] ***`ESC`* Key**: ***`ESC`*** key closes open modals.
+* ***`ESC`* Key**: `ESC` key closes open modals.
+* **Clone in Batch**: A function that clones selected actives in batches.
+* [<ins>***NEW***</ins>] **Modify Similar Assets**: A checkbox in the Active Update Form that gives the function of modify similar assets (same name, manufacturer, model and sku).
 
 ---
 
@@ -36,12 +38,16 @@
 
 ---
 
+## Project Characteristic (Don't be afraided)
+
+* **Without `node_modules` in the project *root***: The project uses the next.js option `standalone`, that gives the same use of `node_modules` also the `yarn dev` is configured to use the comands `cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../`, that make the project runs in `.next/standalone` and keep the navegation in terminal to the project root.
+
 ## 🏁 Getting Started
 
 ### Prerequisites
 
 * Node.js (LTS version)
-* Yarn or NPM
+* Yarn and NPM
 * A running MySQL/MariaDB instance
 
 ---
@@ -76,7 +82,7 @@ npx prisma generate
 yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) (or the **dns / ip** you've setted) with your browser to see the result.
+Open [http://0.0.0.0:3000](http://0.0.0.0:3000) (or the **dns / ip** you've setted) with your browser to see the result.
 
 ---
 
@@ -110,3 +116,6 @@ The system implements a strict permission logic:
 >
 > * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
 
+'''
+Have fun!
+'''
