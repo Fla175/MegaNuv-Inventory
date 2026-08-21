@@ -1,13 +1,12 @@
 {
   "name": "inventory-meganuv",
-  "version": "2.21.0",
+  "version": "2.21.2",
   "private": true,
   "scripts": {
-    "dev": "rm -rf .next && next dev -H 0.0.0.0 -p 3000",
+    "dev": "cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "seed": "npm run build"
+    "lint": "next lint"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

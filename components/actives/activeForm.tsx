@@ -7,7 +7,6 @@ import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { UseToast } from "@/lib/context/ToastContext";
 import CustomSelect from "../customSelect";
-import { getCategoryColor } from "@/lib/constants/colors";
 
 export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -488,7 +487,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 <div className={`grid gap-2 ${gridConfig}`}>
                   {categories.map((category) => {
                     const isSelected = formData.categoryId === category.id;
-                    const color = category.color || getCategoryColor(category.id);
+                    const color = category.color;
                     
                     return (
                       <button 

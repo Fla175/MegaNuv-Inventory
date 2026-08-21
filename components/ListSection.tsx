@@ -9,7 +9,7 @@ import {
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { UseToast } from "../lib/context/ToastContext";
-import { getItemColors, getCategoryColor, getParentSpaceColors } from "../lib/constants/colors";
+import { getItemColors, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { ListSectionProps } from "../lib/types";
 import { useUser } from "@/lib/context/UserContext";
@@ -871,7 +871,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
           const categoryObj = categories.find(ar => ar.id === active.categoryId);
-          const categoryName = categoryObj ? categoryObj.name : "Sem Categoria";
 
           const isSelected = selectedItems.has(active.id);
           
@@ -986,16 +985,16 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                         <p className={`text-[9px] font-bold uppercase tracking-widest mr-2 ${getItemColors(true, hasSubItems).text}`}>Espaço Físico</p>
                       }
                       
-                      {active.categoryId && (
+                      {categoryObj && (
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
-                          style={{ 
-                            color: getCategoryColor(active.categoryId), 
-                            backgroundColor: `${getCategoryColor(active.categoryId)}15`, 
-                            borderColor: `${getCategoryColor(active.categoryId)}40` 
-                          }}
+                          style={categoryObj.color ? { 
+                            color: categoryObj.color, 
+                            backgroundColor: `${categoryObj.color}15`, 
+                            borderColor: `${categoryObj.color}40` 
+                          } : {}}
                         >
-                          {categoryName}
+                          {categoryObj.name}
                         </p>
                       )}
 

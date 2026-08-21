@@ -55,23 +55,3 @@ export const CATEGORY_PALETTE = [
   '#98A6B0', '#8E44AD', '#17A2B8', '#40E0D0', '#2980B9', '#6F42C1', 
   '#E74C3C', '#800020', '#2C3E50', '#A0522D', '#7AA9BD', '#D81B60',
 ];
-
-export function getCategoryColor(categoryId: string) {
-  let hash = 0;
-  for (let i = 0; i < categoryId.length; i++) {
-    hash = categoryId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  const index = Math.abs(hash) % CATEGORY_PALETTE.length;
-  
-  return CATEGORY_PALETTE[index];
-}
-
-export function getNextCategoryColor(usedColors: string[]): string {
-  for (let i = 0; i < CATEGORY_PALETTE.length; i++) {
-    if (!usedColors.includes(CATEGORY_PALETTE[i])) {
-      return CATEGORY_PALETTE[i];
-    }
-  }
-  return CATEGORY_PALETTE[0];
-}
