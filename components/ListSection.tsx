@@ -1,10 +1,11 @@
+// comṕonents/ListSection.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
-  Pencil, Trash2, Copy, Printer, Move, Eye, 
-  MapPin, Box, Layers, Hash, X, ChevronRight, Barcode, Ghost, SearchX, LinkIcon, Image as ImageIcon, Boxes,
-  FileText, FileIcon, Tag, Factory, Cpu, Loader2, Search, ChevronDown
+  Pencil, Trash2, Copy, Printer, Move, Eye, MapPin, Box, Layers, Hash, X, ChevronRight, 
+  Barcode, Ghost, SearchX, LinkIcon, Image as ImageIcon, Boxes, FileText, FileIcon, Tag,
+  Factory, Cpu, Loader2, Search, ChevronDown, Undo2, CheckCircle2
 } from "lucide-react";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
 import { useIsMobile } from "../lib/hooks/useMediaQuery";
@@ -299,6 +300,17 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   const [cloneDestinationSpaceId, setCloneDestinationSpaceId] = useState<string>("");
   const [isCloning, setIsCloning] = useState(false);
 
+  // --- DESFAZER ALTERAÇÃO ---
+  const [undoData, setUndoData] = useState<{
+    table: string;
+    ids: string[];
+    timestamp: string;
+    name: string;
+  } | null>(null);
+
+  const [undoSeconds, setUndoSeconds] = useState(0);
+  const [isUndoing, setIsUndoing] = useState(false);
+
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -417,7 +429,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
 
   const getCategory = (categoryId: string, categoriesList: any[]) => {
     const foundCategory = categoriesList.find(cat => cat.id === categoryId);
-    return foundCategory ? foundCategory.name : "Categoria não encontrada";
+    return foundCategory ? foundCategory.name : "Categoria n      o encontrada";
   };
   
   const [categories, setCategories] = useState<any[]>([]);
@@ -428,6 +440,26 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   useEscapeKey(() => setMovingItem(null), !!movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
   useEscapeKey(exitSelectionMode, isSelectionMode);
+
+  useEffect(() => {
+    if (!undoData) return;
+  
+    setUndoSeconds(10);
+  
+    const interval = window.setInterval(() => {
+      setUndoSeconds((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(interval);
+          setUndoData(null);
+          return 0;
+        }
+  
+        return prev - 1;
+      });
+    }, 1000);
+  
+    return () => window.clearInterval(interval);
+  }, [undoData]);
 
   const toast = UseToast();
 
@@ -609,36 +641,214 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   }, [filters, filteredData.hasFilters, filteredData.actives]);
 
   // --- AÇÕES ---
-  const handleMoveAction = async (targetSpaceId: string, targetParentId?: string) => {
+  const handleMoveAction = async (
+    targetSpaceId: string,
+    targetParentId?: string
+  ) => {
     if (!movingItem) return;
+  
+    const isBatch = movingItem.isBatch;
+  
+    // Guardamos a seleção ANTES de chamar exitSelectionMode().
+    const selectedIds = Array.from(selectedItems);
+  
+    if (isBatch && selectedIds.length === 0) {
+      toast.showError(
+        "Nenhum ativo foi selecionado."
+      );
+      return;
+    }
+  
     setIsMovingLoading(true);
   
     try {
-      const isBatch = movingItem.isBatch;
-      const payload = isBatch 
-        ? { ids: Array.from(selectedItems), newFatherSpaceId: targetSpaceId, newParentId: targetParentId || null }
-        : { id: movingItem.id, newFatherSpaceId: targetSpaceId, newParentId: targetParentId || null };
-      
-      const res = await fetch('/api/actives/move', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const payload = isBatch
+        ? {
+            ids: selectedIds,
+            newFatherSpaceId: targetSpaceId,
+            newParentId: targetParentId || null,
+          }
+        : {
+            id: movingItem.id,
+            newFatherSpaceId: targetSpaceId,
+            newParentId: targetParentId || null,
+          };
   
-      if (res.ok) {
-        onRefresh();
-        setMovingItem(null);
-        if (selectedViewItem) setSelectedViewItem(null);
-        if (isBatch) exitSelectionMode();
-        toast.showSuccess(isBatch ? `${selectedItems.size} ativo(s) movido(s) com sucesso.` : 'Ativo movido com sucesso.');
-      } else {
-        const errData = await res.json();
-        toast.showError(errData.error || 'Erro ao mover o ativo.');
+      const res = await fetch(
+        "/api/actives/move",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        toast.showError(
+          data.error ||
+            "Erro ao mover o ativo."
+        );
+        return;
       }
-    } catch {
-      toast.showError('Não foi possível conectar ao servidor para mover o ativo.');
+  
+      // =====================================================
+      // TIMESTAMP DO SERVIDOR
+      // =====================================================
+  
+      if (!data.timestamp) {
+        console.error(
+          "Resposta do move.ts não possui timestamp:",
+          data
+        );
+  
+        toast.showError(
+          "A movimentação foi realizada, mas o histórico de desfazer não pôde ser preparado."
+        );
+      } else {
+        // ===================================================
+        // POPUP DE DESFAZER
+        // ===================================================
+  
+        const undoId = isBatch
+          ? selectedIds.join(",")
+          : movingItem.id;
+  
+        const undoName = isBatch
+          ? `${selectedIds.length} ativos`
+          : movingItem.name;
+  
+        const currentTimestamp = data.timestamp || new Date().toISOString();
+        showUndo(
+          undoId,
+          undoName,
+          currentTimestamp,
+          isBatch
+            ? selectedIds
+            : [movingItem.id]
+        );
+      }
+  
+      onRefresh();
+  
+      setMovingItem(null);
+  
+      if (selectedViewItem) {
+        setSelectedViewItem(null);
+      }
+  
+      if (isBatch) {
+        exitSelectionMode();
+      }
+  
+      toast.showSuccess(
+        isBatch
+          ? `${data.count ?? selectedIds.length} ativo(s) movido(s) com sucesso.`
+          : "Ativo movido com sucesso."
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao mover ativo:",
+        error
+      );
+  
+      toast.showError(
+        "Não foi possível conectar ao servidor para mover o ativo."
+      );
     } finally {
       setIsMovingLoading(false);
+    }
+  };
+
+  const showUndo = (
+    id: string,
+    name: string,
+    timestamp: string,
+    ids: string[]
+  ) => {
+    setUndoData({
+      table: "Active",
+      ids,
+      name,
+      timestamp,
+    });
+  
+    setUndoSeconds(10);
+  };
+
+  const handleUndo = async () => {
+    if (!undoData || isUndoing) return;
+  
+    setIsUndoing(true);
+  
+    try {
+      let successCount = 0;
+  
+      for (const id of undoData.ids) {
+        const res = await fetch(
+          "/api/database/revert",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              table: undoData.table,
+              id,
+              timestamp: undoData.timestamp,
+            }),
+          }
+        );
+  
+        if (res.ok) {
+          successCount++;
+        } else {
+          const data = await res.json();
+  
+          console.error(
+            `Erro ao reverter ${id}:`,
+            data
+          );
+        }
+      }
+  
+      if (successCount === 0) {
+        toast.showError(
+          "Nenhuma alteração pôde ser revertida."
+        );
+        return;
+      }
+  
+      if (successCount < undoData.ids.length) {
+        toast.showError(
+          `${successCount} de ${undoData.ids.length} alterações foram revertidas.`
+        );
+      } else {
+        toast.showSuccess(
+          successCount === 1
+            ? "Alteração revertida com sucesso."
+            : `${successCount} alterações revertidas com sucesso.`
+        );
+      }
+  
+      setUndoData(null);
+      setUndoSeconds(0);
+  
+      onRefresh();
+    } catch (error) {
+      console.error(
+        "Erro no undo:",
+        error
+      );
+  
+      toast.showError(
+        "Erro de conexão ao tentar reverter."
+      );
+    } finally {
+      setIsUndoing(false);
     }
   };
 
@@ -668,13 +878,18 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             body: JSON.stringify({ ids: [item.id] })
           });
           
+          const data = await res.json();
+
           if (res.ok) { 
+            if (data.timestamp) {
+              const currentTimestamp = data.timestamp || new Date().toISOString();
+              showUndo(item.id, item.name, currentTimestamp, [item.id]);
+            }
             onRefresh(); 
             if (selectedViewItem) setSelectedViewItem(null);
             toast.showSuccess('Item excluído com sucesso.');
           } else {
-            const errData = await res.json();
-            toast.showError(errData.error || 'Erro ao excluir o item.');
+            toast.showError(data.error || 'Erro ao excluir o item.');
           }
         } catch { 
           toast.showError('Erro de conexão ao tentar excluir o item.'); 
@@ -690,19 +905,19 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     try {
       setIsCloning(true);
   
-      // Converte a seleção do padrão ActiveForm (space:ID ou active:ID)
       let destSpaceId: string | undefined = undefined;
       if (cloneDestinationSpaceId) {
         const [id] = cloneDestinationSpaceId.split(":");
-        // Envia destinationSpaceId se for selecionado um Espaço Pai ou Espaço Físico
         destSpaceId = id;
       }
   
+      const selectedIds = Array.from(selectedItems);
+
       const response = await fetch('/api/actives/clone-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          activeIds: Array.from(selectedItems),
+          activeIds: selectedIds,
           quantity: cloneQuantity,
           destinationSpaceId: destSpaceId,
         }),
@@ -712,6 +927,16 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao clonar em lote');
+      }
+
+      if (data.timestamp) {
+        const currentTimestamp = data.timestamp || new Date().toISOString();
+        showUndo(
+          selectedIds.join(","),
+          `${data.count ?? selectedIds.length} ativo(s) clonado(s)`,
+          currentTimestamp,
+          data.ids || selectedIds
+        );
       }
   
       toast.showSuccess(`${data.count} ativo(s) clonado(s) com sucesso!`);
@@ -728,7 +953,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
   };
   
   const handleBatchDelete = async () => {
-    const count = selectedItems.size;
+    const selectedIds = Array.from(selectedItems);
+    const count = selectedIds.length;
+
     setConfirmDialog({
       isOpen: true,
       title: 'Confirmar Exclusão em Massa',
@@ -739,16 +966,26 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           const res = await fetch(`/api/actives/delete`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: Array.from(selectedItems) })
+            body: JSON.stringify({ ids: selectedIds })
           });
           
+          const data = await res.json();
+
           if (res.ok) { 
+            if (data.timestamp) {
+              const currentTimestamp = data.timestamp || new Date().toISOString();
+              showUndo(
+                selectedIds.join(","),
+                `${count} ativos`,
+                currentTimestamp,
+                selectedIds
+              );
+            }
             onRefresh(); 
             exitSelectionMode();
             toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
           } else {
-            const errData = await res.json();
-            toast.showError(errData.error || 'Erro ao excluir os itens em lote.');
+            toast.showError(data.error || 'Erro ao excluir os itens em lote.');
           }
         } catch { 
           toast.showError('Erro de conexão ao tentar excluir os itens.'); 
@@ -912,17 +1149,42 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           };
           
           const handleCheckboxChange = (checked: boolean) => {
-            const childIds = active.isPhysicalSpace ? getAllChildIds(active.id) : [];
+            const childIds = active.isPhysicalSpace
+              ? getAllChildIds(active.id)
+              : [];
           
-            setSelectedItems(prev => {
+            setSelectedItems((prev) => {
               const next = new Set(prev);
           
               if (checked) {
                 next.add(active.id);
-                childIds.forEach(id => next.add(id));
+          
+                childIds.forEach((id) => {
+                  next.add(id);
+                });
               } else {
                 next.delete(active.id);
-                childIds.forEach(id => next.delete(id));
+          
+                childIds.forEach((id) => {
+                  next.delete(id);
+                });
+              }
+          
+              return next;
+            });
+          };
+
+          const toggleSingleSelection = (
+            id: string,
+            checked: boolean
+          ) => {
+            setSelectedItems((prev) => {
+              const next = new Set(prev);
+          
+              if (checked) {
+                next.add(id);
+              } else {
+                next.delete(id);
               }
           
               return next;
@@ -954,7 +1216,18 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                     <input 
                       type="checkbox" 
                       checked={isSelected}
-                      onChange={(e) => { e.stopPropagation(); handleCheckboxChange(e.target.checked); }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                      
+                        if (active.isPhysicalSpace) {
+                          handleCheckboxChange(e.target.checked);
+                        } else {
+                          toggleSingleSelection(
+                            active.id,
+                            e.target.checked
+                          );
+                        }
+                      }}
                       className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
                       onClick={(e) => e.stopPropagation()}
                     />
@@ -990,7 +1263,7 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{ 
-                            color: getCategoryColor(active.categoryId), 
+                            color: categoryObj.color, 
                             backgroundColor: `${categoryObj.color}15`, 
                             borderColor: `${categoryObj.color}40`,
                           }}
@@ -1550,6 +1823,59 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
             </div>
           </div>
         )
+      )}
+
+      {undoData && undoSeconds > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-[calc(100%-2rem)] max-w-md animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-white dark:bg-zinc-950/65 text-zinc-950 dark:text-white rounded-2xl shadow-2xl border border-white/10 dark:border-zinc-200/20 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                <CheckCircle2
+                  size={20}
+                  className="text-emerald-400"
+                />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black uppercase tracking-wide">
+                  Alteração realizada
+                </p>
+
+                <p className="text-[10px] opacity-60 truncate mt-0.5">
+                  {undoData.name}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isUndoing}
+                onClick={handleUndo}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                {isUndoing ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Undo2 size={14} />
+                )}
+
+                Desfazer
+              </button>
+            </div>
+
+            <div className="mt-3 h-1 bg-zinc-200 dark:bg-zinc-200/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 transition-all duration-1000"
+                style={{
+                  width: `${(undoSeconds / 10) * 100}%`,
+                }}
+              />
+            </div>
+
+            <p className="text-[9px] text-center opacity-40 font-bold mt-2">
+              Disponível por mais {undoSeconds}s
+            </p>
+          </div>
+        </div>
       )}
       
       {/* Confirm Dialog */}
