@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** *v2.18.6*
+**Current Version:** *v2.22.1*
 
 ## 🚀 Features
 
@@ -20,7 +20,8 @@
 * **Image attachment**: Attachment of until 5 images for a active.
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * **Custom *Select***: Custom component for Select type Inputs.
-* [<ins>***NEW***</ins>] ***`ESC`* Key**: ***`ESC`*** key closes open modals.
+* ***`ESC`* Key**: ***`ESC`*** key closes open modals.
+* [<ins>***NEW***</ins>] **Revert Button**: Button that reverts recents changes.
 
 ---
 
@@ -42,7 +43,7 @@
 
 * Node.js (LTS version)
 * Yarn or NPM
-* A running MySQL/MariaDB instance
+* A running MySQL/MariaDB instance with system-versioning function setted
 
 ---
 
@@ -76,7 +77,9 @@ npx prisma generate
 yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) (or the **dns / ip** you've setted) with your browser to see the result.
+Open [http://0.0.0.0:3000](http://0.0.0.0:3000), [http://localhost:3000](http://localhost:3000) or the **dns / ip** you've setted with your browser to see the result.
+
+> Important: We recommend you to use `nginx` as your **dns server**.
 
 ---
 
