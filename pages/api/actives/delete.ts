@@ -25,9 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const id = req.body.id;
     let ids: string[] | undefined = req.body.ids;
     
-    if (isBatch) {
-      ids = req.body.ids;
-    } else {
+    if (!isBatch) {
       if (!id && !ids) return res.status(400).json({ error: "ID ou IDs obrigatório." });
       if (typeof id === "string") ids = [id];
     }
@@ -43,13 +41,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (actives.length === 0) return res.status(404).json({ error: "Ativo(s) não encontrado(s)." });
 
+    // EXECUÇÃO EM TRANSAÇÃO
+    await db.$transaction(async (tx) => {
+      // 1. Remove o vínculo parentId de qualquer ativo filho apontando para os IDs que serão deletados
+      await tx.active.updateMany({
+        where: { parentId: { in: ids } },
+        data: { parentId: null }
+      });
+
+      // 2. Remove os registros dos ativos
+      await tx.active.deleteMany({
+        where: { id: { in: ids } }
+      });
+    });
+
+    // 3. Remove os arquivos do MinIO após garantir a deleção do banco
     for (const active of actives) {
       if (active.imageUrl) {
-        await deleteFileFromMinio(active.imageUrl);
+        try {
+          await deleteFileFromMinio(active.imageUrl);
+        } catch (minioErr) {
+          console.error(`Erro ao deletar imagem no MinIO (${active.imageUrl}):`, minioErr);
+        }
       }
     }
-
-    await db.active.deleteMany({ where: { id: { in: ids } } });
 
     const count = actives.length;
     await createLog(
@@ -61,7 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ message: `${count} ativo${count > 1 ? 's' : ''} removido${count > 1 ? 's' : ''} com sucesso.` });
 
-  } catch {
+  } catch (error) {
+    console.error("❌ Erro ao deletar ativo:", error);
     return res.status(500).json({ error: "Erro ao excluir ativo." });
   }
 }

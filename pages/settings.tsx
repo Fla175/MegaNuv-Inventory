@@ -1,13 +1,13 @@
 // pages/settings.tsx
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Moon, Sun, Monitor, Loader2, Trash2, 
-  UserCircle, Users, Pencil, Clock, Mail, Settings, X, CheckCircle, 
-  Plus, LayoutDashboard, ChevronRight, 
-  CalendarFold, KeyRound, CirclePlus,
-  Activity, ClipboardList, Group, Palette
+  UserCircle, Users, Pencil, Clock, Mail, Settings, X,
+  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, 
+  CalendarFold, KeyRound, CirclePlus, Activity,
+  ClipboardList, Group, Palette, Undo2
 } from "lucide-react";
 import { useUser } from "@/lib/context/UserContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
@@ -27,7 +27,6 @@ interface User {
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
-
 }
 
 interface FatherSpace {
@@ -54,6 +53,22 @@ interface Log {
   user: { name: string; email: string };
 }
 
+interface RevertSubItem {
+  table: string;
+  id: string;
+  timestamp: string;
+}
+
+interface RevertItem {
+  groupId?: string;
+  id?: string;
+  table?: string;
+  name: string;
+  timestamp: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  items?: RevertSubItem[];
+}
+
 type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
 
 export default function SettingsPage() {
@@ -63,6 +78,11 @@ export default function SettingsPage() {
   const { user, refreshUser, loading } = useUser();
   const toast = UseToast();
   const [saving, setSaving] = useState(false);
+
+  const [revertItems, setRevertItems] = useState<RevertItem[]>([]);
+  const [isRevertMenuOpen, setIsRevertMenuOpen] = useState(false);
+  const [selectedReverts, setSelectedReverts] = useState<Set<string>>(new Set());
+  const [isReverting, setIsReverting] = useState(false);
 
   // Estados de Listagem
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -78,30 +98,6 @@ export default function SettingsPage() {
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   const [role, setRole] = useState(selectedUser?.role || '');
 
-  useEffect(() => {
-    if (selectedUser) {
-      setRole(selectedUser.role);
-    } else {
-      setRole('');
-    }
-    refreshUser();
-  }, [selectedUser, refreshUser]);
-
-  useEscapeKey(() => {
-    if (confirmDialog.isOpen) {
-      setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-      return;
-    }
-
-    if (selectedSpace) {
-      setSelectedSpace(null);
-    }
-
-    if (isSpaceModalOpen) {
-      setIsSpaceModalOpen(false);
-    }
-  });
-  
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -127,30 +123,138 @@ export default function SettingsPage() {
     ...(user?.isSystem && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
   ];
 
-  // Fechar modais com Esc
+  useEffect(() => {
+    if (selectedUser) {
+      setRole(selectedUser.role);
+    } else {
+      setRole('');
+    }
+    refreshUser();
+  }, [selectedUser, refreshUser]);
+
+  useEscapeKey(() => {
+    if (confirmDialog.isOpen) {
+      setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+    if (selectedSpace) setSelectedSpace(null);
+    if (isSpaceModalOpen) setIsSpaceModalOpen(false);
+  });
+
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
   useEscapeKey(() => setIsSpaceModalOpen(false), isSpaceModalOpen);
   useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
 
   // --- CARREGAMENTO DE DADOS ---
-  const fetchData = async <T,>(endpoint: string, setter: (data: T) => void) => {
+  const fetchData = useCallback(async <T,>(endpoint: string, setter: (data: T) => void) => {
     try {
       const res = await fetch(endpoint);
       if (res.ok) setter(await res.json());
     } catch { /* erro silencioso */ }
-  };
+  }, []);
 
-  useEffect(() => {
+  const refreshActiveTabData = useCallback(() => {
     if (activeTab === 'users') fetchData('/api/users', setUsersList);
     if (activeTab === 'spaces' && canManageAll) fetchData('/api/father-spaces/list', setSpacesList);
     if (activeTab === 'categories' && canManageUsers) fetchData('/api/categories/list', setCategoriesList);
     if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
+  }, [activeTab, canManageAll, canManageUsers, canSeeLogs, fetchData]);
+
+  useEffect(() => {
+    refreshActiveTabData();
     if (tab) {
       setActiveTab(tab as TabType);
     }
-  }, [activeTab, canManageAll, canManageUsers, canSeeLogs, tab, user]);
+  }, [refreshActiveTabData, tab]);
 
-  // --- HANDLERS ---
+  const fetchRevertHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/database/revert");
+      if (!res.ok) {
+        setRevertItems([]);
+        return;
+      }
+      const data = await res.json();
+      setRevertItems(Array.isArray(data.items) ? data.items : []);
+    } catch {
+      setRevertItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchRevertHistory();
+    const interval = window.setInterval(fetchRevertHistory, 5000);
+    return () => window.clearInterval(interval);
+  }, [user, fetchRevertHistory]);
+
+  const toggleRevertItem = (id: string) => {
+    setSelectedReverts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // --- HANDLERS DE REVERSÃO ---
+  const handleRevertSelected = async (targetItems?: RevertItem[]) => {
+    const selectedList = targetItems || revertItems.filter((item) => {
+      const itemKey = item.groupId || item.id;
+      return itemKey && selectedReverts.has(itemKey);
+    });
+  
+    if (selectedList.length === 0 || isReverting) return;
+  
+    setIsReverting(true);
+  
+    // Extrai todos os sub-itens dos lotes ou itens individuais selecionados
+    const payloadItems: RevertSubItem[] = selectedList.flatMap((item) => {
+      if (item.items && item.items.length > 0) {
+        return item.items;
+      }
+      return [{ table: item.table!, id: item.id!, timestamp: item.timestamp }];
+    });
+  
+    try {
+      const res = await fetch("/api/database/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: payloadItems,
+          mode: "HISTORY",
+        }),
+      });
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        toast.showError(data.error || "Não foi possível realizar a reversão.");
+        return;
+      }
+  
+      toast.showSuccess(`${data.revertedCount || payloadItems.length} item(ns) revertido(s) em lote!`);
+      setSelectedReverts(new Set());
+      setIsRevertMenuOpen(false);
+  
+      // Atualiza a tela instantaneamente
+      await fetchRevertHistory();
+      refreshActiveTabData();
+      await refreshUser();
+    } catch {
+      toast.showError("Erro ao processar as reversões.");
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
+  const handleQuickUndo = async () => {
+    if (revertItems.length === 0 || isReverting) return;
+    // Desfaz a alteração mais recente diretamente
+    await handleRevertSelected([revertItems[0]]);
+  };
+
+  // --- HANDLERS CRUD ---
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -169,6 +273,7 @@ export default function SettingsPage() {
         setIsUserModalOpen(false);
         fetchData('/api/users', setUsersList);
         if (isEditingSelf) await refreshUser();
+        await fetchRevertHistory();
       }
     } finally { setSaving(false); }
   };
@@ -177,12 +282,9 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     const formData = new FormData(e.currentTarget);
-    const payload = Object.fromEntries(formData);
+    const payload: Record<string, unknown> = Object.fromEntries(formData);
     
-    if (spaceImageUrl) {
-      payload.imageUrl = spaceImageUrl;
-    }
-    
+    if (spaceImageUrl) payload.imageUrl = spaceImageUrl;
     if (selectedSpace) payload.id = selectedSpace.id;
 
     try {
@@ -195,6 +297,7 @@ export default function SettingsPage() {
         setIsSpaceModalOpen(false);
         setSpaceImageUrl(null);
         fetchData('/api/father-spaces/list', setSpacesList);
+        await fetchRevertHistory();
       }
     } finally { setSaving(false); }
   };
@@ -219,6 +322,7 @@ export default function SettingsPage() {
         setIsCategoryModalOpen(false);
         fetchData('/api/categories/list', setCategoriesList);
         toast.showSuccess('Categoria salva com sucesso!');
+        await fetchRevertHistory();
       } else {
         const errorData = await res.json();
         toast.showError(errorData.error || 'Erro ao salvar: este nome pode já estar em uso.');
@@ -236,7 +340,6 @@ export default function SettingsPage() {
         const checkRes = await fetch(`/api/categories/check-assets?id=${id}`);
         if (checkRes.ok) {
           const { hasAssets } = await checkRes.json();
-          
           if (hasAssets) {
             toast.showError('Não é possível excluir esta categoria pois existem ativos vinculados a ela.');
             return;
@@ -290,11 +393,9 @@ export default function SettingsPage() {
           
           if (res.ok) {
             if (type === 'user' && id === user?.id) window.location.href = '/login';
-            else if (activeTab === 'users') fetchData('/api/users', setUsersList);
-            else if (activeTab === 'spaces') fetchData('/api/father-spaces/list', setSpacesList);
-            else if (activeTab === 'categories') fetchData('/api/categories/list', setCategoriesList);
-            else if (activeTab === 'logs') fetchData('/api/logs/list', setLogsList);
+            else refreshActiveTabData();
             toast.showSuccess('Exclusão realizada com sucesso.');
+            await fetchRevertHistory();
           } else {
             const errorData = await res.json();
             toast.showError(errorData.error || 'Erro ao realizar a exclusão.');
@@ -321,7 +422,6 @@ export default function SettingsPage() {
   };
 
   if (loading) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Sincronizando...</div></Layout>;
-
   if (!user) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Carregando...</div></Layout>;
 
   const tabs = [
@@ -334,38 +434,132 @@ export default function SettingsPage() {
 
   return (
     <Layout title="Configurações">
-        <div className="max-w-6xl mx-auto pb-10 lg:pb-20">
-          <div className="flex items-center gap-3 mb-6 lg:mb-10">
+      <div className="max-w-6xl mx-auto pb-10 lg:pb-20">
+        <div className="flex items-center justify-between mb-6 lg:mb-10">
+          <div className="flex items-center gap-3">
             <div className="bg-blue-600 p-2 lg:p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Settings className="w-5 h-5 lg:w-6 lg:h-6"/></div>
             <div>
               <h1 className="text-2xl lg:text-3xl font-black text-blue-950 dark:text-white italic tracking-tighter uppercase">Configurações</h1>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Painel de Controle e personalização</p>
             </div>
           </div>
-          
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+
+          {/* PAINEL DE REVERSÃO / DESFAZER */}
+          <div className="relative flex items-center gap-2">
+            <button
+              type="button"
+              disabled={revertItems.length === 0 || isReverting}
+              onClick={handleQuickUndo}
+              title="Desfazer última alteração"
+              className="flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-blue-600 border-blue-600 text-white hover:bg-blue-500"
+            >
+              {isReverting ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />}
+              <span className="hidden sm:inline">Desfazer</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={revertItems.length === 0}
+              onClick={() => setIsRevertMenuOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-3 rounded-2xl text-[10px] font-black uppercase border transition-all disabled:opacity-40 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-white/5 text-zinc-600 dark:text-zinc-300 hover:text-blue-600"
+            >
+              Histórico
+              {revertItems.length > 0 && (
+                <span className="bg-blue-600 text-white min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[9px]">
+                  {revertItems.length}
+                </span>
+              )}
+            </button>
+
+            {isRevertMenuOpen && revertItems.length > 0 && (
+              <div className="absolute right-0 top-full mt-2 z-[150] w-80 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+                <div className="p-4 border-b border-zinc-100 dark:border-white/5 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-black uppercase text-zinc-800 dark:text-white">
+                      Reverter alterações
+                    </p>
+                    <p className="text-[9px] text-zinc-400 font-bold mt-1">
+                      Selecione para reverter em lote.
+                    </p>
+                  </div>
+                  <button onClick={() => setIsRevertMenuOpen(false)} className="text-zinc-400 hover:text-red-500">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto">
+                  {revertItems.map((item) => {
+                    const itemKey = (item.groupId || item.id || item.timestamp) as string;
+                    const selected = selectedReverts.has(itemKey);
+                    return (
+                      <button
+                        key={itemKey}
+                        type="button"
+                        onClick={() => toggleRevertItem(itemKey)}
+                        className={`w-full flex items-center gap-3 p-3 text-left border-b border-zinc-100 dark:border-white/5 transition-colors ${
+                          selected ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                            selected ? "bg-blue-600 border-blue-600 text-white" : "border-zinc-300 dark:border-zinc-700"
+                          }`}
+                        >
+                          {selected && <CheckCircle2 size={14} />}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black truncate text-zinc-800 dark:text-zinc-200">
+                            {item.name}
+                          </p>
+                          <p className="text-[9px] text-zinc-400 font-bold uppercase">
+                            {item.action} · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-950">
+                  <button
+                    type="button"
+                    disabled={selectedReverts.size === 0 || isReverting}
+                    onClick={() => handleRevertSelected()}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    {isReverting ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
+                    Reverter selecionados ({selectedReverts.size})
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* MENU LATERAL */}
           <div className="w-full lg:w-72 2xl:w-80 space-y-2 shrink-0">
-            {tabs.filter(t => t.show).map((tab) => (
+            {tabs.filter(t => t.show).map((tabItem) => (
               <button 
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                key={tabItem.id}
+                onClick={() => setActiveTab(tabItem.id as TabType)}
                 className={`w-full flex items-center justify-center lg:justify-between px-3 lg:px-5 py-3 lg:py-4 rounded-2xl font-black transition-all text-xs uppercase tracking-tight ${
-                  activeTab === tab.id 
+                  activeTab === tabItem.id 
                     ? 'bg-blue-600 text-white shadow-xl translate-x-2' 
                     : 'bg-white dark:bg-zinc-900 text-gray-400 dark:text-zinc-500 hover:text-blue-600 border border-gray-100 dark:border-white/5'
                 }`}
               >
-                <tab.icon size={18} className="shrink-0" />
-                <span className="hidden lg:inline truncate ml-3">{tab.label}</span>
-                {activeTab === tab.id && <ChevronRight size={14} className="hidden lg:inline"/>}
+                <tabItem.icon size={18} className="shrink-0" />
+                <span className="hidden lg:inline truncate ml-3">{tabItem.label}</span>
+                {activeTab === tabItem.id && <ChevronRight size={14} className="hidden lg:inline"/>}
               </button>
             ))}
           </div>
 
           <div className="flex-grow bg-white dark:bg-zinc-900 rounded-[2rem] lg:rounded-[3rem] border border-gray-100 dark:border-white/5 shadow-2xl shadow-blue-950/5 overflow-hidden min-h-[400px] lg:min-h-[600px]">
             
-            {/* TAB: USERS (MEU PERFIL + GESTÃO) */}
+            {/* TAB: USERS */}
             {activeTab === 'users' && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-950/30">
@@ -513,10 +707,9 @@ export default function SettingsPage() {
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <div className="flex justify-between items-center mb-10">
                   <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  {categoriesList.length < 18 && (
+                  {categoriesList.length < 18 ? (
                     <button onClick={() => { setSelectedCategory(null); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
-                  )}
-                  {categoriesList.length >= 18 && (
+                  ) : (
                     <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
                   )}
                 </div>
@@ -593,25 +786,23 @@ export default function SettingsPage() {
             {activeTab === 'theme' && (
               <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
                 <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic mb-10 tracking-tighter">Tema</h3>
-
                 <div className="space-y-4 mb-12">
                   <div className="grid grid-cols-3 gap-4">
-                    {([['LIGHT', 'Claro'], ['DARK', 'Escuro'], ['SYSTEM', 'Sistema']] as const).map(([value, label]) => (
+                    {(['LIGHT', 'DARK', 'SYSTEM'] as const).map((value) => (
                       <button key={value} onClick={() => updateConfig({ theme: value }, 'update-theme')} className={`flex flex-col items-center gap-3 p-6 border rounded-[2rem] transition-all ${user.theme === value ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100'}`}>
                         {value === 'LIGHT' ? <Sun size={20}/> : value === 'DARK' ? <Moon size={20}/> : <Monitor size={20}/>}
-                        <span className="text-[10px] font-black uppercase">{label}</span>
+                        <span className="text-[10px] font-black uppercase">{value === 'LIGHT' ? 'Claro' : value === 'DARK' ? 'Escuro' : 'Sistema'}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* MODAL USUÁRIO */}
+      {/* MODAIS */}
       {isUserModalOpen && (
         <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <form onSubmit={handleUserSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
@@ -634,9 +825,7 @@ export default function SettingsPage() {
               </div>
               {selectedUser?.id !== user.id && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">
-                     Nível de Permissão
-                  </label>
+                  <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">Nível de Permissão</label>
                   <input type="hidden" name="role" value={role} />
                   <CustomSelect
                     options={roleOptions}
@@ -653,13 +842,12 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* MODAL CATEGORIA */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button type="button" onClick={() => { setIsCategoryModalOpen(false); }} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
               <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
@@ -671,7 +859,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* MODAL ESPAÇO */}
       {isSpaceModalOpen && (
         <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <form onSubmit={handleSpaceSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
@@ -710,7 +897,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Confirm Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}

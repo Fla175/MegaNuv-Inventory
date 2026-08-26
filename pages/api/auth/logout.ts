@@ -10,7 +10,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // Limpa o cookie de autenticação settando um valor vazio e maxAge negativo
   res.setHeader('Set-Cookie', serialize('auth_token', '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE === 'true',
     path: '/',
     maxAge: -1, 
     sameSite: 'lax',

@@ -3,7 +3,7 @@
 **MegaNuv Inventory** is a professional Inventory Management application built with **Next.js**, featuring advanced role-based access control, persistent user preferences, and a modern UI.
 
 ## 🚀 Version
-**Current Version:** *v2.21.2*
+**Current Version:** *v2.22.1*
 
 ## 🚀 Features
 
@@ -20,9 +20,10 @@
 * **Image Attachment**: Attachment of until 5 images for a active.
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * **Custom *Select***: Custom component for Select type Inputs.
-* ***`ESC`* Key**: `ESC` key closes open modals.
+* ***`ESC`* Key**: ***`ESC`*** key closes open modals.
 * **Clone in Batch**: A function that clones selected actives in batches.
-* [<ins>***NEW***</ins>] **Modify Similar Assets**: A checkbox in the Active Update Form that gives the function of modify similar assets (same name, manufacturer, model and sku).
+* **Modify Similar Assets**: A checkbox in the Active Update Form that gives the function of modify similar assets (same name, manufacturer, model and sku).
+* [<ins>***NEW***</ins>] **Revert Button**: Button that reverts recents changes.
 
 ---
 
@@ -47,8 +48,8 @@
 ### Prerequisites
 
 * Node.js (LTS version)
-* Yarn and NPM
-* A running MySQL/MariaDB instance
+* Yarn or NPM
+* A running MySQL/MariaDB instance with system-versioning function setted
 
 ---
 
@@ -82,7 +83,9 @@ npx prisma generate
 yarn dev
 ```
 
-Open [http://0.0.0.0:3000](http://0.0.0.0:3000) (or the **dns / ip** you've setted) with your browser to see the result.
+Open [http://0.0.0.0:3000](http://0.0.0.0:3000), [http://localhost:3000](http://localhost:3000) or the **dns / ip** you've setted with your browser to see the result.
+
+> Important: We recommend you to use `nginx` as your **dns server**.
 
 ---
 
@@ -116,6 +119,4 @@ The system implements a strict permission logic:
 >
 > * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
 
-'''
 Have fun!
-'''
