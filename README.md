@@ -17,10 +17,12 @@
 * **Responsive UI:** Fully responsive dashboard built with Tailwind CSS and Lucide icons, optimized for desktop and mobile.
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
-* **Image attachment**: Attachment of until 5 images for a active.
+* **Image Attachment**: Attachment of until 5 images for a active.
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * **Custom *Select***: Custom component for Select type Inputs.
 * ***`ESC`* Key**: ***`ESC`*** key closes open modals.
+* **Clone in Batch**: A function that clones selected actives in batches.
+* **Modify Similar Assets**: A checkbox in the Active Update Form that gives the function of modify similar assets (same name, manufacturer, model and sku).
 * [<ins>***NEW***</ins>] **Revert Button**: Button that reverts recents changes.
 
 ---
@@ -36,6 +38,10 @@
 * **Language:** TypeScript (Strict Mode)
 
 ---
+
+## Project Characteristic (Don't be afraided)
+
+* **Without `node_modules` in the project *root***: The project uses the next.js option `standalone`, that gives the same use of `node_modules` also the `yarn dev` is configured to use the comands `cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../`, that make the project runs in `.next/standalone` and keep the navegation in terminal to the project root.
 
 ## 🏁 Getting Started
 
@@ -113,3 +119,4 @@ The system implements a strict permission logic:
 >
 > * [***Learn Next.js*** - an interactive Next.js tutorial.](https://nextjs.org/learn/dashboard-app)
 
+Have fun!

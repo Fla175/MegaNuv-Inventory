@@ -1108,7 +1108,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
           const categoryObj = categories.find(ar => ar.id === active.categoryId);
-          const categoryName = categoryObj ? categoryObj.name : "Sem Categoria";
 
           const isSelected = selectedItems.has(active.id);
           
@@ -1262,13 +1261,21 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
                       {categoryObj && (
                         <p 
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
+<<<<<<< HEAD
                           style={{ 
                             color: categoryObj.color, 
                             backgroundColor: `${categoryObj.color}15`, 
                             borderColor: `${categoryObj.color}40`,
                           }}
+=======
+                          style={categoryObj.color ? { 
+                            color: categoryObj.color, 
+                            backgroundColor: `${categoryObj.color}15`, 
+                            borderColor: `${categoryObj.color}40` 
+                          } : {}}
+>>>>>>> b0daad6fb14d24e4f23be2d62be36385a0dc95dc
                         >
-                          {categoryName}
+                          {categoryObj.name}
                         </p>
                       )}
 

@@ -1,11 +1,20 @@
 {
   "name": "inventory-meganuv",
+<<<<<<< HEAD
   "version": "2.22.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build:opt": "bash scripts/build-optimized.sh",
     "start": "cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js",
+=======
+  "version": "2.21.2",
+  "private": true,
+  "scripts": {
+    "dev": "cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../",
+    "build": "next build",
+    "start": "next start",
+>>>>>>> b0daad6fb14d24e4f23be2d62be36385a0dc95dc
     "lint": "next lint"
   },
   "dependencies": {
