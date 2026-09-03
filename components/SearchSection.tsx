@@ -94,7 +94,7 @@ export default function SearchSection({ filters, setFilters }: SearchSectionProp
           <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={18} />
           <input 
             className="w-full bg-gray-50 dark:bg-zinc-950 p-4 pl-12 rounded-2xl outline-none font-bold text-sm border-2 border-transparent focus:border-blue-600/20 dark:text-white transition-all"
-            placeholder="Modelo ou Série"
+            placeholder="Modelo"
             value={filters.model}
             onChange={(e) => handleInputChange("model", e.target.value)}
           />
