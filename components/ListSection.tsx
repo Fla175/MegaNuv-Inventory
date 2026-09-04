@@ -88,7 +88,7 @@ function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const children = getDirectChildren(parentId);
     if (children.length === 0) return null;
   
-    const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
+    const indentClass = depth > 0 ? "ml-8 border-l-2 dark:border-white/5 pl-4" : "";
 
     return (
       <div className={`${indentClass} flex flex-col`}>
@@ -1086,9 +1086,12 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     const hasChildren = children.length > 0;
     
     if (!hasChildren && level > 0) {
-      const indentClass = level > 0 ? `ml-${level * 6} border-l-2 dark:border-white/5` : "";
+      const staticClasses = level > 0 ? "border-l-2 dark:border-white/5" : "";
+      const dynamicMargin = level > 0 ? `${level * 2}rem` : "0px";
       return (
-        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${indentClass}`}>
+        <div className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 group-hover:opacity-60 transition-opacity ${staticClasses}`}
+        style={{ marginLeft: dynamicMargin }}
+        >
           <Ghost size={24} className="mb-2 text-zinc-400" />
           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
             {level === 0 ? "Nenhum ativo neste local" : "Este espaço físico está vazio"}
@@ -1101,9 +1104,11 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
       return null;
     }
 
-    const indentClass = level > 0 ? `ml-${level * 4} border-l-2 dark:border-white/5 pl-2` : "";
+    const staticClasses = level > 0 ? "border-l-2 dark:border-white/5 pl-4" : "";
+    const dynamicMargin = level > 0 ? `${level * 1.5}rem` : "0px";
+
     return (
-      <div className={indentClass}>
+      <div className={staticClasses} style={{ marginLeft: dynamicMargin }}>
         {children.map((active) => {
           const isExpanded = expandedNodes[active.id];
           const hasSubItems = actives.some(a => a.parentId === active.id);
