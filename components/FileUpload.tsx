@@ -116,7 +116,7 @@ export default function FileUpload({
       selectedFiles = selectedFiles.slice(0, availableSlots); // Corta a array para não passar do limite
     }
 
-    const allowedTypes = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', 'image/png', 'image/jpeg', 'application/pdf'];
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', '.webp', 'image/webp', 'image/png', 'image/jpeg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validFiles: File[] = [];
 
     // 3. Validações individuais (Tipo e Tamanho)
@@ -131,8 +131,8 @@ export default function FileUpload({
         continue;
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        toast.showWarning(`Arquivo "${file.name}" recusado: tamanho acima de 5MB.`);
+      if (file.size > 10 * 1024 * 1024) {
+        toast.showWarning(`Arquivo "${file.name}" recusado: tamanho acima de 10MB.`);
         continue;
       }
 
