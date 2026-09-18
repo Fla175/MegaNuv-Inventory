@@ -289,69 +289,50 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   for (const [id, versions] of groupedById) {
     const ordered = [...versions].sort(
-      (a, b) => new Date(b.ROW_START).getTime() - new Date(a.ROW_START).getTime()
+      (a, b) => new Date(a.ROW_START).getTime() - new Date(b.ROW_START).getTime()
     );
 
-    const current = ordered.find(
-      (version) => new Date(version.ROW_END).getTime() >= new Date(SYSTEM_TIME_MAX).getTime()
+    const liveIndex = ordered.findIndex(
+      (v) => new Date(v.ROW_END).getTime() >= new Date(SYSTEM_TIME_MAX).getTime()
     );
 
-    if (current) {
-      const previous = ordered.find(
-        (version) => new Date(version.ROW_END).getTime() < new Date(SYSTEM_TIME_MAX).getTime()
+    let action: "CREATE" | "UPDATE" | "DELETE" | "CLONE" | "MOVE";
+    let revertTimestamp: Date;
+    let name: string;
+
+    if (liveIndex >= 0) {
+      if (ordered.length === 1) continue;
+      const live = ordered[liveIndex];
+      const previous = ordered[liveIndex - 1];
+
+      const liveParent = String(
+        live.fatherSpaceId ?? live.father_space_id ?? live.parentId ?? live.parent_id
       );
-    
-      if (!previous) continue;
-    
-      const previousEnd = new Date(previous.ROW_END);
-      const revertTimestamp = new Date(previousEnd.getTime() - 1);
-    
-      const isFirstVersion =
-        ordered.filter(
-          (v) => new Date(v.ROW_START).getTime() < new Date(previous.ROW_START).getTime()
-        ).length === 0;
-    
-      let action: "CREATE" | "UPDATE" | "DELETE" | "CLONE" | "MOVE" = "UPDATE";
-    
-      if (isFirstVersion) {
+      const previousParent = String(
+        previous.fatherSpaceId ?? previous.father_space_id ?? previous.parentId ?? previous.parent_id
+      );
+
+      if (liveParent !== previousParent) {
+        action = "MOVE";
+      } else if (liveIndex === 1) {
         action = "CREATE";
       } else {
-        // Extrai os possíveis nomes de coluna (snake_case ou camelCase)
-        const currentParent = String(
-          current.fatherSpaceId ?? current.father_space_id ?? current.parent_id?? current.parentId                   // TODO: Resolver mistério do porque
-        );                                                                                                           // o MOVE não apareçe em nenhum momento
-        const previousParent = String(                                                                               // em settings.tsx mesmo fazendo a ação
-          previous.fatherSpaceId ?? previous.father_space_id ?? previous.parent_id ?? previous.parentId              // de movimentar.
-        );
-    
-        // Se a referência de localização/espaço mudou, é uma movimentação
-        if (currentParent !== previousParent) {
-          action = "MOVE";
-        }
+        action = "UPDATE";
       }
-    
-      rawItems.push({
-        table: "Active",
-        id,
-        name: String(current.name ?? previous.name ?? id),
-        timestamp: revertTimestamp.toISOString(),
-        action,
-      });
-    
-      continue;
+
+      revertTimestamp = new Date(new Date(previous.ROW_END).getTime() - 1);
+      name = String(live.name ?? previous.name ?? id);
+    } else {
+      const lastVersion = ordered[ordered.length - 1];
+      action = ordered.length === 1 ? "CREATE" : "DELETE";
+      revertTimestamp = new Date(new Date(lastVersion.ROW_END).getTime() - 1);
+      name = String(lastVersion.name ?? id);
     }
-
-    const lastVersion = ordered[0];
-    if (!lastVersion) continue;
-
-    const previousVersions = ordered.slice(1);
-    const action = previousVersions.length === 0 ? "CREATE" : "DELETE";
-    const revertTimestamp = new Date(new Date(lastVersion.ROW_END).getTime() - 1);
 
     rawItems.push({
       table: "Active",
       id,
-      name: String(lastVersion.name ?? id),
+      name,
       timestamp: revertTimestamp.toISOString(),
       action,
     });
