@@ -11,21 +11,27 @@ export type User = {
   role: Role;
   theme: Theme;
   isSystem: boolean;
+  isCreator: boolean;
   lastLogin?: string;
   createdAt: string;
 };
 
+export type Impersonation = { active: boolean; creatorName: string } | null;
+
 type UserContextType = {
   user: User | null;
+  impersonation: Impersonation;
   loading: boolean;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
+  restoreCreatorSession: () => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [impersonation, setImpersonation] = useState<Impersonation>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUser = useCallback(async () => {
@@ -44,19 +50,37 @@ export function UserProvider({ children }: { children: ReactNode }) {
          */
         if (data && data.user) {
           setUser(data.user);
+          setImpersonation(data.impersonation ?? null);
         } else {
           // Caso a API mude o formato no futuro
           setUser(data); 
+          setImpersonation(null);
         }
       } else {
         // Se a resposta for 401, 404 ou 500, limpamos o usuário
         setUser(null);
+        setImpersonation(null);
       }
     } catch {
       setUser(null);
+      setImpersonation(null);
     } finally {
       // O ponto mais importante: DESLIGA o "Sincronizando"
       setLoading(false);
+    }
+  }, []);
+
+  const restoreCreatorSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/creator-access", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        window.location.assign("/");
+      }
+    } catch (err) {
+      console.error("Erro ao restaurar sessão:", err);
     }
   }, []);
 
@@ -103,7 +127,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [user?.theme]);
 
   return (
-    <UserContext.Provider value={{ user, loading, setUser, refreshUser: fetchUser }}>
+    <UserContext.Provider value={{ user, impersonation, loading, setUser, refreshUser: fetchUser, restoreCreatorSession }}>
       {children}
     </UserContext.Provider>
   );

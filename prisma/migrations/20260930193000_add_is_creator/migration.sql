@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `isCreator` TINYINT(1) NOT NULL DEFAULT FALSE;

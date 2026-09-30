@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Moon, Sun, Monitor, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X,
-  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, 
+  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, LogIn,
   CalendarFold, KeyRound, CirclePlus, Activity,
   ClipboardList, Group, Palette, Undo2
 } from "lucide-react";
@@ -24,6 +24,7 @@ interface User {
   name: string | null; 
   email: string;
   role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
+  isCreator?: boolean;
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
@@ -97,6 +98,12 @@ export default function SettingsPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   const [role, setRole] = useState(selectedUser?.role || '');
+
+  // Estados do Acesso do Criador
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
+  const [transferConfirmInput, setTransferConfirmInput] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
 
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -252,6 +259,58 @@ export default function SettingsPage() {
     if (revertItems.length === 0 || isReverting) return;
     // Desfaz a alteração mais recente diretamente
     await handleRevertSelected([revertItems[0]]);
+  };
+
+  // --- HANDLERS ACESSO DO CRIADOR ---
+  const handleEnterAccount = async (targetUser: User) => {
+    try {
+      const res = await fetch("/api/creator-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetUserId: targetUser.id }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.showSuccess("Acesso ativado. Redirecionando...");
+        window.location.assign("/");
+      } else if (res.status === 409) {
+        toast.showWarning(data.error || "Restaure sua conta antes de entrar em outra.");
+      } else {
+        toast.showError(data.error || "Erro ao acessar conta.");
+      }
+    } catch {
+      toast.showError("Erro de conexão ao acessar conta.");
+    }
+  };
+
+  const handleTransferCreator = async (targetUser: User) => {
+    if (isTransferring) return;
+    setIsTransferring(true);
+    try {
+      const res = await fetch("/api/creator-access", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newCreatorId: targetUser.id }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.showSuccess("Título de criador transferido com sucesso.");
+        setIsTransferModalOpen(false);
+        setTransferTargetUser(null);
+        setTransferConfirmInput('');
+        window.location.assign("/settings");
+      } else {
+        toast.showError(data.error || "Erro ao transferir título.");
+      }
+    } catch {
+      toast.showError("Erro de conexão ao transferir título.");
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   // --- HANDLERS CRUD ---
@@ -634,7 +693,30 @@ export default function SettingsPage() {
                               </div>
                             </div>
 
-                            <div className={`${showActionButtons && "flex gap-3 mt-6"}`}>
+                            <div className="flex flex-wrap gap-2 mt-6">
+                              {user?.isCreator && (
+                                <>
+                                  <button
+                                    onClick={() => handleEnterAccount(u)}
+                                    className="flex-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-300/40 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-900/60 flex items-center justify-center gap-1.5 transition-all"
+                                    title="Entrar nesta conta sem senha"
+                                  >
+                                    <LogIn size={14} /> Entrar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setTransferTargetUser(u);
+                                      setTransferConfirmInput('');
+                                      setIsTransferModalOpen(true);
+                                    }}
+                                    className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 flex items-center justify-center gap-1.5 transition-all"
+                                    title="Ceder título de criador"
+                                  >
+                                    <KeyRound size={14} /> Ceder
+                                  </button>
+                                </>
+                              )}
+
                               {showActionButtons && (
                                 <>
                                   <button 
@@ -894,6 +976,76 @@ export default function SettingsPage() {
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Modal de Transferência do Título de Criador */}
+      {isTransferModalOpen && transferTargetUser && (
+        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-red-500 mb-4">
+              <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">
+                <KeyRound size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                  Ceder Título de Criador
+                </h3>
+                <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">
+                  Ação irreversível
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
+              Ao transferir o título para <strong className="text-zinc-900 dark:text-white">{transferTargetUser.name || transferTargetUser.email}</strong>, você perderá a capacidade de entrar nas contas dos usuários. Digite o nome ou e-mail exato do destinatário para confirmar:
+            </p>
+
+            <div className="mb-4 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-200 dark:border-white/5">
+              <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-1">Confirme digitando:</p>
+              <p className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 select-all">
+                {transferTargetUser.name || transferTargetUser.email}
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={transferConfirmInput}
+              onChange={(e) => setTransferConfirmInput(e.target.value)}
+              placeholder="Digite exatamente o texto acima..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-red-500 mb-6"
+            />
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTransferModalOpen(false);
+                  setTransferTargetUser(null);
+                  setTransferConfirmInput('');
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  transferConfirmInput.trim() !== (transferTargetUser.name || transferTargetUser.email).trim() ||
+                  isTransferring
+                }
+                onClick={() => handleTransferCreator(transferTargetUser)}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
+              >
+                {isTransferring ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <KeyRound size={16} />
+                )}
+                Confirmar Transferência
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

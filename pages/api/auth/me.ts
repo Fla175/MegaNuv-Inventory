@@ -32,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         role: true,
         theme: true,
         isSystem: true,
+        isCreator: true,
         lastLogin: true,
         createdAt: true,
       }
@@ -41,7 +42,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
-    return res.status(200).json({ user });
+    let impersonation = null;
+    const stashToken = req.cookies["auth_token_creator"];
+    if (stashToken) {
+      try {
+        const { payload: stashPayload } = await jose.jwtVerify(stashToken, secret);
+        if (stashPayload && typeof stashPayload === "object") {
+          impersonation = {
+            active: true,
+            creatorName: (stashPayload.name as string) || (stashPayload.email as string) || "Criador",
+          };
+        }
+      } catch {
+        // Stash token inválido ou expirado - mantém impersonation null
+      }
+    }
+
+    return res.status(200).json({ user, impersonation });
 
   } catch (err) {
     if (err instanceof jose.errors.JWTExpired) {
