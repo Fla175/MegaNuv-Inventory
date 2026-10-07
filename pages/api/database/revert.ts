@@ -232,6 +232,58 @@ async function revertSingleRecordTx(
 }
 
 /**
+ * Deriva o instante de reversão a partir do histórico do registro e valida o
+ * `timestamp` enviado pelo cliente contra ele.
+ *
+ * O `timestamp` do cliente **nunca** chega ao `FOR SYSTEM_TIME AS OF`: ele só
+ * serve para detectar lista desatualizada. O servidor é a autoridade.
+ *
+ * Tolerâncias:
+ *  - QUICK: 11 s — o timestamp vem do relógio do app em `move.ts`, e o banco
+ *    grava `ROW_END` no commit; a folga absorve o skew app↔banco.
+ *  - HISTORY: 5 ms — o timestamp veio do próprio GET (valor derivado); qualquer
+ *    mudança no registro desde a consulta estoura a folga.
+ */
+const HISTORY_TOLERANCE_MS = 5;
+const QUICK_TOLERANCE_MS = 11000;
+
+async function resolveRevertAt(
+  tx: PrismaClientOrTx,
+  table: AllowedTable,
+  id: string,
+  clientTimestamp: string,
+  mode: "QUICK" | "HISTORY"
+): Promise<string> {
+  const config = ALLOWED_TABLES[table];
+
+  const rows = await tx.$queryRawUnsafe<VersionRow[]>(
+    `
+      SELECT *, ROW_START, ROW_END
+      FROM ${quoteTable(config.table)}
+      FOR SYSTEM_TIME ALL
+      WHERE ${quoteColumn(config.idColumn)} = ?
+      ORDER BY ROW_START DESC
+    `,
+    id
+  );
+
+  const plan = planRevert(table, rows);
+  if (!plan) {
+    throw new Error(`Nenhum histórico reversível para ${table} ID: ${id}`);
+  }
+
+  const derived = plan.revertAt.getTime();
+  const client = new Date(clientTimestamp).getTime();
+  const tolerance = mode === "HISTORY" ? HISTORY_TOLERANCE_MS : QUICK_TOLERANCE_MS;
+
+  if (Math.abs(client - derived) > tolerance) {
+    throw new Error("STALE_REVERT_LIST");
+  }
+
+  return plan.revertAt.toISOString();
+}
+
+/**
  * GET - Consulta última alteração reversível de cada registro
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
@@ -370,11 +422,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const results = await db.$transaction(async (tx) => {
     const revertResults = [];
     for (const item of itemsToRevert) {
+      const revertAt = await resolveRevertAt(
+        tx,
+        item.table,
+        item.id,
+        item.timestamp,
+        mode
+      );
       const result = await revertSingleRecordTx(
         tx,
-        item.table as AllowedTable,
+        item.table,
         item.id,
-        item.timestamp
+        revertAt
       );
       revertResults.push(result);
     }
@@ -422,6 +481,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       if (error.message === "USER_NOT_FOUND") {
         return res.status(401).json({ error: "Usuário não identificado." });
+      }
+      if (error.message === "STALE_REVERT_LIST") {
+        return res.status(409).json({
+          error:
+            "O histórico mudou desde que esta lista foi carregada. Atualize e tente novamente.",
+        });
       }
     }
 
