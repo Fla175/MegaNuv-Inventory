@@ -763,6 +763,9 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
     }
   };
 
+  // Único gatilho do popup de desfazer: a movimentação — move.ts é a única
+  // API que devolve `timestamp`. Delete e clone não devolvem; desfazer essas
+  // ações acontece pelo Histórico em Settings.
   const showUndo = (
     id: string,
     name: string,
@@ -881,10 +884,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           const data = await res.json();
 
           if (res.ok) { 
-            if (data.timestamp) {
-              const currentTimestamp = data.timestamp || new Date().toISOString();
-              showUndo(item.id, item.name, currentTimestamp, [item.id]);
-            }
             onRefresh(); 
             if (selectedViewItem) setSelectedViewItem(null);
             toast.showSuccess('Item excluído com sucesso.');
@@ -929,16 +928,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
         throw new Error(data.error || 'Erro ao clonar em lote');
       }
 
-      if (data.timestamp) {
-        const currentTimestamp = data.timestamp || new Date().toISOString();
-        showUndo(
-          selectedIds.join(","),
-          `${data.count ?? selectedIds.length} ativo(s) clonado(s)`,
-          currentTimestamp,
-          data.ids || selectedIds
-        );
-      }
-  
       toast.showSuccess(`${data.count} ativo(s) clonado(s) com sucesso!`);
       setIsCloneBatchOpen(false);
       exitSelectionMode();
@@ -972,15 +961,6 @@ function ListSection({ filters, onEdit, onClone, onRefresh, actives, fatherSpace
           const data = await res.json();
 
           if (res.ok) { 
-            if (data.timestamp) {
-              const currentTimestamp = data.timestamp || new Date().toISOString();
-              showUndo(
-                selectedIds.join(","),
-                `${count} ativos`,
-                currentTimestamp,
-                selectedIds
-              );
-            }
             onRefresh(); 
             exitSelectionMode();
             toast.showSuccess(`${count} ativo${count > 1 ? 's' : ''} excluído${count > 1 ? 's' : ''} com sucesso.`);
