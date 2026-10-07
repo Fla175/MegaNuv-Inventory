@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PatternFormat } from 'react-number-format';
 import CustomSelect from "@/components/customSelect";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
+import { ACTION_LABELS, type RevertItem, type RevertSubItem } from "@/lib/revert/types";
 
 // --- INTERFACES ---
 interface User {
@@ -53,23 +54,6 @@ interface Log {
   createdAt: string;
   user: { name: string; email: string };
 }
-
-interface RevertSubItem {
-  table: string;
-  id: string;
-  timestamp: string;
-}
-
-interface RevertItem {
-  groupId?: string;
-  id?: string;
-  table?: string;
-  name: string;
-  timestamp: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE';
-  items?: RevertSubItem[];
-}
-
 type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
 
 export default function SettingsPage() {
@@ -572,7 +556,10 @@ export default function SettingsPage() {
                             {item.name}
                           </p>
                           <p className="text-[9px] text-zinc-400 font-bold uppercase">
-                            {item.action} · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
+                            {item.items
+                              ? ACTION_LABELS[item.action].batch
+                              : ACTION_LABELS[item.action].single}{" "}
+                            · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
                           </p>
                         </div>
                       </button>
