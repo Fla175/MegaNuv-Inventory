@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const userRole = adminCount === 0 ? "ADMIN" : requestedRole;
-    const userSystem = adminCount === 0 ? true : false;
+    const userIsCreator = adminCount === 0 ? true : false;
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -72,9 +72,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email, 
         password: hashedPassword, 
         role: userRole,
-        isSystem: userSystem,
+        isCreator: userIsCreator,
       },
-      select: { id: true, email: true, name: true, role: true, isSystem: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isCreator: true, createdAt: true },
     });
 
     // SISTEMA DE LOGS: Registro de novo cadastro

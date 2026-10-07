@@ -54,6 +54,7 @@ interface Log {
   createdAt: string;
   user: { name: string; email: string };
 }
+
 type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
 
 export default function SettingsPage() {
@@ -111,7 +112,7 @@ export default function SettingsPage() {
     {value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500"},
     {value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500"},
     {value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500"},
-    ...(user?.isSystem && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
+    ...(user?.isCreator && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
   ];
 
   useEffect(() => {

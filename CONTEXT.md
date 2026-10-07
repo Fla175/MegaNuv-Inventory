@@ -38,7 +38,8 @@ Estado: **implementado e commitado na branch `fix/revert-classification`** (mód
 testes unitários + API com Prisma mockado, teste de integração opt-in, autoridade do timestamp no POST,
 remoção dos gatilhos mortos do popup e vocabulário unificado). Gates verdes: `lint`, `tsc`, `prisma
 validate`, `build:opt`, `vitest` (69 passando, 5 pulados — integração opt-in). 6 commits aprovados pelo
-usuário e executados (ver `git log`); **trabalho do Estágio 1 segue não commitado na mesma árvore**.
+usuário e executados (ver `git log`); **Estágio 1 também commitado** (autorizado pelo usuário) — working
+tree limpo.
 
 ### 2.2 Worktrees e Branches ativos
 
@@ -53,12 +54,13 @@ O worktree P0 está **limpo** — nenhuma correção implementada ainda. É o de
 
 1. ~~Commitar o trabalho de revert~~ — **feito** (6 commits: `test/revert-unit`, `fix/revert-classification`,
    `fix/revert-authority`, `fix/revert-popup-trigger`, `fix/revert-vocabulary`, `chore/revert-observability`).
-   O Estágio 1 pendente segue **aguardando autorização explícita do usuário**.
-2. `chore/security-p0-debt` — remover credenciais hardcoded de `lib/minio.ts` e `pages/api/storage/upload-url.ts`
+2. ~~Commitar o Estágio 1~~ — **feito** (autorizado pelo usuário; renomeação `isSystem`→`isCreator`,
+   formatação Prettier e ajustes de texto consolidados em um commit).
+3. `chore/security-p0-debt` — remover credenciais hardcoded de `lib/minio.ts` e `pages/api/storage/upload-url.ts`
    (rotacionar a credencial no MinIO **antes** — ela está no histórico do Git).
-3. `chore/security-p0-debt` — fechar os 3 endpoints públicos e o `GET /api/users` sem auth.
-4. `fix/build-docker` — corrigir `Dockerfile:7` (`yarn build` não existe).
-5. `refactor/auth-helper` — consolidar as ~22 verificações de JWT em um helper único.
+4. `chore/security-p0-debt` — fechar os 3 endpoints públicos e o `GET /api/users` sem auth.
+5. `fix/build-docker` — corrigir `Dockerfile:7` (`yarn build` não existe).
+6. `refactor/auth-helper` — consolidar as ~22 verificações de JWT em um helper único.
 
 ---
 
@@ -120,17 +122,9 @@ qualquer novo deploy deve considerar os itens 1, 3, 4 e 5.
 
 ### 3.4 Estado do Working Tree
 
-Trabalho **não commitado** na branch `fix/revert-classification` (aguarda autorização de commit):
+**Limpo** — todo o trabalho do revert (6 commits) e do Estágio 1 (1 commit) foi commitado na branch
+`fix/revert-classification`. Nada pendente de autorização.
 
-- **Estágio 1 (sessão anterior, intacto):** `ESTAGIO-1-CREATOR-ACCESS.md`, `SPECS.md`,
-  `__tests__/api/creator-access.test.ts`, `lib/context/UserContext.tsx`, `next-stages.md`,
-  `pages/api/auth/me.ts`, `pages/api/auth/signup.ts`, `pages/api/creator-access.ts`,
-  `pages/initial-setup/register.tsx`, `pages/qrcode/view.tsx`, `prisma/schema.prisma`,
-  `types/inventory.ts`, `components/SearchSection.tsx`, `components/actives/activeForm.tsx`,
-  `pages/api/actives/create.ts`.
-- **Revert (esta sessão):** **commitado** — `pages/api/database/revert.ts`, `components/ListSection.tsx`,
-  `pages/settings.tsx`, `CONTEXT.md`, `SPECS.md`, `lib/revert/` (novo), `__tests__/lib/revert/` (novo),
-  `__tests__/api/revert.test.ts` (novo), `__tests__/integration/` (novo).
 - `yarn.lock` e `package-lock.json` — ver §3.2 #2 (artefato de `npm install` acidental).
 
 ### 3.5 Dependências do ambiente

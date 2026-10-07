@@ -217,7 +217,7 @@ Active 1──N Movement         (onDelete: Cascade)
 
 | Model | PK | Campos-chave | Índices |
 |---|---|---|---|
-| `User` | `id` uuid | `email` @unique, `password`, `name?`, `role`, `theme`, `lastLogin?`, **`isSystem`**, **`isCreator`** | `email` @unique |
+| `User` | `id` uuid | `email` @unique, `password`, `name?`, `role`, `theme`, `lastLogin?`, **`isCreator`** | `email` @unique |
 | `Movement` | `id` uuid | `activeId` FK, `fromSpaceId?`, `toSpaceId?` (Strings **sem FK** — desnormalizadas para preservar histórico) | — |
 | `Category` | `id` uuid | `name` @unique, **`color` @unique nullable**, 18 cores na paleta | `name`, `color` @unique |
 | `Log` | `id` uuid | `action`, `details` @db.Text, `ip?`, `userAgent?` @db.Text, `userId?` | `@@index([userId])`, `@@index([action])` |
@@ -230,7 +230,6 @@ Active 1──N Movement         (onDelete: Cascade)
 - Exclusão de `FatherSpace` ou `Active` pai faz **cascade** em toda a subárvore. Endpoint de delete **deve** avisar sobre o tamanho da subárvore.
 - `fileUrl` é `TEXT` e aceita **dois formatos legados**: JSON array **ou** CSV separado por vírgula. Ler ambos — ver `pages/api/qrcode/public-get.ts:41-52`.
 - O frontend envia `serialNumbers[]`, mas **só o primeiro** é persistido (`pages/api/actives/update.ts:44-46,74`). Não assumir array.
-- `isSystem: true` marca o **primeiro** ADMIN criado e não pode ser revogado.
 - `isCreator: true` marca o único Admin Criador (out-of-band / cessão).
 - `Category.color` é @unique e nullable — `null` é permitido em múltiplas categorias (MySQL permite múltiplos NULL em índice único).
 

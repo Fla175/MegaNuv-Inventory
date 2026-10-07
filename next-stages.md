@@ -19,7 +19,7 @@ Será feito uma correção da função de revert de ações e uma melhoria da UI
 
 # _Estágio 3: (Talvez Patch)_ Fazer uma revisão no projeto com o agente primário `Review`.
 
-Deve ser feito uma varredura no projeto para achar qualquer mínimo problema. Dividiremos esse estágio em 3 etapas:
+Deve ser feito uma varredura no projeto para achar qualquer mínimo problema. Dividiremos esse estágio em 4 etapas:
 
 - **Etapa I: Verificação do Front-End**
   Será verificado o Front-End, e somente ele. Foque nos arquivos `.tsx` e seus conteúdos na área `return` e funções com o próprio código _html_.

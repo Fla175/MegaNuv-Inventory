@@ -10,7 +10,6 @@ export type User = {
   email: string;
   role: Role;
   theme: Theme;
-  isSystem: boolean;
   isCreator: boolean;
   lastLogin?: string;
   createdAt: string;

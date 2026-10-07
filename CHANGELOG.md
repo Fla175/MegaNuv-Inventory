@@ -73,6 +73,18 @@
 #### Removed
 * `__tests__/debug-revert-logic.test.ts` — teste-sonda sem asserções, substituído pelo teste de integração opt-in.
 
+### 🤖 OpenCode Operations
+
+#### Changed
+* **Estágio 1 finalizado e commitado** — trabalho pendente do Acesso do Criador consolidado na branch `fix/revert-classification`:
+  * campo legado `isSystem` removido do schema e unificado em `isCreator` (`prisma/schema.prisma`, `types/inventory.ts`, `lib/context/UserContext.tsx`, `pages/api/auth/me.ts`, `pages/api/auth/signup.ts`, `pages/initial-setup/register.tsx`, `pages/settings.tsx`, `__tests__/api/creator-access.test.ts`, `ESTAGIO-1-CREATOR-ACCESS.md`, `SPECS.md`);
+  * formatação Prettier aplicada em `components/ListSection.tsx`, `components/SearchSection.tsx`, `components/actives/activeForm.tsx`, `pages/qrcode/view.tsx` e `pages/api/actives/create.ts` (aspas, quebras de linha e indentação — sem mudança de comportamento);
+  * `pages/api/auth/signup.ts` — variável `userSystem` renomeada para `userIsCreator` (completa a renomeação do campo);
+  * `pages/api/creator-access.ts` — restaurado `!==` (regressão de `!=` no kill switch);
+  * `components/SearchSection.tsx` — placeholder de busca atualizado para "SKU/EAN ou SN";
+  * `pages/api/actives/create.ts` — mensagem de conflito `P2002` corrigida (o SKU não é mais verificado, só o número de série);
+  * `next-stages.md` — Estágio 3 revisado para 4 etapas.
+
 ### 👤 Manual Developer Changes
 
 #### Refactored

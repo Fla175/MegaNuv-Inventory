@@ -126,7 +126,7 @@ ALTER TABLE `User` ADD COLUMN `isCreator` TINYINT(1) NOT NULL DEFAULT FALSE;
 backfill é, portanto, um passo manual do operador, **idempotente** e com precedência determinística —
 a coluna nasce com todo mundo em `false`, o que **desabilita a feature com segurança** até o passo rodar.
 
-Precedência (primeira que casar): `isSystem = true` mais antigo → `role = 'ADMIN'` mais antigo →
+Precedência (primeira que casar): `isCreator = true` mais antigo → `role = 'ADMIN'` mais antigo →
 `role = 'DIRECTOR'` mais antigo → usuário mais antigo.
 
 ```sql

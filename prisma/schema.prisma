@@ -20,8 +20,7 @@ model User {
   activesCreated Active[]      @relation("UserToActive")
   spacesCreated  FatherSpace[] @relation("UserToSpace")
   logs           Log[]         @relation("UserLogs")
-  isSystem       Boolean       @default(false) // Somente o primeiro ADMIN criado terá este campo setado como "true"
-  isCreator      Boolean       @default(false) // Admin Criador: único por instância, out-of-band
+  isCreator      Boolean       @default(false) // define o Admin Criador
 }
 
 model Movement {

@@ -37,7 +37,7 @@ export interface User {
   name?: string | null;
   role: UserRole;
   theme: Theme;
-  isSystem: boolean;
+  isCreator: boolean;
   lastLogin?: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
