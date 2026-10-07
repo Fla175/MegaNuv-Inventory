@@ -3,41 +3,35 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
 import * as jose from "jose";
 import { createLog } from "@/lib/logger";
+import { planRevert, type VersionRow } from "@/lib/revert/history";
+import { batchActivities, toSubItems, type PlannedItem } from "@/lib/revert/batch";
+import type { AllowedTable, RevertSubItem } from "@/lib/revert/types";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const SYSTEM_TIME_MAX = "2038-01-19 03:14:07.999999";
-
-const ALLOWED_TABLES = {
+const ALLOWED_TABLES: Record<
+  AllowedTable,
+  { table: AllowedTable; idColumn: string }
+> = {
   Active: {
     table: "Active",
     idColumn: "id",
-    nameColumn: "name",
   },
   FatherSpace: {
     table: "FatherSpace",
     idColumn: "id",
-    nameColumn: "name",
   },
   Category: {
     table: "Category",
     idColumn: "id",
-    nameColumn: "name",
   },
-} as const;
+};
 
-type AllowedTable = keyof typeof ALLOWED_TABLES;
 type PrismaClientOrTx = typeof db | Parameters<Parameters<typeof db["$transaction"]>[0]>[0];
-
-interface RevertItem {
-  table: string;
-  id: string;
-  timestamp: string;
-}
 
 interface RevertBody {
   groupId?: string;
-  items?: RevertItem[];
+  items?: RevertSubItem[];
   // Suporte legado para item único
   table?: string;
   id?: string;
@@ -45,14 +39,6 @@ interface RevertBody {
 
   // QUICK = popup de 10 segundos | HISTORY = Settings
   mode?: "QUICK" | "HISTORY";
-}
-
-interface HistoryRow {
-  id: string;
-  name?: string | null;
-  ROW_START: Date;
-  ROW_END: Date;
-  [key: string]: unknown;
 }
 
 function isValidTable(table: string): table is AllowedTable {
@@ -257,17 +243,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  const rawItems: Array<{
-    table: AllowedTable;
-    id: string;
-    name: string;
-    timestamp: string;
-    action: "CREATE" | "UPDATE" | "DELETE" | "CLONE" | "MOVE";
-  }> = [];
-
   const config = ALLOWED_TABLES.Active;
 
-  const rows = await db.$queryRawUnsafe<HistoryRow[]>(
+  // Uma única varredura do histórico: quem classifica a ação é lib/revert/history.
+  const rows = await db.$queryRawUnsafe<VersionRow[]>(
     `
       SELECT
         *,
@@ -279,139 +258,49 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     `
   );
 
-  const groupedById = new Map<string, HistoryRow[]>();
+  const groupedById = new Map<string, VersionRow[]>();
 
   for (const row of rows) {
-    const list = groupedById.get(row.id) || [];
+    const id = String(row.id);
+    const list = groupedById.get(id) || [];
     list.push(row);
-    groupedById.set(row.id, list);
+    groupedById.set(id, list);
   }
+
+  const plannedItems: PlannedItem[] = [];
 
   for (const [id, versions] of groupedById) {
-    const ordered = [...versions].sort(
-      (a, b) => new Date(b.ROW_START).getTime() - new Date(a.ROW_START).getTime()
-    );
+    const plan = planRevert("Active", versions);
+    if (!plan) continue;
 
-    const current = ordered.find(
-      (version) => new Date(version.ROW_END).getTime() >= new Date(SYSTEM_TIME_MAX).getTime()
-    );
-
-    if (current) {
-      const previous = ordered.find(
-        (version) => new Date(version.ROW_END).getTime() < new Date(SYSTEM_TIME_MAX).getTime()
-      );
-    
-      if (!previous) continue;
-    
-      const previousEnd = new Date(previous.ROW_END);
-      const revertTimestamp = new Date(previousEnd.getTime() - 1);
-    
-      const isFirstVersion =
-        ordered.filter(
-          (v) => new Date(v.ROW_START).getTime() < new Date(previous.ROW_START).getTime()
-        ).length === 0;
-    
-      let action: "CREATE" | "UPDATE" | "DELETE" | "CLONE" | "MOVE" = "UPDATE";
-    
-      if (isFirstVersion) {
-        action = "CREATE";
-      } else {
-        // Extrai os possíveis nomes de coluna (snake_case ou camelCase)
-        const currentParent = String(
-          current.fatherSpaceId ?? current.father_space_id ?? current.parent_id?? current.parentId                   // TODO: Resolver mistério do porque
-        );                                                                                                           // o MOVE não apareçe em nenhum momento
-        const previousParent = String(                                                                               // em settings.tsx mesmo fazendo a ação
-          previous.fatherSpaceId ?? previous.father_space_id ?? previous.parent_id ?? previous.parentId              // de movimentar.
-        );
-    
-        // Se a referência de localização/espaço mudou, é uma movimentação
-        if (currentParent !== previousParent) {
-          action = "MOVE";
-        }
-      }
-    
-      rawItems.push({
-        table: "Active",
-        id,
-        name: String(current.name ?? previous.name ?? id),
-        timestamp: revertTimestamp.toISOString(),
-        action,
-      });
-    
-      continue;
-    }
-
-    const lastVersion = ordered[0];
-    if (!lastVersion) continue;
-
-    const previousVersions = ordered.slice(1);
-    const action = previousVersions.length === 0 ? "CREATE" : "DELETE";
-    const revertTimestamp = new Date(new Date(lastVersion.ROW_END).getTime() - 1);
-
-    rawItems.push({
+    plannedItems.push({
       table: "Active",
       id,
-      name: String(lastVersion.name ?? id),
-      timestamp: revertTimestamp.toISOString(),
-      action,
+      name: plan.name,
+      action: plan.action,
+      timestamp: plan.revertAt.toISOString(),
     });
   }
 
-  // Ordena do mais recente ao mais antigo
-  rawItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  // --- AGRUPAMENTO EM LOTES (BATCHES) POR JANELA DE TEMPO (2 SEGUNDOS) ---
-  const groupedActivities: Array<{
-    groupId: string;
-    name: string;
-    timestamp: string;
-    action: "CREATE" | "UPDATE" | "DELETE" | "CLONE" | "MOVE";
-    items: typeof rawItems;
-  }> = [];
-
-  const TIME_THRESHOLD_MS = 2000; // Itens criados dentro de 2 segundos pertencem à mesma atividade
-
-  for (const item of rawItems) {
-    const itemTime = new Date(item.timestamp).getTime();
-
-    // Tenta encontrar um lote existente na mesma janela de tempo e mesma ação
-    const existingGroup = groupedActivities.find((group) => {
-      const groupTime = new Date(group.timestamp).getTime();
-      return Math.abs(groupTime - itemTime) <= TIME_THRESHOLD_MS && group.action === item.action;
-    });
-
-    if (existingGroup) {
-      existingGroup.items.push(item);
-      existingGroup.name = `${item.action === "CLONE" ? "Clonagem em grupo" : item.action === "DELETE" ? "Deleção em grupo" : item.action === "MOVE" ? "Movimentação em grupo" : item.action === "CREATE" ? "Criação" : "Edição"} (${existingGroup.items.length} ativos)`;
-    } else {
-      groupedActivities.push({
-        groupId: `batch-${itemTime}-${Math.random().toString(36).substring(2, 7)}`,
-        name: item.name ,
-        timestamp: item.timestamp,
-        action: item.action,
-        items: [item],
-      });
-    }
-  }
-
-  // Se houver apenas 1 item no lote, desestrutura para o padrão individual simples
-  const responseItems = groupedActivities.map((group) => {
-    if (group.items.length === 1) {
+  // Atividades: registros soltos ou lotes de mesma ação na janela de 2s.
+  const responseItems = batchActivities(plannedItems).map((activity) => {
+    if (activity.items.length === 1) {
+      const only = activity.items[0];
       return {
-        table: group.items[0].table,
-        id: group.items[0].id,
-        name: group.items[0].name,
-        timestamp: group.items[0].timestamp,
-        action: group.items[0].action,
+        table: only.table,
+        id: only.id,
+        name: activity.name,
+        timestamp: activity.timestamp,
+        action: activity.action,
       };
     }
 
     return {
-      groupId: group.groupId,
-      name: group.name,
-      timestamp: group.timestamp,
-      action: group.action,
-      items: group.items.map((i) => ({ table: i.table, id: i.id, timestamp: i.timestamp })),
+      groupId: activity.groupId,
+      name: activity.name,
+      timestamp: activity.timestamp,
+      action: activity.action,
+      items: toSubItems(activity),
     };
   });
 
@@ -433,12 +322,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const { groupId, items, table, id, timestamp, mode = "QUICK" }: RevertBody = req.body || {};
 
   // Normalização do payload: aceita lista `items` ou registro único (`table`, `id`, `timestamp`)
-  let itemsToRevert: RevertItem[] = [];
+  let itemsToRevert: RevertSubItem[] = [];
 
   if (Array.isArray(items) && items.length > 0) {
     itemsToRevert = items;
   } else if (table && id && timestamp) {
-    itemsToRevert = [{ table, id, timestamp }];
+    itemsToRevert = [{ table: table as AllowedTable, id, timestamp }];
   } else {
     return res.status(400).json({
       error: "Forneça os campos 'table', 'id' e 'timestamp' ou um array em 'items'.",
