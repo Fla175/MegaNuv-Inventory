@@ -46,6 +46,33 @@
   * **P2 (15 itens)** — 0% de cobertura de testes, ausência de CI, verificação de JWT replicada em ~22 arquivos, `components/ListSection.tsx` com 1.927 linhas, 12 dependências órfãs, espaço de IDs de 4 chars hex, variáveis de ambiente mortas/ausentes, `tsconfig.json` permissivo, `content` do Tailwind incompleto, inconsistências de schema e `README.md` desatualizado.
 * Adotadas as decisões do usuário em 25/09/2026: `project.id` = `meganuv-inventory`; gerenciador oficial **Yarn 1**; IA **pode commitar em branch própria** (nunca `push`/`tag`/`main`/branch de versão); versionamento por **branch dedicada** `inventory-vX.Y.Z`; DoD **estrita desde já** (testes e CI obrigatórios, apesar da dívida atual); dívida de segurança **documentada + worktree isolado** (não bloqueadora dura de release).
 
+### 🤖 OpenCode Operations
+
+#### Fixed
+* **Classificação de ações do revert** — a lógica saiu do handler de 170 linhas (`pages/api/database/revert.ts`) para módulos puros (`lib/revert/history.ts`). Corrigidos, com verdade de campo do banco `revert_probe`:
+  * registro criado e nunca alterado era rotulado `CREATE` em vez de `MOVE`/`UPDATE` (condição `isFirstVersion` invertida em `revert.ts:309-317`);
+  * registro com única versão vigente era **omitido** da listagem (`revert.ts:304`);
+  * registro deletado era rotulado `CREATE` em vez de `DELETE` (`revert.ts:348`);
+  * `CLONE` nunca era produzido — agora é inferido por lote de criações simultâneas na janela de 2 s (`lib/revert/batch.ts`);
+  * janela de agrupamento com âncora no item mais recente fragmentava lotes — agora desliza sobre o item mais antigo do lote;
+  * `groupId` com `Math.random()` perdia a seleção a cada poll de 5 s — agora determinístico.
+* **Autoridade do timestamp no POST** — `resolveRevertAt` deriva o instante de reversão do histórico (`planRevert`) e valida o `timestamp` do cliente contra ele (tolerância: QUICK 11 s, HISTORY 5 ms); divergência vira `409` "lista desatualizada". O `timestamp` do cliente **nunca** chega ao `FOR SYSTEM_TIME AS OF`.
+* **Gatilhos mortos do popup de desfazer** (`components/ListSection.tsx`) — removidos 3 call sites de `showUndo` (delete individual, clone em lote, delete em lote): essas APIs não devolvem `timestamp`, então o popup nunca aparecia. Invariante documentado: popup só para movimentação.
+* **Vocabulário unificado** — `lib/revert/types.ts` é a fonte única de `REVERT_ACTIONS` (CREATE/UPDATE/DELETE/CLONE/MOVE) e `ACTION_LABELS`; `pages/settings.tsx` importa os tipos (a união local mentia: só 3 ações) e exibe rótulos em pt-BR em vez do valor cru.
+
+#### Added
+* `lib/revert/types.ts`, `lib/revert/history.ts`, `lib/revert/batch.ts` — módulos puros de classificação/agrupamento, sem I/O.
+* `__tests__/lib/revert/history.test.ts` (16 casos, tabela-verdade do `revert_probe`), `__tests__/lib/revert/batch.test.ts` (janela deslizante, CLONE, rótulos, groupId estável) e `__tests__/api/revert.test.ts` (13 casos com Prisma mockado: classificação do GET + autoridade/409/410 do POST).
+* `__tests__/integration/revert-system-versioning.test.ts` — teste de integração **opt-in** (`REVERT_PROBE_DATABASE_URL`) contra o MariaDB com system-versioning; substitui o `debug-revert-logic.test.ts`, que tinha 0 `expect()` e 5 `console.log()` (verde falso).
+
+#### Changed
+* `pages/api/database/revert.ts` — `handleGet` delegado a `planRevert` + `batchActivities`; removidos `SYSTEM_TIME_MAX`, `HistoryRow` e `nameColumn` mortos; `handlePost` usa `resolveRevertAt` dentro da transação.
+* `pages/settings.tsx` — tipos de revert importados de `lib/revert/types`; rótulos de ação em pt-BR no Histórico.
+* `SPECS.md` e `CONTEXT.md` — contrato do revert atualizado (ver seções correspondentes).
+
+#### Removed
+* `__tests__/debug-revert-logic.test.ts` — teste-sonda sem asserções, substituído pelo teste de integração opt-in.
+
 ### 👤 Manual Developer Changes
 
 #### Refactored

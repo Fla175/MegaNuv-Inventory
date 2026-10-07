@@ -98,9 +98,10 @@ MinIO externo ao compose · `output: "standalone"` no Next.
 | Validade da presigned URL | **1 h** | `pages/api/qrcode/public-get.ts` |
 | Logs listados | `take: 200` | `pages/api/logs/list` |
 | Itens do dashboard | 20 recentes / 20 movimentos | `pages/api/dashboard/stats` |
-| Janela do Revert `QUICK` | **10 s** (validada server-side) | `pages/api/database/revert.ts:468-477` |
-| `SYSTEM_TIME_MAX` | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB) | `pages/api/database/revert.ts:9` |
-| Tabelas reversíveis | `Active`, `FatherSpace`, `Category` (whitelist) | `pages/api/database/revert.ts:11-27` |
+| Janela do Revert `QUICK` | **10 s** (validada server-side) | `pages/api/database/revert.ts` |
+| Tolerância do timestamp no Revert | QUICK **11 s** · HISTORY **5 ms** (servidor deriva o instante via `planRevert`; divergência → `409`) | `pages/api/database/revert.ts` (`resolveRevertAt`) |
+| `SYSTEM_TIME_MAX` | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB) | `lib/revert/history.ts` (`TIMESTAMP_MAX`) |
+| Tabelas reversíveis | `Active`, `FatherSpace`, `Category` (whitelist) | `lib/revert/history.ts` (`REVERTABLE_TABLES`) |
 | Escala do inventário | `Active.id` = 4 chars hex (65.536 combinações) — colisão provável em inventário grande | `lib/prisma.ts:8-24` |
 | Tamanho máximo de arquivo de componente | **1.927 linhas** em `components/ListSection.tsx` | — |
 | Threads de conexão Prisma | 1 (singleton com hot-reload guard) | `lib/prisma.ts:46-54` |
@@ -274,7 +275,7 @@ Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é
 | `/api/storage/file` | GET | privado | privado (proxy autenticado) |
 | `/api/users` | GET | **SEM AUTH no handler** | **privado** |
 | `/api/users/check-director` | GET | **SEM AUTH no handler** | privado (ou resposta booleana genérica) |
-| `/api/database/revert` | GET, POST | privado, bloqueia VIEWER | privado, bloqueia VIEWER |
+| `/api/database/revert` | GET, POST | privado, bloqueia VIEWER | privado, bloqueia VIEWER · POST valida o `timestamp` do cliente contra o derivado do histórico (`409` se divergir) |
 | `/api/actives/update` | PUT | **sem auth no handler** | privado (confia só no middleware — frágil) |
 
 **Paginação:** não existe. `list` devolve o conjunto inteiro; `/api/logs/list` limita a 200.
@@ -297,8 +298,9 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
 | ID único de `Active`/`FatherSpace` | Loop `randomBytes(2)` + `findUnique` até não colidir (`lib/prisma.ts:8-24`) — **não é transacional** |
 | Serial duplicado | 409 + tratamento de `P2002` (`pages/api/actives/create.ts`, `actives/update.ts`) |
 | Log de auditoria | `lib/logger.ts` **nunca lança** — falha de log não pode derrubar a operação |
-| Revert `QUICK` | Valida `elapsed ≤ 10 s` antes de executar (`pages/api/database/revert.ts:468-477`) |
-| Revert em transação | `db.$transaction` (`pages/api/database/revert.ts:481`) |
+| Revert `QUICK` | Valida `elapsed ≤ 10 s` antes de executar; o instante de reversão é **derivado no servidor** (`planRevert`) e o `timestamp` do cliente só é comparado (tolerância 11 s) — nunca usado no `FOR SYSTEM_TIME AS OF` |
+| Revert `HISTORY` | `timestamp` do GET comparado ao derivado (tolerância 5 ms); divergência → `409` "lista desatualizada" |
+| Revert em transação | `db.$transaction` (`pages/api/database/revert.ts`) |
 | Logout | Só limpa o cookie — **o JWT continua válido até 8 h** (sem revogação) |
 | Upload | Sem idempotência: cada POST gera `Date.now()-filename` como objectName |
 
