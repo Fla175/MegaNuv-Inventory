@@ -6,6 +6,12 @@
 > Documento de **design**. Nenhum arquivo de aplicação foi alterado. A implementação é o
 > `## 6. Plano de execução` e depende da aprovação do usuário.
 
+> **Atualizado em 15/10/2026.** O dono do projeto removeu as feature flags do Acesso do Criador: o
+> recurso é **sempre ativo** e **sempre exige a senha do criador** (commit `0d575aa`). As variáveis
+> `CREATOR_ACCESS_ENABLED` e `CREATOR_ACCESS_REQUIRE_PASSWORD` não existem mais. Onde este documento
+> ainda descreve flag, kill switch ou a variante B como padrão, o texto é **histórico** — o contrato
+> canônico vigente está em `SPECS.md` §5.1.
+
 **Status:** proposto · **Data:** 30/09/2026 · **Base:** `inventory-v2.22.6` @ `531a2f9`
 
 ---
@@ -84,7 +90,7 @@ coerência total de autorização.
 | # | Alternativa | Veredito |
 |---|---|---|
 | A | **Overlay assinado por `jose` + stash httpOnly** (adotada) | 1 clique real, sem senha, sem custo por requisição, 0 arquivos legados alterados. bcrypt não participa. |
-| B | A + `bcrypt.compare` da senha do criador no POST | bcrypt no lugar certo (senha humana de baixa entropia). Mas contraria "acesso automático": vira 2 cliques + 1 campo, e +80-120 ms de CPU por emissão. **Fica como opt-in**, não como padrão. |
+| B | A + `bcrypt.compare` da senha do criador no POST | bcrypt no lugar certo (senha humana de baixa entropia). Mas contraria "acesso automático": vira 2 cliques + 1 campo, e +80-120 ms de CPU por emissão. Foi **opt-in**; em 15/10/2026 virou o **padrão** (decisão do dono, §13 item 5). |
 | C | `bcrypt.compare` a **cada requisição** do caminho comum | bcrypt é o algoritmo **errado** para segredo de alta entropia (HMAC-SHA256 seria o certo), roda a 60-100 ms × todas as requisições da API e **não adiciona segurança** — o token HMAC já é unforgeável. Rejeitada. |
 | D | Regerar e sobrescrever `user.password` do alvo | Destrói a senha real do usuário e deixa a conta exposta no navegador. Rejeitada por risco de dados. |
 
@@ -153,7 +159,7 @@ correspondente (§10).
 | **A** | **Nunca** escrito por caminho genérico de usuário. | `pages/api/users/[id].ts:80-88` grava só `{name, email, role, password}`; `users/index.ts:58-65` grava só `{name, email, role, password}`. Confirmado por inspeção + teste de regressão parametrizado sobre as duas rotas. |
 | **B** | Escrita só pelo endpoint de cessão, e só pelo detentor atual. | `PATCH /api/creator-access` exige `isCreator === true` na sessão **efetiva**. |
 | **C** | `logout` limpa **os dois** cookies. | ⚠️ **Bug de projeto aberto:** `pages/api/auth/logout.ts:9-17` limpa só `auth_token`. Sem esta correção, um creator que faz logout enquanto impersona **deixa um token de 8h do diretor vivo no navegador**. Correção entra no escopo. |
-| **D** | Kill switch, **fail-closed**. | `process.env.CREATOR_ACCESS_ENABLED !== 'true'` → `403`. Sem fallback, sem default implícito, conforme `AGENTS.md` §3.1. Custo: exige a variável no `.env`. |
+| **D** | Acesso **incondicional**, fail-closed **por senha**. | O acesso do criador **nunca** é desligável por configuração: nenhuma flag o habilita ou desabilita. A proteção é exigir a senha do criador e validá-la com `bcrypt.compare` a cada entrada — ausente → `400`, incorreta → `401`. **Motivo da troca (15/10/2026):** a flag anterior era obrigatória, mas não documentada no `.env.example`; quem configurou a implantação omitiu a linha e o recurso degradou em silêncio com um `403` sem mensagem, enquanto `vitest.config.ts` semeava a flag como `true` e mascarava a falha em CI. Um kill switch cujo default desliga o recurso é uma armadilha, não um controle. **Não reintroduzir flags.** |
 | **E** | No máximo **um** detentor. | Verificação dentro de `db.$transaction` com `isolationLevel: Serializable`. |
 | **F** | Não vazado na listagem. | `/api/users` GET **não** inclui `isCreator` no `select` (`users/index.ts:16-23` fica intocado) — o botão depende só do flag da **sessão**. |
 | **G** | Auditável. | `enter` / `restore` / `transfer` gravam `Log` com ator, alvo, IP e UserAgent. |
@@ -185,25 +191,26 @@ Envelope de erro: `{ error: string }`, conforme `SPECS.md` §4.2 (o projeto mist
 
 ```jsonc
 // request
-{ "targetUserId": "<uuid>", "reason": "opcional, min 8 chars, vai para o log" }
+{ "targetUserId": "<uuid>", "reason": "opcional, min 8 chars, vai para o log", "password": "<senha do criador>" }
 ```
 
 | Passo | Ação |
 |---|---|
 | 1 | `req.method !== 'POST'` → `405` |
-| 2 | D ≠ `'true'` → `403 { error: "Creator access desabilitado." }` |
-| 3 | Sem `auth_token` / token inválido → `401` |
-| 4 | `verifyAuthToken` → `userId` do criador **efetivo** |
-| 5 | `prisma.user.findUnique({ id })` → ausente → `403` (não revela existência) |
-| 6 | `user.isCreator !== true` → `403` |
-| 7 | Alvo inexistente → `404` |
-| 8 | `targetUserId === userId` → `400` |
-| 9 | Stash já presente → `409 { error: "Restaure sua conta antes de entrar em outra." }` |
-| 10 | `tokenCriador` = cookie `auth_token` atual (verbatim) |
-| 11 | `tokenAlvo` = `generateAuthToken({...alvo}, { expiresIn: '2h' })` |
-| 12 | `createLog(req, userId, "CREATOR_ACCESS_ENTER", "…")` |
-| 13 | `Set-Cookie: auth_token=<tokenAlvo>` + `Set-Cookie: auth_token_creator=<tokenCriador>` |
-| 14 | `200 { user: {id, name, email, role}, impersonated: true }` |
+| 2 | Sem `auth_token` / token inválido → `401` |
+| 3 | `verifyAuthToken` → `userId` do criador **efetivo** |
+| 4 | `prisma.user.findUnique({ id })` → ausente → `403` (não revela existência) |
+| 5 | `user.isCreator !== true` → `403` |
+| 6 | Alvo inexistente → `404` |
+| 7 | `targetUserId === userId` → `400` |
+| 8 | Stash já presente → `409 { error: "Restaure sua conta antes de entrar em outra." }` |
+| 9 | Sem `password` no corpo → `400 { error: "Senha é obrigatória." }` |
+| 10 | `bcrypt.compare(password, creator.password)` falso → `401 { error: "Senha incorreta." }` |
+| 11 | `tokenCriador` = cookie `auth_token` atual (verbatim) |
+| 12 | `tokenAlvo` = `generateAuthToken({...alvo}, { expiresIn: '2h' })` |
+| 13 | `createLog(req, userId, "CREATOR_ACCESS_ENTER", "…")` |
+| 14 | `Set-Cookie: auth_token=<tokenAlvo>` + `Set-Cookie: auth_token_creator=<tokenCriador>` |
+| 15 | `200 { user: {id, name, email, role}, impersonated: true }` |
 
 ### `DELETE /api/creator-access` — voltar à conta do criador
 
@@ -357,7 +364,7 @@ existir — o buraco é criado na fatia 3 e só fechado na 4.
 | Grupo | Casos |
 |---|---|
 | **RBAC** (`POST`) | matriz parametrizada sobre os 4 papéis × creator/não-creator: sem sessão → `401`; `VIEWER` → `403`; `MANAGER` → `403`; `ADMIN` não-criador → `403`; creator → `200` |
-| **Guards** | kill switch `403`; alvo inexistente `404`; auto-alvo `400`; stash presente `409`; sem `targetUserId` `400`; método errado `405` |
+| **Guards** | senha ausente `400`; senha incorreta `401` (sem `Set-Cookie` emitido); senha correta `200`; alvo inexistente `404`; auto-alvo `400`; stash presente `409`; sem `targetUserId` `400`; método errado `405` |
 | **Blindagem** (regressão, regras A/F) | `PATCH /api/users/:id` e `POST /api/users` **não** alteram `isCreator`, para nenhum corpo |
 | **Cessão** (regras E) | transfer promove `VIEWER`/`MANAGER` → `ADMIN`; preserva `ADMIN`/`DIRECTOR`; exatamente 1 detentor após N transfers concorrentes; auto-cessão `400` |
 | **Cookies** (regra C) | `POST` emite os dois; `DELETE` troca e expira o stash; `logout` limpa os dois |
@@ -380,7 +387,7 @@ yarn test                                   # novo no gate 5 (autorizado)
 yarn build:opt                              # build standalone
 ```
 
-`CREATOR_ACCESS_ENABLED=true` e `COOKIE_SECURE=<valor>` precisam existir no `.env`. `SPECS.md` §2.3 e
+`COOKIE_SECURE=<valor>` precisa existir no `.env`. `SPECS.md` §2.3 e
 `CONTEXT.md` §3.3 item 8 registram que `COOKIE_SECURE` está ausente — ao tocar `logout.ts` e
 `creator-access.ts`, a mesma expressão `process.env.COOKIE_SECURE === 'true'` de `login.ts:49` é usada,
 **sem valor padrão**.
@@ -406,4 +413,4 @@ yarn build:opt                              # build standalone
 | 2 | **Nome do cookie de stash.** Você escreveu `auth-token-impersonated`; a convenção do projeto é `auth_token`. | Proposto `auth_token_creator`, por simetria com `auth_token` e com `authMiddleware`. O nome é interno — só o que importa é que os 22 endpoints nunca o leiam. |
 | 3 | **Ao ceder o título, o criador anterior é rebaixado?** | Proposto: **mantém o papel** que já tinha (normalmente `ADMIN`), perde só `isCreator`. Rebaixar para `ADMIN` quem era `DIRECTOR` é uma decisão sua. |
 | 4 | **Voltar quando o token do criador expirou.** | Proposto: troca os cookies mesmo assim e deixa o middleware mandar para `/login`. Nenhum caminho de recuperação. |
-| 5 | **Fator de confirmação (variante B do ADR).** | Proposto: **fora do padrão**, Activado por `CREATOR_ACCESS_REQUIRE_PASSWORD=true`. Deixa o caminho bcrypt disponível sem impor o campo extra a quem não quiser. |
+| 5 | **Fator de confirmação (variante B do ADR).** — **SUPERADA em 15/10/2026** | ~~Proposto: **fora do padrão**, ativado por `CREATOR_ACCESS_REQUIRE_PASSWORD=true`. Deixa o caminho bcrypt disponível sem impor o campo extra a quem não quiser.~~ **Superada:** o dono optou por exigir a senha **sempre**, dispensando a flag — o caminho bcrypt deixou de ser opt-in e virou a única porta de entrada (regra **D**). Motivo: as senhas ficam no **Bitwarden**, então o campo extra deixa de ser atrito e o custo de `bcrypt.compare` (~80-120 ms) é absorvido por uma única requisição autenticada. |
