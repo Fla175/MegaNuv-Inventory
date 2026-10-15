@@ -26,7 +26,6 @@ interface User {
   email: string;
   role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
   isCreator?: boolean;
-  creatorAccessEnabled?: boolean;
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
@@ -90,6 +89,11 @@ export default function SettingsPage() {
   const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
   const [transferConfirmInput, setTransferConfirmInput] = useState('');
   const [isTransferring, setIsTransferring] = useState(false);
+
+  const [enterTargetUser, setEnterTargetUser] = useState<User | null>(null);
+  const [enterPassword, setEnterPassword] = useState('');
+  const [isEnterModalOpen, setIsEnterModalOpen] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
 
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -249,18 +253,30 @@ export default function SettingsPage() {
 
   // --- HANDLERS ACESSO DO CRIADOR ---
   const handleEnterAccount = async (targetUser: User) => {
+    if (isEntering) return;
+    if (!enterPassword) {
+      toast.showWarning("Informe sua senha para entrar na conta.");
+      return;
+    }
+    setIsEntering(true);
     try {
       const res = await fetch("/api/creator-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ targetUserId: targetUser.id }),
+        body: JSON.stringify({ targetUserId: targetUser.id, password: enterPassword }),
       });
 
       const data = await res.json();
       if (res.ok) {
         toast.showSuccess("Acesso ativado. Redirecionando...");
         window.location.assign("/");
+      } else if (res.status === 401) {
+        toast.showWarning(data.error || "Senha incorreta.");
+        setEnterPassword('');
+      } else if (res.status === 400) {
+        toast.showWarning(data.error || "Senha é obrigatória.");
+        setEnterPassword('');
       } else if (res.status === 409) {
         toast.showWarning(data.error || "Restaure sua conta antes de entrar em outra.");
       } else {
@@ -268,6 +284,8 @@ export default function SettingsPage() {
       }
     } catch {
       toast.showError("Erro de conexão ao acessar conta.");
+    } finally {
+      setIsEntering(false);
     }
   };
 
@@ -683,12 +701,16 @@ export default function SettingsPage() {
                             </div>
 
                             <div className="flex flex-wrap gap-2 mt-6">
-                              {user?.isCreator && user.creatorAccessEnabled && (
+                              {user?.isCreator && (
                                 <>
                                   <button
-                                    onClick={() => handleEnterAccount(u)}
+                                    onClick={() => {
+                                      setEnterTargetUser(u);
+                                      setEnterPassword('');
+                                      setIsEnterModalOpen(true);
+                                    }}
                                     className="flex-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-300/40 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-900/60 flex items-center justify-center gap-1.5 transition-all"
-                                    title="Entrar nesta conta sem senha"
+                                    title="Entrar nesta conta (requer sua senha)"
                                   >
                                     <LogIn size={14} /> Entrar
                                   </button>
@@ -965,6 +987,68 @@ export default function SettingsPage() {
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Modal de Solicitação de Senha para Entrar na Conta */}
+      {isEnterModalOpen && enterTargetUser && (
+        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-amber-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-amber-500 mb-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-950/60 rounded-2xl">
+                <LogIn size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                  Entrar na Conta
+                </h3>
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
+                  Confirmação de segurança
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
+              Para entrar na conta de <strong className="text-zinc-900 dark:text-white">{enterTargetUser.name || enterTargetUser.email}</strong>, confirme a sua senha de criador:
+            </p>
+
+            <input
+              type="password"
+              value={enterPassword}
+              autoComplete="current-password"
+              autoFocus
+              onChange={(e) => setEnterPassword(e.target.value)}
+              placeholder="Sua senha..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 mb-6"
+            />
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEnterModalOpen(false);
+                  setEnterTargetUser(null);
+                  setEnterPassword('');
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isEntering}
+                onClick={() => handleEnterAccount(enterTargetUser)}
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
+              >
+                {isEntering ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <LogIn size={16} />
+                )}
+                Confirmar Entrada
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

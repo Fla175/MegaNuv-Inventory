@@ -1,4 +1,10 @@
 // pages/api/creator-access.ts
+//
+// O acesso do criador é SEMPRE ativo e SEMPRE exige a senha do criador.
+// Antes havia flags de ambiente (`CREATOR_ACCESS_ENABLED`,
+// `CREATOR_ACCESS_REQUIRE_PASSWORD`) que se comportavam como kill switch e como
+// confirmation opcional: quem configurou omitiu a linha e o recurso degradou em
+// silêncio, respondendo 403 sem sinalizar o motivo. Não reintroduzir flags aqui.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 import bcrypt from 'bcryptjs';
@@ -19,10 +25,6 @@ function extractToken(req: NextApiRequest): string | null {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (process.env.CREATOR_ACCESS_ENABLED !== 'true') {
-    return res.status(403).json({ error: 'Creator access desabilitado.' });
-  }
-
   const isSecure = process.env.COOKIE_SECURE === 'true';
 
   if (req.method === 'POST') {
@@ -61,19 +63,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(409).json({ error: 'Restaure sua conta antes de entrar em outra.' });
     }
 
-    if (process.env.CREATOR_ACCESS_REQUIRE_PASSWORD === 'true') {
-      if (!password || typeof password !== 'string') {
-        return res.status(400).json({ error: 'Senha é obrigatória.' });
-      }
-      const isPasswordValid = await bcrypt.compare(password, creator.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: 'Senha incorreta.' });
-      }
-    }
-
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Senha é obrigatória.' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, creator.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
     }
 
     const tokenAlvo = await generateAuthToken(

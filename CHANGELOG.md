@@ -19,6 +19,47 @@
 ### 🤖 OpenCode Operations
 
 #### Security
+* **Remoção definitiva das feature flags `CREATOR_ACCESS_ENABLED` e `CREATOR_ACCESS_REQUIRE_PASSWORD`** —
+  decisão do dono do projeto: o Acesso do Criador é **sempre habilitado** e **sempre exige a senha do
+  criador**. Como o dono guarda as senhas no **Bitwarden**, exigir a senha não é atrito e não se justifica
+  um interruptor. Registrando o motivo do descarte: a causa raiz do bug reportado foi ter uma flag
+  **obrigatória disfarçada de opcional** — quem configurou omitiu a linha e o recurso degradou em silêncio,
+  respondendo `403` sem sinalizar o motivo. Um "feature flag" de segurança cujo padrão desliga o recurso é
+  armadilha, não controle. Consequências aplicadas:
+  - `pages/api/creator-access.ts` não abre mais com kill switch: `POST`/`DELETE`/`PATCH` respondem conforme a
+    autenticação real, sem gate de ambiente.
+  - O `POST` passou a **exigir sempre** a senha do criador, validada com `bcrypt.compare(password,
+    creator.password)` **depois** de resolver o `creator` e o `targetUser`. Contratos preservados:
+    `400 { error: 'Senha é obrigatória.' }` (ausente/vazia) e `401 { error: 'Senha incorreta.' }` (errada);
+    `targetUserId` continua obrigatório (`400`) e a validação da senha **não** emite cookie de impersonação.
+  - `.env.example` não declara mais nenhuma variável de Acesso do Criador.
+  - `vitest.config.ts` perdeu o comentário que documentava a flag como não semeada de propósito.
+* **Confirmação de senha na UI (defesa em profundidade):** o botão "Entrar" deixa de chamar a API
+  diretamente e abre um modal de solicitação de senha, no mesmo padrão visual do modal de transferência
+  já existente em `pages/settings.tsx`. O campo usa `<input type="password" autoComplete="current-password">`
+  para que o autofill do navegador/Bitwarden funcione. `400` e `401` viram toast apropriado e o campo é
+  limpo para nova tentativa; `401` reporta explicitamente senha incorreta.
+
+#### Changed
+* `POST /api/creator-access` passou a enviar `{ targetUserId, password }` (antes só `targetUserId`).
+* A UI de `pages/settings.tsx` mantém o modal de transferência intacto; o novo modal de entrada é irmão dele.
+
+#### Fixed
+* **403 silencioso do `/api/creator-access`:** a degradação vinha de a flag ser lida como ausente. Agora não
+  há flag para faltar — o recurso está ativo por construção.
+* **2 testes que já falhavam antes desta mudança passavam a depender do `.env` local:** o `.env` da máquina
+  tinha `CREATOR_ACCESS_REQUIRE_PASSWORD=true`, que o Vitest carrega, e fazia `returns 200 for creator user`
+  e `returns 404 when target user does not exist` retornarem `400`. Com a exigência de senha incondicional os
+  dois foram corrigidos na raiz (mock de `bcrypt` + senha no body), não por ajuste de `.env`.
+* **Cobertura do caminho de senha, antes inexistente:** adicionados 4 casos — `400` sem `password`,
+  `400` com `password` vazia, `401` com senha errada (garantindo ausência de `Set-Cookie`) e `200` com senha
+  correta (garantindo a chamada a `bcrypt.compare` com o hash do criador). O `describe` inteiro
+  `Kill Switch Guard` (3 casos do `403` da flag) e os 5 casos de `creatorAccessEnabled` em `/api/auth/me`
+  foram removidos; no lugar ficou um caso que afirma que o campo **não** é mais exposto.
+
+### 🤖 OpenCode Operations
+
+#### Security
 * **Recurso de Acesso do Criador inoperante em produção (403 em todo POST/DELETE/PATCH)** —
   `pages/api/creator-access.ts:22` abria com `if (process.env.CREATOR_ACCESS_ENABLED !== 'true') return 403`,
   mas a variável **não era declarada nem no `.env` nem no `.env.example`**. Com a flag ausente,

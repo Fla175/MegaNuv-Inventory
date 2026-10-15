@@ -39,9 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     let impersonation = null;
-    // Sinaliza ao cliente se o recurso de Acesso do Criador está ativo, para que a
-    // UI esconda os botões que sempre falhariam com 403.
-    const creatorAccessEnabled = process.env.CREATOR_ACCESS_ENABLED === "true";
     const stashSecret = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
     const stashToken = req.cookies["auth_token_creator"];
     if (stashToken) {
@@ -58,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    return res.status(200).json({ user: { ...user, creatorAccessEnabled }, impersonation });
+    return res.status(200).json({ user, impersonation });
 
   } catch (err) {
     if (err instanceof jose.errors.JWTExpired) {

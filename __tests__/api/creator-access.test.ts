@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
 import { generateAuthToken, verifyAuthToken } from '@/lib/auth';
 import creatorAccessHandler from '@/pages/api/creator-access';
@@ -27,6 +28,19 @@ vi.mock('@/lib/prisma', () => {
       user: mockUser,
       log: mockLog,
       $transaction: vi.fn(async (cb) => cb({ user: mockUser, log: mockLog })),
+    },
+  };
+});
+
+// Mock bcrypt: o acesso do criador SEMPRE exige senha, então toda entrada bem
+// sucedida depende de `bcrypt.compare` retornar true.
+vi.mock('bcryptjs', () => {
+  const compare = vi.fn(async () => true);
+  return {
+    default: {
+      compare,
+      hash: vi.fn(async () => 'fake-hash'),
+      genSalt: vi.fn(async () => 'fake-salt'),
     },
   };
 });
@@ -77,56 +91,20 @@ function createMockReqRes(options: {
 
 describe('pages/api/creator-access', () => {
   const origEnv = process.env;
+  const CREATOR_PASSWORD_HASH = '$2a$10$abcdefghijklmnopqrstuvFakeHashForTests00000000';
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // `vi.resetAllMocks()` limpa a implementação do mock de bcrypt.
+    (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     process.env = {
       ...origEnv,
       JWT_SECRET: 'test-secret-key-1234567890',
-      CREATOR_ACCESS_ENABLED: 'true',
     };
   });
 
   afterEach(() => {
     process.env = origEnv;
-  });
-
-  describe('Kill Switch Guard', () => {
-    it('returns 403 when CREATOR_ACCESS_ENABLED is not true', async () => {
-      process.env.CREATOR_ACCESS_ENABLED = 'false';
-      const { req, res, resState } = createMockReqRes({ method: 'POST' });
-
-      await creatorAccessHandler(req, res);
-
-      expect(resState.statusCode).toBe(403);
-      expect(resState.jsonBody).toEqual({ error: 'Creator access desabilitado.' });
-    });
-
-    it('returns 403 when CREATOR_ACCESS_ENABLED is absent (undefined !== "true")', async () => {
-      // Regressão do bug: a flag não é declarada no .env de produção, então
-      // `process.env.CREATOR_ACCESS_ENABLED !== 'true'` era sempre verdadeiro e
-      // o botão "Entrar" da UI falhava com 403 mesmo para o creator.
-      delete process.env.CREATOR_ACCESS_ENABLED;
-      expect(process.env.CREATOR_ACCESS_ENABLED).toBeUndefined();
-
-      const { req, res, resState } = createMockReqRes({ method: 'POST' });
-
-      await creatorAccessHandler(req, res);
-
-      expect(resState.statusCode).toBe(403);
-      expect(resState.jsonBody).toEqual({ error: 'Creator access desabilitado.' });
-    });
-
-    it('blocks DELETE and PATCH too when CREATOR_ACCESS_ENABLED is absent', async () => {
-      delete process.env.CREATOR_ACCESS_ENABLED;
-
-      for (const method of ['DELETE', 'PATCH'] as const) {
-        const { req, res, resState } = createMockReqRes({ method });
-        await creatorAccessHandler(req, res);
-        expect(resState.statusCode).toBe(403);
-        expect(resState.jsonBody).toEqual({ error: 'Creator access desabilitado.' });
-      }
-    });
   });
 
   describe('RBAC & Auth Guard (POST)', () => {
@@ -162,7 +140,8 @@ describe('pages/api/creator-access', () => {
     it('returns 200 for creator user', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
       (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
-        if (where.id === 'c-1') return { id: 'c-1', role: UserRole.ADMIN, isCreator: true };
+        if (where.id === 'c-1')
+          return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
         return null;
       });
@@ -170,7 +149,7 @@ describe('pages/api/creator-access', () => {
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
         cookies: { auth_token: token },
-        body: { targetUserId: 'target-1' },
+        body: { targetUserId: 'target-1', password: 'CreatorPassword123!' },
       });
 
       await creatorAccessHandler(req, res);
@@ -184,6 +163,98 @@ describe('pages/api/creator-access', () => {
       expect(setCookie).toBeDefined();
       expect(setCookie.some((c: string) => c.startsWith('auth_token='))).toBe(true);
       expect(setCookie.some((c: string) => c.startsWith('auth_token_creator='))).toBe(true);
+    });
+  });
+
+  describe('Creator Password Requirement', () => {
+    it('returns 400 when password is missing from the body', async () => {
+      const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === 'c-1')
+          return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
+        if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
+        return null;
+      });
+
+      const { req, res, resState } = createMockReqRes({
+        method: 'POST',
+        cookies: { auth_token: token },
+        body: { targetUserId: 'target-1' },
+      });
+
+      await creatorAccessHandler(req, res);
+
+      expect(resState.statusCode).toBe(400);
+      expect(resState.jsonBody).toEqual({ error: 'Senha é obrigatória.' });
+    });
+
+    it('returns 400 when password is an empty string', async () => {
+      const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === 'c-1')
+          return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
+        if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
+        return null;
+      });
+
+      const { req, res, resState } = createMockReqRes({
+        method: 'POST',
+        cookies: { auth_token: token },
+        body: { targetUserId: 'target-1', password: '' },
+      });
+
+      await creatorAccessHandler(req, res);
+
+      expect(resState.statusCode).toBe(400);
+      expect(resState.jsonBody).toEqual({ error: 'Senha é obrigatória.' });
+    });
+
+    it('returns 401 when password does not match the creator password', async () => {
+      (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+      const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === 'c-1')
+          return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
+        if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
+        return null;
+      });
+
+      const { req, res, resState } = createMockReqRes({
+        method: 'POST',
+        cookies: { auth_token: token },
+        body: { targetUserId: 'target-1', password: 'WrongPassword!' },
+      });
+
+      await creatorAccessHandler(req, res);
+
+      expect(resState.statusCode).toBe(401);
+      expect(resState.jsonBody).toEqual({ error: 'Senha incorreta.' });
+      // Nenhum cookie de impersonação pode ser emitido quando a senha falha.
+      expect(resState.headers['Set-Cookie']).toBeUndefined();
+    });
+
+    it('returns 200 and issues cookies when password matches', async () => {
+      const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === 'c-1')
+          return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
+        if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
+        return null;
+      });
+
+      const { req, res, resState } = createMockReqRes({
+        method: 'POST',
+        cookies: { auth_token: token },
+        body: { targetUserId: 'target-1', password: 'CreatorPassword123!' },
+      });
+
+      await creatorAccessHandler(req, res);
+
+      expect(resState.statusCode).toBe(200);
+      expect(resState.jsonBody.impersonated).toBe(true);
+      expect(bcrypt.compare).toHaveBeenCalledWith('CreatorPassword123!', CREATOR_PASSWORD_HASH);
+      expect(resState.headers['Set-Cookie']).toBeDefined();
     });
   });
 
@@ -494,8 +565,7 @@ describe('pages/api/creator-access', () => {
       });
     });
 
-    it('exposes creatorAccessEnabled=true when the flag is exactly "true"', async () => {
-      process.env.CREATOR_ACCESS_ENABLED = 'true';
+    it('does NOT expose creatorAccessEnabled anymore', async () => {
       const token = await generateAuthToken({ userId: 'u-1', email: 'user@ex.com', role: UserRole.ADMIN });
       (prisma.user.findUnique as any).mockResolvedValue({
         id: 'u-1',
@@ -512,35 +582,7 @@ describe('pages/api/creator-access', () => {
       await meHandler(req, res);
 
       expect(resState.statusCode).toBe(200);
-      expect(resState.jsonBody.user.creatorAccessEnabled).toBe(true);
-    });
-
-    it.each([
-      { label: 'absent', value: undefined },
-      { label: '"false"', value: 'false' },
-      { label: '"TRUE"', value: 'TRUE' },
-      { label: '"1"', value: '1' },
-    ])('exposes creatorAccessEnabled=false when the flag is $label', async ({ value }) => {
-      if (value === undefined) delete process.env.CREATOR_ACCESS_ENABLED;
-      else process.env.CREATOR_ACCESS_ENABLED = value;
-
-      const token = await generateAuthToken({ userId: 'u-1', email: 'user@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({
-        id: 'u-1',
-        name: 'Normal User',
-        email: 'user@ex.com',
-        role: UserRole.ADMIN,
-        theme: 'SYSTEM',
-        isCreator: true,
-        lastLogin: null,
-        createdAt: new Date(),
-      });
-
-      const { req, res, resState } = createMockReqRes({ method: 'GET', cookies: { auth_token: token } });
-      await meHandler(req, res);
-
-      expect(resState.statusCode).toBe(200);
-      expect(resState.jsonBody.user.creatorAccessEnabled).toBe(false);
+      expect(resState.jsonBody.user).not.toHaveProperty('creatorAccessEnabled');
     });
   });
 });

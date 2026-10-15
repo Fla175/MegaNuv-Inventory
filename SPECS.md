@@ -355,24 +355,27 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   `categories/list`, `father-spaces/list`) chegou a checar apenas se o token existia, sem verificar a
   assinatura — qualquer string não-vazia passava. Regra: presença de token não é autenticação.
 
-**Recurso de Acesso do Criador (feature flag obrigatória)**
-- `CREATOR_ACCESS_ENABLED` é **obrigatória** para o recurso de Acesso do Criador, e não opcional como o nome
-  sugere. `pages/api/creator-access.ts` compara `process.env.CREATOR_ACCESS_ENABLED !== 'true'` (comparação
-  **estrita**: só a string exata `"true"` liga) e devolve **403** em `POST`, `DELETE` e `PATCH` quando a
-  variável está ausente ou tem qualquer outro valor. Ausência de configuração **não pode** ser um default
-  silencioso que finge que o recurso existe.
-- Consequência de projeto: a variável **precisa estar declarada no `.env`** e **listada no `.env.example`**.
-  Uma flag de segurança ausente do exemplo é uma flag que ninguém descobre — foi exatamente o que aconteceu.
-- `/api/auth/me` expõe `creatorAccessEnabled: boolean` no objeto do usuário (`creatorAccessEnabled =
-  process.env.CREATOR_ACCESS_ENABLED === 'true'`), e a UI **exige esse campo além de `isCreator`** para
-  exibir os botões "Entrar"/"Ceder" em `pages/settings.tsx`. Botão que depende de flag desligada deve ser
-  **escondido**, não exibido para falhar com 403.
-- `CREATOR_ACCESS_REQUIRE_PASSWORD` (booleana, padrão `false`) só é lida **depois** do kill switch e exige a
-  senha do criador quando `"true"`.
-- Regra para testes: **nenhuma flag de kill switch pode ser semeada globalmente** em `vitest.config.ts`
-  (`test.env`). Ambiente global de teste é exatamente o que faz a suíte passar enquanto a produção falha —
-  foi o caso de `CREATOR_ACCESS_ENABLED: 'true'` até ser removido. Cada suíte define a flag no seu próprio
-  `beforeEach`, incluindo um caso explícito para a flag **ausente**.
+**Recurso de Acesso do Criador (incondicional e sempre autenticado por senha)**
+- O acesso do criador é **sempre ativo** e **não existe mais nenhuma flag de ambiente** para ligá-lo ou
+  desligá-lo. Decisão do dono do projeto: exigir a senha do criador não é atrito — as senhas ficam no
+  Bitwarden. **Não reintroduzir `CREATOR_ACCESS_ENABLED` nem `CREATOR_ACCESS_REQUIRE_PASSWORD`.**
+- Causa raiz do bug anterior (403 silencioso em produção) foi ter uma flag **obrigatória disfarçada de
+  opcional**: quem configurou omitiu a linha e o recurso degradou sem sinalizar. Feature flag de segurança
+ cujo valor padrão desliga o recurso é armadilha, não controle.
+- `POST /api/creator-access` **exige sempre** a senha do criador, validada com
+  `bcrypt.compare(password, creator.password)` **após** resolver o `creator` e o `targetUser`:
+  `targetUserId` ausente → `400 { error: 'targetUserId é obrigatório.' }`;
+  senha ausente/vazia → `400 { error: 'Senha é obrigatória.' }`;
+  senha errada → `401 { error: 'Senha incorreta.' }` (sem emitir cookie de impersonação).
+- `pages/settings.tsx` pede a senha em um modal próprio (`input type="password"` com
+  `autoComplete="current-password"`, para o autofill do navegador/Bitwarden funcionar) antes de chamar a API,
+  e trata `400`/`401` com toast + limpeza do campo.
+- A visibilidade dos botões "Entrar"/"Ceder" depende **apenas** de `user.isCreator`. O campo
+  `creatorAccessEnabled` foi removido de `/api/auth/me` e de `lib/context/UserContext.tsx`.
+- Regras que permanecem válidas para qualquer flag futura: **nenhuma flag de kill switch pode ser semeada
+  globalmente** em `vitest.config.ts` (`test.env`) — ambiente global de teste é exatamente o que faz a suíte
+  passar enquanto a produção falha. Se um kill switch for indispensável, ele precisa de teste explícito para o
+  valor **ausente**.
 
 **Upload e mídia**
 - ✅ Limite de 10 MB e tipos aceitos **são validados no servidor** em `lib/uploadPolicy.ts`, aplicado por

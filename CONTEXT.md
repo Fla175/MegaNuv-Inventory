@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 15/10/2026 · **Branch:** `chore/security-p0-debt` (rebased sobre `fix/revert-classification`)
+**Última atualização:** 15/10/2026 · **Branch:** `integration/security-build-auth`
 **Versão:** `2.23.0` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -73,14 +73,17 @@ conjunto de correções de segurança.
 7. ~~`refactor/auth-helper`~~ — **feito**: `lib/apiAuth.ts` consolida a verificação de JWT de ~20 arquivos;
    corrigidos de passagem 3 endpoints que não verificavam token e o `revert` que devolvia 500 para 401.
    O gate de RBAC do `signup` voltou a aceitar `DIRECTOR`.
-8. ~~**Bump de versão para `2.22.7`~~** — **feito**, mas o patch estava errado: o trabalho da branch
-   `refactor/auth-helper` somava correção de segurança, correção de build, refactor de auth em ~20 endpoints
-   e correção de RBAC, com mudança de comportamento observável. Rebaixado para **`2.23.0`** (minor) com
-   `npm version 2.23.0 --no-git-tag-version`. **Falta criação humana da branch `inventory-v2.23.0` e da tag
-   `v2.23.0`** — a branch antiga `inventory-v2.22.7` **não** deve ser criada.
-9. `fix/creator-access-flag` — resolvido nesta sessão junto: `CREATOR_ACCESS_ENABLED` não existia no `.env`
-   nem no `.env.example`, então `/api/creator-access` respondia 403 sempre; e o `seed` criava o admin master
-   sem `isCreator`. Ambos corrigidos e cobertos por teste.
+8. ~~**Bump de versão**~~ — **feito**: para **`2.23.0`** (minor) com
+   `npm version 2.23.0 --no-git-tag-version`. O bump para `2.22.7` foi rebaixado porque a série
+   `refactor/auth-helper` soma correção de segurança, correção de build, refactor de auth em ~20 endpoints
+   e correção de RBAC, com mudança de comportamento observável. **Falta criação humana da branch
+   `inventory-v2.23.0` e da tag `v2.23.0`** — a branch antiga `inventory-v2.22.7` **não** deve ser criada.
+9. ~~`fix/creator-access-flag`~~ — **resolvido e depois revertido por decisão do dono**: o
+   `CREATOR_ACCESS_ENABLED` não existia no `.env` nem no `.env.example`, então `/api/creator-access`
+   respondia 403 sempre. A correção inicial foi **declarar a flag**; o dono **rejeitou essa abordagem**:
+   as duas feature flags foram **removidas do código**. O Acesso do Criador é agora **sempre ativo** e
+   **sempre exige a senha do criador** (o dono guarda as senhas no Bitwarden, então não há atrito).
+   Causa raiz registrada: flag obrigatória disfarçada de opcional degradou em silêncio.
 10. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
 11. `chore/docker-compose-env` — `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`, e o serviço `app`
     usa `command: yarn dev` com bind-mount do código (a imagem construída não é usada).
@@ -184,8 +187,10 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   `lib/version.ts` lê a versão de lá, sem hardcode.
 - **Versão atual: `2.23.0`** (bumped de `2.22.7`, **minor**). O patch para `2.22.7` era incorreto: a série
   `refactor/auth-helper` carrega correção de segurança, correção de build, refactor de auth em ~20 endpoints
-  e correção de RBAC, com **mudança de comportamento observável** (novo campo `creatorAccessEnabled` em
-  `/api/auth/me`, botões condicionais na UI, novo `isCreator` no seed) — isso é minor, não patch.
+  e correção de RBAC, com **mudança de comportamento observável** (botões condicionais na UI, novo
+  `isCreator` no seed, exigência de senha do criador em toda entrada) — isso é minor, não patch.
+  O campo `creatorAccessEnabled` que chegou a ser adicionado em `/api/auth/me` foi **removido** na
+  sequência (§2.3 item 9), junto com as duas feature flags do Acesso do Criador.
   A branch `inventory-v2.23.0` e a tag `v2.23.0` são criação humana; a `inventory-v2.22.7` **não** deve ser
   criada.
 - `npm` é proibido para **instalar** dependências (`AGENTS.md` §3.3), mas `npm version` é seguro: ele
