@@ -142,7 +142,7 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 ├── next.config.ts           # standalone, strict mode, webpack fallback, remotePatterns
 ├── inventory-policy.json    # policy IAM do usuário MinIO (formato AWS S3 v1)
 ├── compose.yml              # serviço `app` + `banco` (MariaDB)
-├── Dockerfile               # 2 estágios (node:22-alpine)
+├── Dockerfile               # 2 estágios (node:22-alpine), runner non-root sobre output:"standalone"
 ├── eslint.config.mjs        # flat config: next/core-web-vitals + next/typescript
 ├── tailwind.config.mjs  postcss.config.mjs  tsconfig.json
 ├── pages/                   # ← PAGES ROUTER
@@ -173,7 +173,7 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │   ├── schema.prisma        # 6 models, 2 enums, 124 L
 │   └── migrations/          # 16 migrations, 2026-01-12 → 2026-05-30 (imutáveis)
 ├── styles/globals.css       # 123 L — @media print p/ etiquetas
-├── scripts/build-optimized.sh
+├── scripts/build-optimized.sh  # build standalone + montagem dos assets p/ o runner
 └── public/                  # 7 SVG (6 são boilerplate do Next, sem uso)
 ```
 
@@ -419,9 +419,17 @@ yarn test            # testes + coverage acima do threshold
 
 **Estado atual: os 5 passam** (verificados na branch `chore/security-p0-debt`).
 
-> `npx prisma validate` e `yarn build:opt` exigem `DATABASE_URL`, `JWT_SECRET` e as `MINIO_*` no ambiente.
-> Em máquina sem `.env`, passar valores fictícios inline **apenas para o gate** — nunca criar um `.env`
-> com valores de teste versionável. `.env` é gitignored.
+> **Requisitos de ambiente por gate** (verificado empiricamente):
+> - `npx prisma validate` exige apenas `DATABASE_URL` presente (não conecta ao banco).
+> - `yarn lint`, `npx tsc --noEmit`, `yarn test` e **`yarn build:opt` não exigem nenhuma variável de
+>   ambiente.** As rotas de API (`pages/api/**`) só são avaliadas em runtime, não em tempo de build, então
+>   o `requireEnv()` de `lib/minio.ts` e o `JWT_SECRET` de `lib/auth.ts` **não** são disparados no build.
+>   É isso que permite ao `Dockerfile` construir a imagem sem nenhum segredo.
+> - Em máquina sem `.env`, passar um `DATABASE_URL` fictício inline **apenas para o `prisma validate`** —
+>   nunca criar um `.env` com valores de teste versionável. `.env` é gitignored.
+> - `NODE_ENV=production` é definido no **runner**, não no builder: o Next faz inlining de
+>   `process.env.*` no bundle do cliente, então configuração de runtime deve ser lida no servidor e não
+>   passar por variáveis `NEXT_PUBLIC_`.
 
 **Pipeline CI (a criar — `.github/workflows/ci.yml`):**
 

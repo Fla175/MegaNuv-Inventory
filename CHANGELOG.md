@@ -13,6 +13,25 @@
 
 ### 🤖 OpenCode Operations
 
+#### Fixed
+* **Build da imagem Docker corrigido** — `Dockerfile:7` executava `yarn build`, que **não existe** no `package.json`; o script de build é `build:opt` (`scripts/build-optimized.sh`). O build da imagem estava quebrado (`error Command "build" not found`) e agora usa o script correto.
+* **`Dockerfile` passa a respeitar `output: "standalone"`** — o runner copiava o `node_modules` inteiro (1.1G) e depois executava `CMD ["yarn","start"]`, cujo script faz `cd .next/standalone && node server.js`, layout que o runner nunca montava. Agora o runner copia o conteúdo de `.next/standalone` para `/app`, mais `.next/static`, `public/`, `prisma/` e `package.json`, e sobe com `node server.js` — que é o que o artifact standalone realmente produz. Verificado: o `server.js` gerado sobe e responde (`GET /` → 307 para login, `GET /api/hello` → 200).
+* **Camada de instalação com cache mount do BuildKit** — o cache do yarn (~2.8G, com binários do rolldown para ~13 plataformas) era gravado dentro da layer. Agora é montado como cache do BuildKit: persiste entre builds, mas nunca entra na imagem, o que reduz a layer de instalação e evita estourar o disco do host.
+* **Runner não-root** — o estágio final roda como `node` (uid 1000), com `NODE_ENV=production` e `HOSTNAME=0.0.0.0` explícitos.
+* **Instalação com `--frozen-lockfile`** no Dockerfile — garante que a imagem nunca altera o `yarn.lock` (regra de `SPECS.md` §5.3); antes era `yarn install` sem trava.
+* **`scripts/build-optimized.sh`**: os `echo "$ comando"` imprimiam o `$` literal em vez do comando sendo executado; e `next build` falhava com `command not found` quando o script era rodado fora do `yarn run`, porque `node_modules/.bin` não está no `PATH`. Passou a usar `yarn next build` e `echo "> ..."`.
+
+#### Docs
+* Documentado em `CONTEXT.md` §3.2 que o `yarn build` inexistente foi corrigido, e em `SPECS.md` §3.2 o novo fluxo de build da imagem em dois estágios.
+
+> **Limitação deste ambiente:** o `docker build` completo **não pôde ser executado** até o fim — o host fica sem espaço
+> (precisa de ~4G para o cache do yarn + `node_modules` simultâneos, e havia ~4G livres) e a etapa `yarn install`
+> falha com `ENOSPC`. O que **foi** verificado: `docker build --check` retorna *"Check complete, no warnings
+> found"* (Dockerfile válido) e o artifact standalone foi executado de verdade, confirmando os caminhos de
+> `COPY` e o `CMD`. O build completo da imagem precisa ser reexecutado em um host com mais espaço.
+
+### 🤖 OpenCode Operations
+
 #### Security
 * **Credenciais MinIO removidas do código** (`lib/minio.ts`, `pages/api/storage/upload-url.ts`) — os fallbacks que embutiam `accessKey`/`secretKey` de produção foram substituídos por `requireEnv()`, que **falha no import** se a variável estiver ausente (mesma convenção já usada por `JWT_SECRET` em `lib/auth.ts:8`). Nenhuma credencial real é ecoada aqui; as linhas originais eram o único ponto de vazamento no código. **A credencial que estava no histórico do Git não é removida por esta mudança: continua sendo necessário rotacioná-la no servidor.**
 * **Hosts de produção eliminados do código** — `lib/minio.ts`, `pages/api/storage/upload-url.ts` e `next.config.ts` não fixam mais endpoint/IP de produção. `next/image` agora deriva `remotePatterns` de `MINIO_PUBLIC_ENDPOINT` e **falha fechado** (lista vazia) quando a variável não está definida em tempo de build. O exemplo do comentário em `lib/mediaUrl.ts` foi genericizado.
