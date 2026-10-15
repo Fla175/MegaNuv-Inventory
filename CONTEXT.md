@@ -5,7 +5,7 @@
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
 **Última atualização:** 15/10/2026 · **Branch:** `chore/security-p0-debt` (rebased sobre `fix/revert-classification`)
-**Versão:** `2.22.6` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
+**Versão:** `2.22.7` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
 
@@ -67,10 +67,17 @@ conjunto de correções de segurança.
 3. ~~Remover credenciais hardcoded de `lib/minio.ts` e `upload-url.ts`~~ — **feito**.
 4. ~~Fechar os endpoints públicos e o `GET /api/users` sem auth~~ — **feito**.
 5. **Rotacionar a credencial MinIO no servidor** — antes de qualquer deploy. Não é feito por IA.
-6. `fix/build-docker` — corrigir `Dockerfile:7` (`yarn build` não existe; o script correto é `build:opt`).
-7. `refactor/auth-helper` — consolidar as verificações de JWT replicadas em `pages/api/**`
-   (o `authMiddleware` agora aceita cookie, o que já reduz parte da inconsistência).
-8. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
+6. ~~`fix/build-docker`~~ — **feito**: `yarn build:opt` no Dockerfile, runner standalone non-root,
+   cache mount do BuildKit, e as duas correções que só apareceram ao rodar o build completo
+   (`bash` ausente no alpine e `prisma generate` na ordem de layers errada). Imagem de 341MB **validada**.
+7. ~~`refactor/auth-helper`~~ — **feito**: `lib/apiAuth.ts` consolida a verificação de JWT de ~20 arquivos;
+   corrigidos de passagem 3 endpoints que não verificavam token e o `revert` que devolvia 500 para 401.
+   O gate de RBAC do `signup` voltou a aceitar `DIRECTOR`.
+8. **Bump de versão para `2.22.7`** feito com `npm version --no-git-tag-version`. **Falta criação humana
+   da branch `inventory-v2.22.7` e da tag `v2.22.7`.**
+9. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
+10. `chore/docker-compose-env` — `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`, e o serviço `app`
+    usa `command: yarn dev` com bind-mount do código (a imagem construída não é usada).
 
 ---
 
@@ -165,6 +172,14 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   (`v2.22.5`, `inventory-v2.22.6`) e os merges `e5262f6`, `3347121` de sincronização dev→produção.
 - Branch de versão é **proibida para a IA**: sem `push`, sem `tag`, sem commit direto.
 - A IA trabalha apenas em branch própria (`<tipo>/<slug>`) e reporta ao usuário.
+- **Bump de versão pela IA:** `npm version <X.Y.Z> --no-git-tag-version`. O `--no-git-tag-version` é
+  obrigatório — sem ele o `npm version` cria tag e commit automático, e a IA não cria tag
+  (`AGENTS.md` §3.2). O comando **não** altera o `yarn.lock`. Bump em `package.json` é suficiente:
+  `lib/version.ts` lê a versão de lá, sem hardcode.
+- **Versão atual: `2.22.7`** ( bumped de `2.22.6`, patch seguindo a convenção histórica da série
+  `2.20.1` → `2.22.6`). A branch `inventory-v2.22.7` e a tag `v2.22.7` são criação humana.
+- `npm` é proibido para **instalar** dependências (`AGENTS.md` §3.3), mas `npm version` é seguro: ele
+  não toca em lockfile nem em `node_modules`.
 
 **Histórico de branches:** `main` · `inventory-v2.0.0` · `inventory-v2.22.1` · `inventory-v2.22.4` ·
 `inventory-v2.22.6` · `v2.22.5` · `inventory-2.0` · `arena/01a0b6ab-meganuv-inventory`.

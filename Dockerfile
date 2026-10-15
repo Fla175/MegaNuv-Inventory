@@ -23,9 +23,16 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
 
 COPY . .
 
-# O postinstall do @prisma/client já roda `prisma generate` (o schema está no
-# contexto), então não é preciso um `prisma generate` explícito aqui. Manter
-# apenas um ponto de geração evita o segundo runnable layer.
+# `yarn install` roda ANTES deste COPY (a layer de dependências vem primeiro para
+# reaproveitar cache), então o postinstall do @prisma/client roda sem o
+# prisma/schema.prisma na imagem e não gera nada. O build quebra com
+# "Module '@prisma/client' has no exported member 'UserRole'" — por isso o
+# generate explícito aqui, depois que o schema está no contexto.
+RUN npx prisma generate
+
+# `node:22-alpine` não traz bash, e `yarn build:opt` executa
+# `bash scripts/build-optimized.sh` (`/bin/sh: bash: not found` sem isto).
+RUN apk add --no-cache bash
 
 # `yarn build` não existe no package.json — o script de build é `build:opt`
 # (scripts/build-optimized.sh). O build não exige JWT_SECRET nem MINIO_*: as

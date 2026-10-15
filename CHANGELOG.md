@@ -11,6 +11,26 @@
 
 ## [Unreleased]
 
+> **Próxima release: `2.22.7`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
+> hardcode). O bump foi feito com `npm version 2.22.7 --no-git-tag-version`: o `--no-git-tag-version` é
+> obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
+> `yarn.lock` não foi tocado. A branch `inventory-v2.22.7` e a tag `v2.22.7` são criação humana.
+
+### 🤖 OpenCode Operations
+
+#### Security
+* **`POST /api/auth/signup` aceita `DIRECTOR` novamente** — o gate usava `session.role !== 'ADMIN'`, que
+  barrava o próprio `DIRECTOR` de criar usuário, em desacordo com a tabela de RBAC (`SPECS.md` §4.2), onde
+  `DIRECTOR` tem "todos" em *Gerencia usuários*. A condição passou a usar `isPrivileged()`
+  (`lib/apiAuth.ts`), que cobre `DIRECTOR` e `ADMIN` em um único lugar.
+  *Coberto por `__tests__/api/signup-rbac.test.ts` (6 casos: tabela de papéis para `ADMIN`/`DIRECTOR`/
+  `MANAGER`/`VIEWER`, ausência de sessão e o bootstrap do primeiro `ADMIN` como `isCreator`). Confirmado que
+  o teste falha ao reintroduzir a condição antiga.*
+
+#### Changed
+* **Versão `2.22.6` → `2.22.7`** via `npm version --no-git-tag-version` (patch, seguindo a convenção
+  histórica `2.20.1` → `2.22.6`). Apenas `package.json` mudou; `lib/version.ts` lê a versão de lá.
+
 ### 🤖 OpenCode Operations
 
 #### Security
@@ -52,11 +72,23 @@
 #### Docs
 * Documentado em `CONTEXT.md` §3.2 que o `yarn build` inexistente foi corrigido, e em `SPECS.md` §3.2 o novo fluxo de build da imagem em dois estágios.
 
-> **Limitação deste ambiente:** o `docker build` completo **não pôde ser executado** até o fim — o host fica sem espaço
-> (precisa de ~4G para o cache do yarn + `node_modules` simultâneos, e havia ~4G livres) e a etapa `yarn install`
-> falha com `ENOSPC`. O que **foi** verificado: `docker build --check` retorna *"Check complete, no warnings
-> found"* (Dockerfile válido) e o artifact standalone foi executado de verdade, confirmando os caminhos de
-> `COPY` e o `CMD`. O build completo da imagem precisa ser reexecutado em um host com mais espaço.
+> **#### Fixed
+* **Build da imagem Docker corrigido de verdade** — ver a seção da release `2.22.7` abaixo. Dois defeitos
+  novos só apareceram quando o `docker build` foi executado de ponta a ponta:
+  * `node:22-alpine` **não traz `bash`**, e `yarn build:opt` executa `bash scripts/build-optimized.sh`
+    (`/bin/sh: bash: not found`). O builder agora instala `bash` via `apk add --no-cache bash`.
+  * ao dividir a layer de dependências, `yarn install` passa a rodar **antes** de `COPY . .`; o
+    `postinstall` do `@prisma/client` roda sem o `prisma/schema.prisma` na imagem e não gera o Client, o
+    que quebrava o type-check com `Module '@prisma/client' has no exported member 'UserRole'`. Restaurado o
+    `npx prisma generate` explícito **depois** do `COPY . .`.
+    *Lição: a remoção anterior do `generate` foi validada apenas localmente, onde o Client já estava
+    gerado — a verificação não reproduzia a ordem de layers do container.*
+
+> **Validação real da imagem** (não mais só `docker build --check`): o build completa, a imagem fica com
+> **341MB**, o container sobe como `uid=1000(node)` e responde — `GET /` → 307, `GET /api/hello` → 200,
+> `GET /login` → 200. Os endpoints protegidos respondem **401** sem sessão e **401** com token falso
+> (`Authorization: Bearer qualquercoisa`), confirmando as correções de segurança na imagem real.
+> (`POST /api/auth/login` responde 500 nesse container de teste porque ele não tem banco configurado.)
 
 ### 🤖 OpenCode Operations
 

@@ -148,7 +148,7 @@ Ao final de **toda** sessão com alteração, acrescentar em `CHANGELOG.md`:
 ```md
 ### <agent-name> Operations
 #### Added | Changed | Fixed | Removed
-*描述 ou descrição
+* descrição ou descrição
 ```
 
 Usar apenas as subseções que se aplicarem. Nunca reescrever entradas anteriores (append-only).

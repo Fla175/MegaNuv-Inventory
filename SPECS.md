@@ -443,6 +443,17 @@ yarn test            # testes + coverage acima do threshold
 >   `process.env.*` no bundle do cliente, então configuração de runtime deve ser lida no servidor e não
 >   passar por variáveis `NEXT_PUBLIC_`.
 
+**Requisitos da imagem Docker** (`Dockerfile`, verificados com `docker build` completo):
+- O builder precisa de **bash**: `yarn build:opt` executa `bash scripts/build-optimized.sh`, e
+  `node:22-alpine` não traz bash (`/bin/sh: bash: not found`).
+- O builder precisa de **`npx prisma generate` explícito depois de `COPY . .`**: a layer de dependências
+  vem primeiro (para reaproveitar cache), então o `postinstall` do `@prisma/client` roda **sem** o
+  `prisma/schema.prisma` na imagem e não gera o Client — o build quebra com
+  `Module '@prisma/client' has no exported member 'UserRole'`.
+- Validado de ponta a ponta: imagem de **341MB**, container rodando como `uid=1000(node)`,
+  `GET /` → 307, `GET /api/hello` → 200, e os endpoints protegidos respondendo **401** tanto sem sessão
+  quanto com `Authorization: Bearer qualquercoisa`.
+
 **Pipeline CI (a criar — `.github/workflows/ci.yml`):**
 
 ```yaml

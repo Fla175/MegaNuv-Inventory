@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { getSessionUser } from '@/lib/apiAuth';
+import { getSessionUser, isPrivileged } from '@/lib/apiAuth';
 
 const saltRounds = 10;
 
@@ -24,15 +24,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // 2. Se NÃO existe ADMIN, permitir registro (primeiro ADMIN do sistema)
-    // 3. Se JÁ existe ADMIN, exigir token de ADMIN autenticado
+    // 3. Se JÁ existe ADMIN, exigir sessão de ADMIN **ou DIRECTOR**.
+    //    A tabela de RBAC (SPECS.md §4.2) dá a DIRECTOR "todos" em Gerencia
+    //    usuários, e o ADMIN é quem tem o papel oposto (exceto DIRECTOR).
+    //    Antes, `session.role !== 'ADMIN'` barrava o próprio DIRECTOR.
     if (adminCount > 0) {
       const session = await getSessionUser(req);
       if (!session) {
         return res.status(401).json({ message: 'Sessão expirada. Faça login.' });
       }
 
-      if (session.role !== 'ADMIN') {
-        return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
+      if (!isPrivileged(session)) {
+        return res.status(403).json({ message: 'Apenas ADMIN e DIRECTOR podem criar novos usuários.' });
       }
     }
 
