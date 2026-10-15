@@ -13,7 +13,9 @@ type NextApiHandler = (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
 
 /**
  * Middleware para proteger rotas de API.
- * Verifica o token JWT no cabeçalho 'Authorization'.
+ * Verifica o token JWT no cabeçalho 'Authorization' (Bearer) **ou** no cookie
+ * `auth_token` (httpOnly). O cookie é aceito para manter compatibilidade com
+ * chamadas feitas pelo próprio frontend (fetch sem header explícito).
  *
  * @param handler O manipulador de API a ser protegido.
  * @param requiredRoles Opcional: Um array de papéis que são permitidos para acessar esta rota.
@@ -21,20 +23,25 @@ type NextApiHandler = (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
  */
 export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]) => {
   return async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
-    // 1. Extrair o token do cabeçalho Authorization
+    // 1. Extrair o token do cabeçalho Authorization ou do cookie de sessão
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Authorization token missing or malformed.' });
-    }
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : null;
+    const cookieToken = req.cookies?.auth_token;
 
-    const token = authHeader.split(' ')[1]; // Pega a parte do token após "Bearer "
+    const token = bearerToken || cookieToken;
+    if (!token) {
+      return res.status(401).json({ message: 'Autenticação necessária. Faça login para continuar.' });
+    }
 
     // 2. Verificar o token
     const decodedUser = await verifyAuthToken(token);
 
     if (!decodedUser) {
       // Token inválido ou expirado
-      return res.status(401).json({ message: 'Invalid or expired token.' });
+      return res.status(401).json({ message: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
     // 3. Anexar as informações do usuário à requisição
@@ -43,7 +50,7 @@ export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]
     // 4. Verificar papéis (se forem exigidos para esta rota)
     if (requiredRoles && requiredRoles.length > 0) {
       if (!req.user.role || !requiredRoles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'Forbidden: Insufficient permissions.' });
+        return res.status(403).json({ message: 'Forbidden: Permissões insuficientes.' });
       }
     }
 

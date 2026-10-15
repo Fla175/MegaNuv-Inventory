@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 06/10/2026 · **Branch do worktree principal:** `fix/revert-classification` ·
+**Última atualização:** 15/10/2026 · **Branch:** `chore/security-p0-debt` (rebased sobre `fix/revert-classification`)
 **Versão:** `2.22.6` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -27,64 +27,78 @@ em segurança, testes e manutenção. Ver §3.
 
 ### 2.1 Foco atual
 
-> **Correção da classificação de reversão (revert).**
-> Causa-raiz provada no banco `revert_probe` (MariaDB com system-versioning): a classificação de ação
-> morava dentro do handler `pages/api/database/revert.ts` e estava invertida — registro criado e nunca
-> alterado era rotulado `CREATE` em vez de `MOVE`/`UPDATE`, registro com única versão vigente era
-> **omitido** da listagem, e registro deletado era rotulado `CREATE` em vez de `DELETE`. O `POST`
-> (execução da reversão) estava correto — o defeito era de rótulo/listagem, não de corrupção de dados.
+> **Correções de segurança P0 (§3.1) — implementadas e verificadas nesta branch.**
+> Foco da sessão: remover credenciais/hosts de produção do código e fechar os endpoints que
+> estavam alcançáveis sem autenticação.
 
-Estado: **implementado e commitado na branch `fix/revert-classification`** (módulos puros `lib/revert/*`,
-testes unitários + API com Prisma mockado, teste de integração opt-in, autoridade do timestamp no POST,
-remoção dos gatilhos mortos do popup e vocabulário unificado). Gates verdes: `lint`, `tsc`, `prisma
-validate`, `build:opt`, `vitest` (69 passando, 5 pulados — integração opt-in). 6 commits aprovados pelo
-usuário e executados (ver `git log`); **Estágio 1 também commitado** (autorizado pelo usuário) — working
-tree limpo.
+Estado: **implementado na branch `chore/security-p0-debt`**, que foi **rebaseada sobre
+`fix/revert-classification`** (o rebase foi necessário porque a branch original derivava de
+`inventory-v2.22.6` e não tinha o framework de documentação — `AGENTS.md`, `CHANGELOG.md`,
+`CONTEXT.md`, `SPECS.md` foram criados depois; sem eles a regra `AGENTS.md` §3.4 não podia ser cumprida).
+
+Gates executados e verdes: `yarn lint` (0 erros), `npx tsc --noEmit` (0 erros), `npx prisma validate`
+(schema válido), `yarn build:opt` (standalone 90M), `yarn test` (**101 passando, 5 pulados** — a integração
+opt-in) e cobertura da superfície de segurança em **83% de linhas / 80% de branches**, acima do gate de 70%.
+
+Corrigido nesta branch (detalhe no `CHANGELOG.md`): credenciais MinIO e hosts de produção removidos do
+código; `authMiddleware` aceitando cookie além de Bearer; autenticação no handler de
+`/api/storage/upload-url`, `/api/storage/delete-url`, `/api/qrcode/public-get`, `GET /api/users`,
+`GET /api/users/check-director` e `PUT /api/actives/update`; `inventory-policy.json` sem `s3:*`; validação
+de upload autoritativa no servidor (`lib/uploadPolicy.ts`); `.env.example` criado.
+
+> **Ação humana obrigatória:** a credencial MinIO que estava no código **continua válida no servidor** e
+> **no histórico do Git**. Esta mudança impede nova exposição, mas só a **rotação da credencial** elimina a
+> exposição passada. Isso vale para qualquer novo deploy.
 
 ### 2.2 Worktrees e Branches ativos
 
-| Caminho                      | Branch                   | Finalidade                                                  |
-| ---------------------------- | ------------------------ | ----------------------------------------------------------- |
-| `/var/code/inventory`        | `fix/revert-classification` | Correção da classificação de reversão (foco atual).      |
-| `/tmp/opencode/inventory-p0` | `chore/security-p0-debt` | **Isolado.** Correções de segurança P0 (§3.1).              |
+| Caminho                      | Branch                        | Finalidade                                                             |
+| ---------------------------- | ----------------------------- | ---------------------------------------------------------------------- |
+| `/var/code/inventory`        | `fix/revert-classification`   | Revert + Estágio 1 (commitado, tree limpo).                            |
+| `/tmp/opencode/inventory-p0` | `chore/security-p0-debt`      | Correções de segurança P0 — **rebased sobre `fix/revert-classification`**. |
 
-O worktree P0 está **limpo** — nenhuma correção implementada ainda. É o destino natural da próxima sessão de IA.
+O worktree P0 contém o mesmo código-base da branch principal; a diferença entre elas é **apenas** o
+conjunto de correções de segurança.
 
 ### 2.3 Ordem de trabalho sugerida para a próxima sessão
 
-1. ~~Commitar o trabalho de revert~~ — **feito** (6 commits: `test/revert-unit`, `fix/revert-classification`,
-   `fix/revert-authority`, `fix/revert-popup-trigger`, `fix/revert-vocabulary`, `chore/revert-observability`).
-2. ~~Commitar o Estágio 1~~ — **feito** (autorizado pelo usuário; renomeação `isSystem`→`isCreator`,
-   formatação Prettier e ajustes de texto consolidados em um commit).
-3. `chore/security-p0-debt` — remover credenciais hardcoded de `lib/minio.ts` e `pages/api/storage/upload-url.ts`
-   (rotacionar a credencial no MinIO **antes** — ela está no histórico do Git).
-4. `chore/security-p0-debt` — fechar os 3 endpoints públicos e o `GET /api/users` sem auth.
-5. `fix/build-docker` — corrigir `Dockerfile:7` (`yarn build` não existe).
-6. `refactor/auth-helper` — consolidar as ~22 verificações de JWT em um helper único.
+1. ~~Commitar o trabalho de revert~~ — **feito** (6 commits).
+2. ~~Commitar o Estágio 1~~ — **feito** (1 commit).
+3. ~~Remover credenciais hardcoded de `lib/minio.ts` e `upload-url.ts`~~ — **feito**.
+4. ~~Fechar os endpoints públicos e o `GET /api/users` sem auth~~ — **feito**.
+5. **Rotacionar a credencial MinIO no servidor** — antes de qualquer deploy. Não é feito por IA.
+6. `fix/build-docker` — corrigir `Dockerfile:7` (`yarn build` não existe; o script correto é `build:opt`).
+7. `refactor/auth-helper` — consolidar as verificações de JWT replicadas em `pages/api/**`
+   (o `authMiddleware` agora aceita cookie, o que já reduz parte da inconsistência).
+8. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
 
 ---
 
 ## 3. Known Issues & Blockers
 
-### 3.1 🔴 P0 — Segurança (dívida crítica ABERTA)
+### 3.1 🔴 P0 — Segurança
 
-| #   | Problema                                                       | Onde                                                                | Impacto                                                                                                                                                     |
-| --- | -------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Credenciais MinIO hardcoded** como fallback de `process.env` | `lib/minio.ts:9-10,18-19` · `pages/api/storage/upload-url.ts:14-15` | Qualquer pessoa com acesso ao repositório tem a chave do bucket. **Está no histórico do Git** — não some ao remover.                                        |
-| 2   | **Host/IP de produção hardcoded**                              | `lib/minio.ts:6,15` · `upload-url.ts:11,40` · `next.config.ts:21`   | Vaza topologia de infraestrutura.                                                                                                                           |
-| 3   | **`/api/storage/upload-url` público e sem auth**               | `middleware.ts:13` + handler sem verificação                        | **Upload anônimo** no bucket. Vetor de DoS de storage.                                                                                                      |
-| 4   | **`/api/storage/delete-url` público**                          | `middleware.ts` (`PUBLIC_PATHS`)                                    | **Exclusão anônima** de objetos do bucket, se a URL for conhecida.                                                                                          |
-| 5   | **`/api/qrcode/public-get` público**                           | `middleware.ts:12` + fora do matcher (`middleware.ts:98`)           | **Vazamento de inventário**: nome, SKU/EAN, fabricante, modelo, **número de série**, valor e anexos com presigned URL de 1 h, sem nenhuma autenticação. |
-| 6   | **`GET /api/users` sem auth no handler**                       | `pages/api/users/index.ts:13-31`                                    | Lista de todos os usuários (nome, e-mail, papel) a qualquer pessoa que alcance o endpoint.                                                                  |
-| 7   | **`GET /api/users/check-director` sem auth**                   | `pages/api/users/index.ts`                                          | Vaza se já existe DIRECTOR.                                                                                                                                 |
-| 8   | **`/api/actives/update` sem auth no handler**                  | `pages/api/actives/update.ts`                                       | Confia apenas no middleware. Qualquer brecha futura no middleware vira escrita não autenticada.                                                             |
-| 9   | **`inventory-policy.json` concede `s3:*`**                     | `inventory-policy.json:5-8`                                         | A mesma credencial de aplicação pode **deletar o bucket** e gerenciar ACLs.                                                                                 |
-| 10  | **Validação de upload só no cliente**                          | `components/FileUpload.tsx:134`                                     | Limite de 10 MB e tipo de arquivo não são aplicados no servidor.                                                                                            |
-| 11  | **Logout não revoga o token**                                  | `pages/api/auth/logout.ts`                                          | JWT válido por até **8 h** após logout. Sem denylist de sessão.                                                                                             |
-| 12  | **Segredos no histórico do Git**                               | `git log`                                                           | **Não reescrever histórico.** Remediação = rotacionar a credencial no servidor.                                                                             |
+> **Itens 1 a 10 foram corrigidos nesta branch** (`chore/security-p0-debt`) — ver `CHANGELOG.md`.
+> **Os itens 11 e 12 continuam abertos.** A coluna *Estado* reflete a situação pós-correção.
 
-**Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026, mas
-qualquer novo deploy deve considerar os itens 1, 3, 4 e 5.
+| #   | Problema                                                       | Onde                                                                | Estado / Impacto                                                                                                                                     |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Credenciais MinIO hardcoded** como fallback de `process.env` | `lib/minio.ts` · `pages/api/storage/upload-url.ts`                  | ✅ **Código corrigido** — `requireEnv()` falha no import se a variável faltar. ⚠️ **A credencial segue válida no servidor e no histórico do Git: só a rotação elimina a exposição passada.** |
+| 2   | **Host/IP de produção hardcoded**                              | `lib/minio.ts` · `upload-url.ts` · `next.config.ts`                 | ✅ **Corrigido** — nenhum host em código; `remotePatterns` vem de `MINIO_PUBLIC_ENDPOINT` e falha fechado se ausente.                             |
+| 3   | **`/api/storage/upload-url` público e sem auth**               | `middleware.ts` · `pages/api/storage/upload-url.ts`                 | ✅ **Corrigido** — saiu de `PUBLIC_PATHS` e passou a exigir sessão no handler.                                                                      |
+| 4   | **`/api/storage/delete-url` público**                          | `pages/api/storage/delete-url.ts`                                   | ✅ **Corrigido** — exige sessão no handler.                                                                                                          |
+| 5   | **`/api/qrcode/public-get` público**                           | `middleware.ts` · `pages/api/qrcode/public-get.ts`                  | ✅ **Corrigido** — exige sessão no handler. Estava fora do matcher do middleware; agora a proteção não depende dele.                                  |
+| 6   | **`GET /api/users` sem auth no handler**                       | `pages/api/users/index.ts`                                          | ✅ **Corrigido** — passou a usar `authMiddleware`.                                                                                                     |
+| 7   | **`GET /api/users/check-director` sem auth**                   | `pages/api/users/check-director.ts`                                 | ✅ **Corrigido** — passou a usar `authMiddleware`.                                                                                                     |
+| 8   | **`/api/actives/update` sem auth no handler**                  | `pages/api/actives/update.ts`                                       | ✅ **Corrigido** — deixou de depender só do middleware.                                                                                               |
+| 9   | **`inventory-policy.json` concede `s3:*`**                     | `inventory-policy.json`                                             | ✅ **Restrito** a `GetObject`/`PutObject`/`DeleteObject`. ⚠️ **Requer aplicar a nova policy no MinIO** — o arquivo só tem efeito depois de aplicado no servidor. |
+| 10  | **Validação de upload só no cliente**                          | `lib/uploadPolicy.ts` (novo) · `pages/api/storage/upload-url.ts`    | ✅ **Corrigido** — validação autoritativa no servidor (tipo, coerência MIME×extensão e 10 MB).                                                        |
+| 11  | **Logout não revoga o token**                                  | `pages/api/auth/logout.ts`                                          | 🔴 **ABERTO** — JWT válido por até **8 h** após logout. Sem denylist de sessão.                                                                       |
+| 12  | **Segredos no histórico do Git**                               | `git log`                                                           | 🔴 **ABERTO** — **não reescrever histórico.** Remediação = **rotacionar a credencial no servidor** (ação humana, §2.3 item 5).                       |
+
+**Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026. Antes de
+qualquer novo deploy: **rotacionar a credencial MinIO** (item 12) e **aplicar a nova `inventory-policy.json`**
+no servidor (item 9) — as duas são ações humanas, não de código.
 
 ### 3.2 🟠 P1 — Build e Corretude
 
@@ -92,9 +106,9 @@ qualquer novo deploy deve considerar os itens 1, 3, 4 e 5.
 | --- | ------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **`yarn build` não existe** no `package.json`                | `Dockerfile:7`                       | O build da imagem Docker **está quebrado hoje**: `error Command "build" not found`. O script correto é `yarn build:opt` (`scripts/build-optimized.sh`). |
 | 2   | `package-lock.json` não rastreado + `yarn.lock` modificado   | raiz                                 | Artefato de `npm install` acidental. **Remover o `package-lock.json`** e restaurar `yarn.lock`.                                                         |
-| 3   | `String()` sem argumento                                     | `pages/api/storage/upload-url.ts:25` | Sempre retorna `""` → o `active` retornado é sempre `null` e vai na resposta.                                                                           |
+| 3   | ~~`String()` sem argumento~~ — **corrigido**                | `pages/api/storage/upload-url.ts`                                    | O `activeId` agora é lido do formulário e vinculado ao ativo quando informado.                                                                              |
 | 4   | `echo "$ comando"` com `$` literal                           | `scripts/build-optimized.sh:4-7`     | Deveria ser `set -x` ou `echo "comando"`.                                                                                                               |
-| 5   | `remotePatterns.port: ''`                                    | `next.config.ts:22`                  | Código de porta vazio pode rejeitar URL com porta explícita. Omitir a propriedade.                                                                      |
+| 5   | ~~`remotePatterns.port: ''`~~ — **corrigido**               | `next.config.ts`                                                      | Propriedade omitida; `remotePatterns` agora deriva de `MINIO_PUBLIC_ENDPOINT`.                                                                            |
 | 6   | JSON inválido (vírgula final)                                | `.vscode/settings.json:8`            | VS Code reporta erro de parse.                                                                                                                          |
 | 7   | `/qrcode` em `PUBLIC_PATHS` mas sem `pages/qrcode/index.tsx` | `middleware.ts:17`                   | A rota `/qrcode` retorna 404. Existe apenas `/qrcode/view`.                                                                                             |
 | 8   | Shield de "setup inicial" totalmente comentado               | `middleware.ts:41-59`                | A verificação é feita client-side em `pages/login.tsx:16-38`. Fragilidade conhecida.                                                                    |
@@ -104,7 +118,7 @@ qualquer novo deploy deve considerar os itens 1, 3, 4 e 5.
 
 | #   | Problema                                                                       | Onde                                                                                                                                               |
 | --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **0% de cobertura de testes** e nenhum runner instalado                        | projeto inteiro                                                                                                                                    |
+| 1   | **Cobertura de testes ainda parcial** — runner instalado, mas longe do alvo | projeto inteiro                                                                                                                                    | `vitest` está instalado e roda (**101 testes**), mas o gate de cobertura se aplica hoje **só à superfície de segurança** (`lib/middlewares`, `lib/uploadPolicy.ts`, `pages/api/users/{index,check-director}.ts` — 83% linhas / 80% branches). O alvo de `SPECS.md` §5.2 (70–80% por domínio em todo `pages/api/**`) permanece **pendente** e exige cobrir os 36 endpoints. |
 | 2   | **Nenhuma CI**                                                                 | sem `.github/`                                                                                                                                     |
 | 3   | **Verificação de JWT replicada em ~22 arquivos**                               | `pages/api/**`; `lib/middlewares/authMiddleware.ts` é usado por **1** arquivo (`protected.ts`)                                                     |
 | 4   | **`components/ListSection.tsx` tem 1.927 linhas**                              | UI + modais + impressão + context menu + upload + revert                                                                                           |

@@ -268,14 +268,18 @@ Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é
 | `/api/auth/signup` | POST | público | público (só cria DIRECTOR) |
 | `/api/creator-access` | POST, DELETE, PATCH | privado (criador) | privado (exclusivo do criador) |
 | `/api/public/initial-check` | GET | público | público (`requiresSetup: userCount === 0`) |
-| `/api/qrcode/public-get` | GET | **PÚBLICO** | público **assinado** ou privado |
-| `/api/storage/upload-url` | POST | **PÚBLICO** | **privado** |
-| `/api/storage/delete-url` | DELETE | **PÚBLICO** | **privado** |
+| `/api/qrcode/public-get` | GET | ✅ **privado** (exige sessão) | privado |
+| `/api/storage/upload-url` | POST | ✅ **privado** (exige sessão) | **privado** |
+| `/api/storage/delete-url` | DELETE | ✅ **privato** (exige sessão) | **privado** |
 | `/api/storage/file` | GET | privado | privado (proxy autenticado) |
-| `/api/users` | GET | **SEM AUTH no handler** | **privado** |
-| `/api/users/check-director` | GET | **SEM AUTH no handler** | privado (ou resposta booleana genérica) |
+| `/api/users` | GET | ✅ **privado** (`authMiddleware`) | **privado** |
+| `/api/users/check-director` | GET | ✅ **privado** (`authMiddleware`) | privado |
 | `/api/database/revert` | GET, POST | privado, bloqueia VIEWER | privado, bloqueia VIEWER · POST valida o `timestamp` do cliente contra o derivado do histórico (`409` se divergir) |
-| `/api/actives/update` | PUT | **sem auth no handler** | privado (confia só no middleware — frágil) |
+| `/api/actives/update` | PUT | ✅ **privado** (`authMiddleware`) | privado |
+
+> Os seis endpoints marcados com ✅ foram fechados na branch `chore/security-p0-debt`. **A proteção
+> está no handler**, não só no middleware: `authMiddleware` envolve o handler e devolve `401` sem
+> sessão. Nenhum deles depende mais exclusivamente do `middleware.ts` para ser privado.
 
 **Paginação:** não existe. `list` devolve o conjunto inteiro; `/api/logs/list` limita a 200.
 Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versionar.
@@ -319,30 +323,43 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
 - Toda verificação de token passa por `verifyAuthToken()`. **Proibido** `jwtDecode` sem verificação de assinatura.
 
 **Segredos**
-- `.env` **nunca** é rastreado (`.gitignore:34` usa `.env*`).
+- `.env` **nunca** é rastreado (`.gitignore` usa `.env*` com `!.env.example`).
 - **Nenhuma** credencial, IP ou host de produção pode ser escrito em código. `process.env.X` **sem fallback**.
-- **Dívida ativa:** `lib/minio.ts:9-10,18-19` e `pages/api/storage/upload-url.ts:14-15` contêm credenciais
-  MinIO hardcoded como fallback; `lib/minio.ts:6,15` e `upload-url.ts:11,40` fixam infraestrutura de produção.
-  **Não reproduzir. Não ecoar. Não "simplificar"**. Corrigir em `chore/security-p0-debt` (worktree `/tmp/opencode/inventory-p0`).
-- Criar `.env.example` e ajustar `.gitignore` para `!.env.example` (pendência, `CONTEXT.md` §3).
+- `lib/minio.ts` usa `requireEnv()`, que **lança no import** se `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`,
+  `MINIO_SECRET_KEY` ou `MINIO_PUBLIC_ENDPOINT` estiverem ausentes — mesma convenção de `JWT_SECRET`.
+  Ausência de configuração deve **parar o app**, nunca cair em um valor padrão.
+- ✅ **Resolvido em `chore/security-p0-debt`:** as credenciais MinIO e os hosts de produção foram removidos
+  do código. **Não reintroduzir. Não ecoar.** O valor original continua no histórico do Git — a correção
+  definitiva é **rotacionar a credencial no servidor** (ação humana).
+- ✅ `.env.example` criado e `.gitignore` ajustado com `!.env.example`. O arquivo lista **apenas nomes de
+  variáveis e placeholders**; nenhum valor real pode entrar nele.
 
 **Controle de acesso**
 - Duas camadas: `middleware.ts` (rota) **e** verificação no handler. O handler **não** pode assumir que o
   middleware rodou — qualquer endpoint listado em `PUBLIC_PATHS` é alcançável sem sessão.
 - `PUBLIC_PATHS` é lista de allow: **cada entrada exige justificativa**. Endpoint novo → privado por padrão.
-- `authMiddleware` (`lib/middlewares/authMiddleware.ts`) aceita **apenas** `Authorization: Bearer`, não cookie.
-  Ampliar para cookie oupadronizar em um helper único — ver `CONTEXT.md` §3.3.
+- ✅ `authMiddleware` (`lib/middlewares/authMiddleware.ts`) agora aceita **cookie `auth_token`** e
+  `Authorization: Bearer`. O cookie é a forma canônica de sessão do frontend (`fetch` sem header explícito).
+  O `req.user` preenchido pelo helper é a fonte de verdade para RBAC dentro do handler.
+- Handler novo sensível → envolver com `authMiddleware`, **não** depender só do `middleware.ts`.
 
 **Upload e mídia**
-- Limite de 10 MB e tipos aceitos **precisam** de validação **no servidor** (hoje é só cliente, `components/FileUpload.tsx:134`).
-- `next.config.ts:17-26` — `remotePatterns` só permite `minio.meganuv.com:80`. **Não ampliar** sem revisão.
-- `inventory-policy.json` concede `s3:*` (inclui deletar bucket e gerenciar ACL) no bucket `inventory`.
-  Restringir a `GetObject`/`PutObject`/`DeleteObject` em credenciais separadas.
+- ✅ Limite de 10 MB e tipos aceitos **são validados no servidor** em `lib/uploadPolicy.ts`, aplicado por
+  `pages/api/storage/upload-url.ts`. A checagem do cliente (`components/FileUpload.tsx`) é só UX.
+- A validação exige **coerência**: extensão presente precisa estar na allowlist **e** MIME presente precisa
+  estar na allowlist. `application/octet-stream` nunca é aceito. Aceite por "MIME **ou** extensão" é
+  bypass — permite `.exe` com MIME `application/pdf`.
+- `next.config.ts` — `remotePatterns` deriva de `MINIO_PUBLIC_ENDPOINT` e **falha fechado** (lista vazia)
+  quando a variável não está definida em tempo de build. **Não reintroduzir host fixo; não ampliar sem revisão.**
+- ✅ `inventory-policy.json` restringida a `GetObject`/`PutObject`/`DeleteObject` (sem `s3:*`).
+  ⚠️ **A policy só tem efeito depois de aplicada no servidor** — ação humana, ver `CONTEXT.md` §3.1 item 9.
 
 **Validação de entrada**
 - Sem biblioteca de validação (Zod etc.) no projeto. Handlers validam manualmente.
-- **Dívida:** `pages/api/storage/upload-url.ts:24-26` usa `String()` sem argumento (sempre `""`), tornando
-  o `active` retornado sempre `null`. Ao tocar nesse arquivo, corrigir.
+- ✅ `String()` sem argumento corrigido: `upload-url.ts` lê `activeId` do formulário e vincula o arquivo ao
+  ativo quando informado.
+- Lógica de validação com regra de negócio deve viver em módulo **puro** em `lib/` (sem I/O), para ser
+  testável sem passar por `formidable`/HTTP. `lib/uploadPolicy.ts` é o padrão.
 
 **Histórico do Git**
 - O histórico **contém segredos**. **Nunca** reescrever com `rebase`/`filter-branch`/`filter-repo`.
@@ -353,7 +370,14 @@ Tratar como dado sensível: não logar em chat de IA, não enviar a serviço ext
 
 ### 5.2 Testing Strategy & Coverage Thresholds
 
-**Estado atual: 0% de cobertura. Nenhum runner instalado. Nenhum arquivo `*.test.*`.**
+**Estado atual:** `vitest` instalado e rodando — **101 testes passando** (5 pulados: integração opt-in do
+revert, que exige `REVERT_PROBE_DATABASE_URL`). Cobertura medida: **83% de linhas / 80% de branches /
+100% de funções** na superfície de segurança.
+
+> ⚠️ **O gate de cobertura hoje se aplica só a** `lib/middlewares/**`, `lib/uploadPolicy.ts`,
+> `pages/api/users/index.ts` e `pages/api/users/check-director.ts`. O alvo global desta tabela
+> **permanece pendente** (`CONTEXT.md` §3.3 item 1): cobri-lo exige cobrir todos os 36 endpoints.
+> O threshold é um **ratchet sobre o que já é testado**, não uma declaração de que o projeto está coberto.
 
 **Alvo (obrigatório a partir deste setup):**
 
@@ -375,7 +399,11 @@ Tratar como dado sensível: não logar em chat de IA, não enviar a serviço ext
 - Bug corrigido → teste de regressão obrigatório.
 - Regra de RBAC nova → tabela de testes parametrizada sobre os 4 papéis.
 - Teste não pode acessar MinIO, MariaDB de produção nem rede real. Usar mock/stub.
-- Segredos **nunca** em fixture. Usar `.env.test` local e não rastreado.
+- Segredos **nunca** em fixture. O ambiente de teste é semeado no bloco `env` do `vitest.config.ts` com
+  valores fictícios; `lib/minio.ts` e `lib/auth.ts` **falham no import** sem essas variáveis, então
+  qualquer `MINIO_*` novo precisa ser adicionado ali.
+- Lógica de validação com regra de negócio fica em módulo **puro** em `lib/` (sem I/O), para ser testada
+  sem HTTP. Testar através de `formidable` só para alcançar uma condição é teste de plumbing.
 
 ### 5.3 Automated Validation Pipeline (CI/CD Gates)
 
@@ -389,7 +417,11 @@ yarn build:opt       # build standalone bem-sucedido
 yarn test            # testes + coverage acima do threshold
 ```
 
-**Estado atual: os 4 primeiros passam; `yarn test` não existe.**
+**Estado atual: os 5 passam** (verificados na branch `chore/security-p0-debt`).
+
+> `npx prisma validate` e `yarn build:opt` exigem `DATABASE_URL`, `JWT_SECRET` e as `MINIO_*` no ambiente.
+> Em máquina sem `.env`, passar valores fictícios inline **apenas para o gate** — nunca criar um `.env`
+> com valores de teste versionável. `.env` é gitignored.
 
 **Pipeline CI (a criar — `.github/workflows/ci.yml`):**
 

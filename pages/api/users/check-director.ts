@@ -1,8 +1,9 @@
 // pages/api/users/check-director.ts
-import { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "@/lib/prisma";
+import { NextApiResponse } from "next";
+import prisma from "@/lib/prisma";
+import { authMiddleware, AuthenticatedNextApiRequest } from "@/lib/middlewares/authMiddleware";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Método não permitido" });
   }
@@ -16,4 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch {
     return res.status(500).json({ error: "Erro interno do servidor" });
   }
-}
+};
+
+export default authMiddleware(handler);

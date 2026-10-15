@@ -11,6 +11,37 @@
 
 ## [Unreleased]
 
+### 🤖 OpenCode Operations
+
+#### Security
+* **Credenciais MinIO removidas do código** (`lib/minio.ts`, `pages/api/storage/upload-url.ts`) — os fallbacks que embutiam `accessKey`/`secretKey` de produção foram substituídos por `requireEnv()`, que **falha no import** se a variável estiver ausente (mesma convenção já usada por `JWT_SECRET` em `lib/auth.ts:8`). Nenhuma credencial real é ecoada aqui; as linhas originais eram o único ponto de vazamento no código. **A credencial que estava no histórico do Git não é removida por esta mudança: continua sendo necessário rotacioná-la no servidor.**
+* **Hosts de produção eliminados do código** — `lib/minio.ts`, `pages/api/storage/upload-url.ts` e `next.config.ts` não fixam mais endpoint/IP de produção. `next/image` agora deriva `remotePatterns` de `MINIO_PUBLIC_ENDPOINT` e **falha fechado** (lista vazia) quando a variável não está definida em tempo de build. O exemplo do comentário em `lib/mediaUrl.ts` foi genericizado.
+* **Endpoints públicos fechados com autenticação no handler** (itens 3, 4, 5 e 8 de `CONTEXT.md` §3.1): `/api/storage/upload-url`, `/api/storage/delete-url`, `/api/qrcode/public-get` e `PUT /api/actives/update`. Os três primeiros saíram de `PUBLIC_PATHS` no `middleware.ts` e passaram a ser protegidos por `authMiddleware` no handler — a camada de controle do handler deixa de depender do middleware.
+* **`GET /api/users` e `GET /api/users/check-director` agora exigem sessão** — `GET /api/users` listava nome, e-mail e papel de todos os usuários sem qualquer verificação; `check-director` confirmava a existência do DIRECTOR. Ambos passam por `authMiddleware`.
+* **`authMiddleware` aceita cookie `auth_token` além de `Authorization: Bearer`** — o frontend chama as APIs com `fetch` e o cookie httpOnly é a forma canônica de sessão; aceitar apenas o header deixava handlersAuth Protected inconsistentes com o middleware de rota.
+* **`inventory-policy.json` restrito** de `s3:*` (que incluía deletar o bucket e gerenciar ACL) para `s3:GetObject`, `s3:PutObject` e `s3:DeleteObject`.
+
+#### Fixed
+* **Validação de upload agora é autoritativa no servidor** (item 10). A checagem de 10 MB e de tipo existia só em `components/FileUpload.tsx`, contornável com um cliente arbitrário. A regra foi extraída para o módulo puro `lib/uploadPolicy.ts` e aplicada em `pages/api/storage/upload-url.ts`.
+* **Bypass corrigido na própria validação**: a primeira versão aceitava arquivo por MIME **ou** por extensão, o que permitia enviar um `.exe` com MIME `application/pdf`. A regra final exige coerência — extensão presente precisa estar na allowlist **e** MIME presente precisa estar na allowlist; `application/octet-stream` nunca é aceito. O teste que encontrou isso está em `__tests__/lib/uploadPolicy.test.ts`.
+* **`String()` sem argumento removido** (`pages/api/storage/upload-url.ts:25`) — retornava sempre `""`, então o campo `active` da resposta era invariavelmente `null`. O upload agora aceita um campo opcional `activeId` no formulário e vincula o arquivo ao ativo quando ele existe.
+* **`next.config.ts`** — removido `remotePatterns.port: ''`, que pode rejeitar URL com porta explícita.
+* **Arquivos não utilizados** — o `package.json` referencia `vitest.config.ts` (arquivo único); não há mais config duplicada.
+
+#### Added
+* `lib/uploadPolicy.ts` — módulo puro (sem I/O) com a allowlist de MIME/extensão, o limite de 10 MB e `validateUpload()`, testável isoladamente.
+* `__tests__/lib/uploadPolicy.test.ts` — 21 casos cobrindo extração de extensão, coerência MIME×extensão, rejeição de executáveis e de `application/octet-stream`, e os limites de tamanho (inclusive exatamente no limite).
+* `__tests__/api/security-auth.test.ts` — 12 casos verificando que os cinco endpoints protegidos respondem `401` sem sessão e que a RBAC de `POST /api/users` é respeitada (VIEWER e MANAGER barrados por papel), além do fluxo por cookie e por `Authorization: Bearer`.
+* `.env.example` — documenta os nomes das variáveis obrigatórias com valores de placeholder, e `.gitignore` foi ajustado com `!.env.example` para que o arquivo possa ser versionado sem nunca versionar um `.env`.
+
+#### Changed
+* `middleware.ts` — `/api/storage/upload-url` saiu de `PUBLIC_PATHS` e o early-return que liberava a rota foi removido; `PUBLIC_PATHS` ficou reduced a login, auth, APIs públicas e estáticos.
+* `vitest.config.ts` — as variáveis `MINIO_*` de teste foram adicionadas ao bloco `env` (necessárias porque `lib/minio.ts` falha no import sem elas) e o threshold de cobertura passou a se aplicar à superfície de segurança coberta nesta branch, em vez de todo o `pages/api/**`. **O alvo global de 70–80% de `SPECS.md` §5.2 permanece pendente** e está registrado em `CONTEXT.md` §3.3: o projeto tem baseline 0% e 36 endpoints, então elevar o gate para o conjunto exige cobrir o projeto inteiro.
+* `CONTEXT.md` e `SPECS.md` — contrato de segurança dos endpoints e o estado de cobertura atualizados para refletir o que foi corrigido.
+
+#### Removed
+* Nenhum arquivo versionado foi removido. (Durante o trabalho, um `getAuthenticatedUser` Chegou a ser adicionado em `lib/auth.ts` e foi removido antes do commit por estar sem uso — código morto não entra.)
+
 ### 🤖 Antigravity Operations
 
 #### Added

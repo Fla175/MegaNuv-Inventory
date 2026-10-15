@@ -2,7 +2,7 @@
 const MINIO_URL_PATTERN = /^https?:\/\/[^/]+\/inventory\/(.+)$/;
 
 // Extrai a chave (key) do MinIO a partir de uma URL salva no banco.
-// Ex: http://minio.meganuv.com/inventory/fotos/imagem.jpg -> fotos/imagem.jpg
+// Ex: http://<host-publico>/inventory/fotos/imagem.jpg -> fotos/imagem.jpg
 export function getMinioKeyFromUrl(url: string): string | null {
   if (!url) return null; // Proteção extra caso receba null/undefined
   
