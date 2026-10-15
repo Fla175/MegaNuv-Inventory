@@ -14,6 +14,12 @@
 ### 🤖 OpenCode Operations
 
 #### Fixed
+* **Envelope de erro do `authMiddleware` alinhado ao contrato do projeto** (`lib/middlewares/authMiddleware.ts`) — o helper respondia `{ message: ... }`, mas o envelope documentado em `SPECS.md` §4.2 é `{ error: string }` e **todo** o frontend lê `data.error` nos toasts (`components/FileUpload.tsx`, `components/ListSection.tsx`, `components/imageUpload.tsx`, `components/actives/activeForm.tsx`, `pages/settings.tsx`). Consequência prática: nos endpoints protegidos, um 401 caía no texto genérico de fallback em vez de "Autenticação necessária". As respostas 401/403 do helper agora usam `error`, e o 403 deixou de ser meioaportada.
+* **Testes que travam o contrato do envelope** — 4 casos novos em `__tests__/api/security-auth.test.ts` cobrem o formato do 401 (sem sessão e com token inválido) e do 403 por `requiredRoles`, incluindo a asserção de que `message` **não** é usado. Verificado que o teste falha ao reintroduzir a chave antiga.
+
+### 🤖 OpenCode Operations
+
+#### Fixed
 * **Build da imagem Docker corrigido** — `Dockerfile:7` executava `yarn build`, que **não existe** no `package.json`; o script de build é `build:opt` (`scripts/build-optimized.sh`). O build da imagem estava quebrado (`error Command "build" not found`) e agora usa o script correto.
 * **`Dockerfile` passa a respeitar `output: "standalone"`** — o runner copiava o `node_modules` inteiro (1.1G) e depois executava `CMD ["yarn","start"]`, cujo script faz `cd .next/standalone && node server.js`, layout que o runner nunca montava. Agora o runner copia o conteúdo de `.next/standalone` para `/app`, mais `.next/static`, `public/`, `prisma/` e `package.json`, e sobe com `node server.js` — que é o que o artifact standalone realmente produz. Verificado: o `server.js` gerado sobe e responde (`GET /` → 307 para login, `GET /api/hello` → 200).
 * **Camada de instalação com cache mount do BuildKit** — o cache do yarn (~2.8G, com binários do rolldown para ~13 plataformas) era gravado dentro da layer. Agora é montado como cache do BuildKit: persiste entre builds, mas nunca entra na imagem, o que reduz a layer de instalação e evita estourar o disco do host.

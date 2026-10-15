@@ -33,7 +33,7 @@ export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]
 
     const token = bearerToken || cookieToken;
     if (!token) {
-      return res.status(401).json({ message: 'Autenticação necessária. Faça login para continuar.' });
+      return res.status(401).json({ error: 'Autenticação necessária. Faça login para continuar.' });
     }
 
     // 2. Verificar o token
@@ -41,7 +41,7 @@ export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]
 
     if (!decodedUser) {
       // Token inválido ou expirado
-      return res.status(401).json({ message: 'Sessão inválida ou expirada. Faça login novamente.' });
+      return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
     // 3. Anexar as informações do usuário à requisição
@@ -50,7 +50,7 @@ export const authMiddleware = (handler: NextApiHandler, requiredRoles?: string[]
     // 4. Verificar papéis (se forem exigidos para esta rota)
     if (requiredRoles && requiredRoles.length > 0) {
       if (!req.user.role || !requiredRoles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'Forbidden: Permissões insuficientes.' });
+        return res.status(403).json({ error: 'Permissões insuficientes para esta operação.' });
       }
     }
 

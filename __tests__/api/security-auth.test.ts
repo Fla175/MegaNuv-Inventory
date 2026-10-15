@@ -203,3 +203,61 @@ describe('GET /api/qrcode/public-get (auth)', () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
+
+describe('envelope de erro do authMiddleware (SPECS.md §4.2)', () => {
+  it('401 sem sessão usa a chave `error`, não `message`', async () => {
+    const { default: handler } = await import('@/pages/api/users/check-director');
+    const req = makeReq({ method: 'GET' });
+    const res = makeRes();
+    await handler(req, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    // O frontend lê `data.error` em todos os toasts (components/*.tsx, pages/settings.tsx).
+    // Se o authMiddleware responder `message`, o usuário vê a mensagem genérica de fallback.
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
+    expect(res.json).not.toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
+  });
+
+  it('401 com token inválido também usa a chave `error`', async () => {
+    const { verifyAuthToken } = await import('@/lib/auth');
+    (verifyAuthToken as any).mockResolvedValueOnce(null);
+
+    const { default: handler } = await import('@/pages/api/users/check-director');
+    const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-invalido' } });
+    const res = makeRes();
+    await handler(req, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
+  });
+});
+
+describe('authMiddleware com requiredRoles', () => {
+  it('403 usa a chave `error` quando o papel não é permitido', async () => {
+    const { authMiddleware } = await import('@/lib/middlewares/authMiddleware');
+    const handler = vi.fn();
+    const wrapped = authMiddleware(handler, ['DIRECTOR', 'ADMIN']);
+
+    setRole('VIEWER');
+    const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-valido' } });
+    const res = makeRes();
+    await wrapped(req, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('deixa passar quando o papel é permitido', async () => {
+    const { authMiddleware } = await import('@/lib/middlewares/authMiddleware');
+    const handler = vi.fn();
+    const wrapped = authMiddleware(handler, ['DIRECTOR', 'ADMIN']);
+
+    setRole('ADMIN');
+    const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-valido' } });
+    const res = makeRes();
+    await wrapped(req, res as any);
+
+    expect(handler).toHaveBeenCalled();
+  });
+});
