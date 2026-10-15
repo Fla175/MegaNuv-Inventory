@@ -2,10 +2,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import * as jose from 'jose';
+import { getSessionUser } from '@/lib/apiAuth';
 
 const saltRounds = 10;
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,19 +26,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 2. Se NÃO existe ADMIN, permitir registro (primeiro ADMIN do sistema)
     // 3. Se JÁ existe ADMIN, exigir token de ADMIN autenticado
     if (adminCount > 0) {
-      const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-      if (!token) {
+      const session = await getSessionUser(req);
+      if (!session) {
         return res.status(401).json({ message: 'Sessão expirada. Faça login.' });
       }
 
-      try {
-        const secret = new TextEncoder().encode(JWT_SECRET!);
-        const { payload } = await jose.jwtVerify(token, secret);
-        if (payload.role !== 'ADMIN') {
-          return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
-        }
-      } catch {
-        return res.status(401).json({ message: 'Token inválido.' });
+      if (session.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
       }
     }
 

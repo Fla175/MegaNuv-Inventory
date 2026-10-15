@@ -2,11 +2,9 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import * as jose from "jose";
+import { getSessionUser } from "@/lib/apiAuth";
 import { randomBytes } from "crypto";
 import { createLog } from "@/lib/logger";
-
-const JWT_SECRET = process.env.JWT_SECRET;
 
 async function checkExistingSerialNumbers(
   serialNumbers: string[]
@@ -41,22 +39,10 @@ export default async function handler(
     return res.status(405).json({ error: "Método não permitido" });
 
   try {
-    const token =
-      req.cookies.auth_token ||
-      req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as {
-      role: string;
-      id?: string;
-      userId?: string;
-      sub?: string;
-      [key: string]: unknown;
-    };
-
-    const userId = decoded.id || decoded.userId || decoded.sub;
+    const userId = session.userId;
 
     if (!userId || userId === "undefined") {
       return res
@@ -64,7 +50,7 @@ export default async function handler(
         .json({ error: "Usuário não identificado no token de autenticação." });
     }
 
-    if (decoded.role === "VIEWER") {
+    if (session.role === "VIEWER") {
       return res
         .status(403)
         .json({ error: "Visualizadores não podem criar ativos." });

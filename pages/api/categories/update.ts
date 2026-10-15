@@ -1,15 +1,8 @@
 // pages/api/categories/update.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import * as jose from "jose";
 import { createLog } from "@/lib/logger";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-interface DecodedToken {
-  userId: string;
-  role: string;
-}
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Aceita PUT ou PATCH para atualizações
@@ -18,14 +11,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as unknown as DecodedToken;
-
-    if (decoded.role === "VIEWER") {
+    if (session.role === "VIEWER") {
       return res.status(403).json({ error: "Visualizadores não podem atualizar categorias." });
     }
 
@@ -55,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 2. Regista a Auditoria
     await createLog(
       req,
-      decoded.userId,
+      session.userId,
       "ATUALIZAÇÃO DA CATEGORIA",
       `Atualizou a categoria; ID: ${id}. Novo Nome: ${name}, Cor: ${color}`
     );
@@ -63,7 +52,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(updatedCategory);
   
   } catch (error: unknown) {
-    if (error instanceof jose.errors.JWTInvalid) return res.status(401).json({ error: "Token inválido." });
     
     const err = error as { code?: string };
     if (typeof error === 'object' && error !== null && 'code' in error && err.code === 'P2025') {

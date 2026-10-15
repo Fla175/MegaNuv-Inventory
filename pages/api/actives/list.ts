@@ -1,14 +1,15 @@
 // pages/api/actives/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
 
   try {
     // Autenticação JWT
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
     const actives = await db.active.findMany({
       include: {

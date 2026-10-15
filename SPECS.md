@@ -164,9 +164,10 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │   ├── AddLocationModal.tsx
 │   ├── actives/activeForm.tsx (659 L)
 │   └── ui/  ConfirmDialog.tsx  Toast.tsx  ToastContainer.tsx
-├── lib/                     # 13 arquivos — nunca importa de pages/ ou components/
-│   ├── prisma.ts  auth.ts  minio.ts  logger.ts
-│   ├── mediaUrl.ts  version.ts  types.ts
+├── lib/                     # nunca importa de pages/ ou components/
+│   ├── prisma.ts  auth.ts  apiAuth.ts  minio.ts  logger.ts
+│   ├── mediaUrl.ts  version.ts  types.ts  uploadPolicy.ts
+│   ├── revert/             # classificação e agrupamento do revert (puros)
 │   ├── constants/colors.ts  context/  hooks/  middlewares/
 ├── types/inventory.ts       # tipos de dominio
 ├── prisma/
@@ -342,6 +343,17 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   `Authorization: Bearer`. O cookie é a forma canônica de sessão do frontend (`fetch` sem header explícito).
   O `req.user` preenchido pelo helper é a fonte de verdade para RBAC dentro do handler.
 - Handler novo sensível → envolver com `authMiddleware`, **não** depender só do `middleware.ts`.
+- ✅ **Resolução de sessão em handler: usar `getSessionUser(req)` de `lib/apiAuth.ts`.** A sequência
+  `req.cookies.auth_token || req.headers.authorization?.replace('Bearer ', '')` seguida de `jwtVerify`
+  manual **não pode ser reintroduzida** — o `replace` não validava o esquema `Bearer`, cada arquivo repetia
+  a codificação do segredo, e a leitura do id divergia entre arquivos sendo que o token do login carrega
+  apenas `userId` (§4.2).
+- `getSessionToken(req)` aceita cookie `auth_token` e header `Authorization: Bearer <token>` (esquema
+  case-insensitive, com espaços tolerados). `getSessionUser(req)` **nunca lança**: devolve `null` para token
+  ausente, inválido ou expirado, e quem chama decide o status e o corpo — preservando o envelope `{ error }`.
+- **Endpoint de listagem também precisa verificar a sessão.** Três endpoints (`actives/list`,
+  `categories/list`, `father-spaces/list`) chegou a checar apenas se o token existia, sem verificar a
+  assinatura — qualquer string não-vazia passava. Regra: presença de token não é autenticação.
 
 **Upload e mídia**
 - ✅ Limite de 10 MB e tipos aceitos **são validados no servidor** em `lib/uploadPolicy.ts`, aplicado por

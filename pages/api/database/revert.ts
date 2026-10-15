@@ -1,13 +1,12 @@
 // pages/api/database/revert.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
-import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 import { planRevert, type VersionRow } from "@/lib/revert/history";
 import { batchActivities, toSubItems, type PlannedItem } from "@/lib/revert/batch";
 import type { AllowedTable, RevertSubItem } from "@/lib/revert/types";
+import { getSessionUser } from "@/lib/apiAuth";
 
-const JWT_SECRET = process.env.JWT_SECRET;
 
 const ALLOWED_TABLES: Record<
   AllowedTable,
@@ -59,30 +58,19 @@ function quoteColumn(column: string) {
 }
 
 async function authenticate(req: NextApiRequest) {
-  const token =
-    req.cookies.auth_token ||
-    req.headers.authorization?.replace("Bearer ", "");
+  // `lib/auth.ts` valida JWT_SECRET no import do módulo, então a checagem
+  // "JWT_SECRET_MISSING" que existia aqui era inalcançável. `getSessionUser`
+  // nunca lança: token ausente, inválido ou expirado resultam em `null`.
+  //
+  // Antes, um token inválido fazia `jwtVerify` lançar e a exceção caía no catch
+  // sem mapeamento, devolvendo 500 em vez de 401.
+  const session = await getSessionUser(req);
 
-  if (!token) {
+  if (!session) {
     throw new Error("UNAUTHORIZED");
   }
 
-  if (!JWT_SECRET) {
-    throw new Error("JWT_SECRET_MISSING");
-  }
-
-  const secret = new TextEncoder().encode(JWT_SECRET);
-
-  const { payload } = await jose.jwtVerify(token, secret);
-
-  const decoded = payload as {
-    role?: string;
-    id?: string;
-    userId?: string;
-    sub?: string;
-  };
-
-  const userId = decoded.id || decoded.userId || decoded.sub;
+  const userId = session.userId;
 
   if (!userId || userId === "undefined") {
     throw new Error("USER_NOT_FOUND");
@@ -90,7 +78,7 @@ async function authenticate(req: NextApiRequest) {
 
   return {
     userId: String(userId),
-    role: decoded.role,
+    role: session.role,
   };
 }
 
@@ -475,9 +463,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error instanceof Error) {
       if (error.message === "UNAUTHORIZED") {
         return res.status(401).json({ error: "Sessão expirada." });
-      }
-      if (error.message === "JWT_SECRET_MISSING") {
-        return res.status(500).json({ error: "JWT_SECRET não configurado." });
       }
       if (error.message === "USER_NOT_FOUND") {
         return res.status(401).json({ error: "Usuário não identificado." });

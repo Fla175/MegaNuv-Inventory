@@ -1,11 +1,9 @@
 // pages/api/categories/create.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 import { CATEGORY_PALETTE } from "@/lib/constants/colors";
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -14,15 +12,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // 1. AUTENTICAÇÃO JWT (Seu padrão)
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
-
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as { role: string; userId: string; [key: string]: unknown };
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
     // 2. AUTORIZAÇÃO (ADMIN e MANAGER criam categorias)
-    if (decoded.role === "VIEWER") {
+    if (session.role === "VIEWER") {
       return res.status(403).json({ error: "Visualizadores não podem criar categorias." });
     }
 
@@ -66,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await createLog(
       req, 
-      decoded.userId, 
+      session.userId, 
       "CRIAÇÃO DE CATEGORIA",
       `Criou a Categoria: ${name} (${assignedColor})`
     );
@@ -74,7 +68,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(201).json(newCategory);
  
    } catch (error: unknown) {
-      if (error instanceof jose.errors.JWTInvalid) return res.status(401).json({ error: "Token inválido." });
      
      const err = error as { code?: string };
      if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2002') {

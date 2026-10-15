@@ -1,15 +1,8 @@
 // pages/api/categories/delete.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import * as jose from "jose";
 import { createLog } from "@/lib/logger";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-
-interface DecodedToken {
-  userId: string;
-  role: string;
-}
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "DELETE") {
@@ -17,14 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as unknown as DecodedToken;
-
-    if (decoded.role === "VIEWER") {
+    if (session.role === "VIEWER") {
       return res.status(403).json({ error: "Visualizadores não podem excluir categorias." });
     }
 
@@ -44,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 2. Regista a Auditoria
     await createLog(
       req,
-      decoded.userId,
+      session.userId,
       "DELEÇÃO DE CATEGORIA",
       `Removeu a Categoria: ${categoryToDelete.name}`
     );
@@ -56,11 +45,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const err = error as { code?: string };
     if (typeof error === 'object' && error !== null && 'code' in err && err.code === 'P2003') {
       return res.status(400).json({ error: "Não é possível excluir esta categoria pois existem ativos ou registros vinculados a ela." });
-    }
-
-    // Se for erro de validação JWT
-    if (error instanceof jose.errors.JWTInvalid) {
-      return res.status(401).json({ error: "Token inválido." });
     }
 
     // Outros erros

@@ -2,10 +2,9 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
-import * as jose from "jose";
+import { getSessionUser } from "@/lib/apiAuth";
 import { createLog } from "@/lib/logger";
 
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(
   req: NextApiRequest,
@@ -22,40 +21,15 @@ export default async function handler(
     // AUTENTICAÇÃO
     // =========================================================
 
-    const token =
-      req.cookies.auth_token ||
-      req.headers.authorization?.replace("Bearer ", "");
+    const session = await getSessionUser(req);
 
-    if (!token) {
+    if (!session) {
       return res.status(401).json({
         error: "Sessão expirada.",
       });
     }
 
-    if (!JWT_SECRET) {
-      console.error("❌ JWT_SECRET não configurado.");
-
-      return res.status(500).json({
-        error: "Configuração de autenticação ausente.",
-      });
-    }
-
-    const secret = new TextEncoder().encode(JWT_SECRET);
-
-    const { payload } = await jose.jwtVerify(token, secret);
-
-    const decoded = payload as {
-      role?: string;
-      id?: string;
-      userId?: string;
-      sub?: string;
-      [key: string]: unknown;
-    };
-
-    const userId =
-      decoded.id ||
-      decoded.userId ||
-      decoded.sub;
+    const userId = session.userId;
 
     if (!userId || userId === "undefined") {
       return res.status(401).json({
@@ -64,7 +38,7 @@ export default async function handler(
       });
     }
 
-    if (decoded.role === "VIEWER") {
+    if (session.role === "VIEWER") {
       return res.status(403).json({
         error:
           "Permissão negada. Nível de acesso não permitido.",

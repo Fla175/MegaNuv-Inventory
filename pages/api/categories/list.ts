@@ -1,6 +1,7 @@
 // pages/api/categories/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -9,8 +10,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Autenticação JWT
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
     // Busca todas as áreas ordenadas por nome
     const categories = await prisma.category.findMany({

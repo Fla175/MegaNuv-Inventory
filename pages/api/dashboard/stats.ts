@@ -1,21 +1,16 @@
 // pages/api/dashboard/stats.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import * as jose from 'jose';
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
 
-  const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Sessão expirada." });
+  const session = await getSessionUser(req);
+  if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as { role: string };
-    if (decoded.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
+    if (session.role === "VIEWER") return res.status(403).json({ error: "Acesso negado." });
 
     const activeStats = await prisma.active.aggregate({
       _sum: { fixedValue: true },

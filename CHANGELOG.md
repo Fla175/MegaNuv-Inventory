@@ -13,6 +13,28 @@
 
 ### 🤖 OpenCode Operations
 
+#### Security
+* **Três endpoints de listagem aceitavam qualquer token não-vazio** — `pages/api/actives/list.ts`, `pages/api/categories/list.ts` e `pages/api/father-spaces/list.ts` faziam apenas `if (!token)` e **nunca verificavam a assinatura**: um header `Authorization: Bearer qualquercoisa` devolvia o inventário, as categorias e a árvore de espaços completa. Na prática o `middleware.ts` segurava a requisição, mas o handler não pode assumir que o middleware rodou (`SPECS.md` §5.1). Agora todos verificam a sessão.
+
+#### Fixed
+* **Verificação de JWT consolidada em um helper único** (`lib/apiAuth.ts`) — 20 arquivos de `pages/api/**` repetiam a mesma sequência com variações que não eram cosméticas:
+  * o prefixo `Bearer ` não era validado — `authorization?.replace("Bearer ", "")` aceitava um header sem o esquema e o repassava ao verificador; o helper exige o esquema (`/^Bearer\s+(.+)$/i`);
+  * cada arquivo repetia `new TextEncoder().encode(JWT_SECRET!)`, apesar de `verifyAuthToken()` ser a fonte de verdade;
+  * a leitura do id divergia entre `decoded.id || decoded.userId || decoded.sub`, `decoded.id || decoded.sub || decoded.userId` e só `decoded.userId`, embora o token do login carregue apenas `userId` (`SPECS.md` §4.2) — as demais expressões eram código morto;
+  * `pages/api/database/revert.ts` tinha um `catch` de `jose.errors.JWTInvalid` que se tornou inalcançável (o helper nunca lança) e foi removido em `categories/{create,update,delete}`.
+* **`/api/database/revert` devolvia 500 em vez de 401 para token inválido** — `jwtVerify` lançava, a exceção caía no `catch` sem mapeamento e virava `Erro interno`. Com o helper, token ausente, inválido ou expirado resulta em `null` e o endpoint passa a responder `401`.
+* **Chave `JWT_SECRET_MISSING` removida de `revert.ts`** — era inalcançável, já que `lib/auth.ts` valida `JWT_SECRET` no import do módulo.
+
+#### Added
+* `lib/apiAuth.ts` — `getSessionToken(req)`, `getSessionUser(req)`, `isViewer()` e `isPrivileged()`. Não escreve na resposta: quem chama decide o status e o corpo, preservando o envelope `{ error: string }` de cada endpoint.
+* `__tests__/lib/apiAuth.test.ts` — 21 casos cobrindo extração por cookie e por header, esquema `Bearer` case-insensitive, rejeição de header sem esquema, preferência do header sobre o cookie, token vazio, `req.cookies` indefinido, `getSessionUser` sem lançar, os predicados de papel e três casos de regressão para o bug de token não verificado.
+
+#### Changed
+* `pages/api/auth/me.ts` — a sessão principal passou a usar o helper; a verificação do token de **stash** do criador (`auth_token_creator`) continua com `jwtVerify` direto, porque é um cookie distinto e fora do escopo do helper.
+* Nenhum status code ou mensagem de erro foi alterado, exceto o `revert.ts` (500 → 401 para token inválido), que era um defeito.
+
+### 🤖 OpenCode Operations
+
 #### Fixed
 * **Envelope de erro do `authMiddleware` alinhado ao contrato do projeto** (`lib/middlewares/authMiddleware.ts`) — o helper respondia `{ message: ... }`, mas o envelope documentado em `SPECS.md` §4.2 é `{ error: string }` e **todo** o frontend lê `data.error` nos toasts (`components/FileUpload.tsx`, `components/ListSection.tsx`, `components/imageUpload.tsx`, `components/actives/activeForm.tsx`, `pages/settings.tsx`). Consequência prática: nos endpoints protegidos, um 401 caía no texto genérico de fallback em vez de "Autenticação necessária". As respostas 401/403 do helper agora usam `error`, e o 403 deixou de ser meioaportada.
 * **Testes que travam o contrato do envelope** — 4 casos novos em `__tests__/api/security-auth.test.ts` cobrem o formato do 401 (sem sessão e com token inválido) e do 403 por `requiredRoles`, incluindo a asserção de que `message` **não** é usado. Verificado que o teste falha ao reintroduzir a chave antiga.

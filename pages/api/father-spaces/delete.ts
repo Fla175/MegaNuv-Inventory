@@ -1,25 +1,20 @@
 // pages/api/father-spaces/delete.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
-import * as jose from "jose";
 import { createLog } from "@/lib/logger";
 import { deleteFileFromMinio } from "@/lib/minio";
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "DELETE") return res.status(405).json({ error: "Use DELETE." });
 
   try {
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
-    const secret = new TextEncoder().encode(JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as { role: string; userId?: string; id?: string; [key: string]: unknown };
-    const userId = (decoded.id || decoded.userId) ?? null;
+    const userId = session.userId;
 
-    if (decoded.role !== "ADMIN") {
+    if (session.role !== "ADMIN") {
       return res.status(403).json({ error: "Acesso negado. Apenas admins excluem espaços." });
     }
 
