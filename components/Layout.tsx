@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   UserCircle,
+  Undo2,
 } from "lucide-react";
 import { useUser } from "../lib/context/UserContext";
 import { useEscapeKey } from "../lib/hooks/useEscapeKey";
@@ -27,7 +28,7 @@ interface LayoutProps {
 export default function Layout({ children, title = "MegaNuv Inventory" }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
-  const { user } = useUser();
+  const { user, impersonation, restoreCreatorSession } = useUser();
   const projectVersion = VERSION;
 
   useEffect(() => {
@@ -162,6 +163,22 @@ export default function Layout({ children, title = "MegaNuv Inventory" }: Layout
 
         <main className="flex-1 p-3 sm:p-6 md:p-8 lg:p-10 mt-14 lg:mt-0 min-h-screen lg:min-h-0 pb-24 lg:pb-10 bg-white dark:bg-zinc-950 text-blue-950 dark:text-gray-100 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
+            {impersonation?.active && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Undo2 size={16} className="text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">
+                    Sessão de {impersonation.creatorName} · você está como {user?.name || user?.email}
+                  </span>
+                </div>
+                <button
+                  onClick={restoreCreatorSession}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider transition-all"
+                >
+                  Voltar à minha conta
+                </button>
+              </div>
+            )}
             {children}
           </div>
         </main>

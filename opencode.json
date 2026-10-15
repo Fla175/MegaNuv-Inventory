@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": true,
+  "layout": "stretch",
+  "server": {
+    "hostname": "10.20.30.110",
+  },
+  "enterprise": {
+    "url": "https://meganuv.com"
+  },
+  "references": {
+    "meganuv-inventory": {
+      "path": "./",
+      "description": "Software de gerenciamento de inventário para a MegaNuv."
+    },
+  },
+  "watcher": {
+    "ignore": [
+      ".vscode"
+    ],
+  },
+}

@@ -1,10 +1,11 @@
 // pages/api/actives/update.ts
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextApiResponse } from "next";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { authMiddleware, AuthenticatedNextApiRequest } from "@/lib/middlewares/authMiddleware";
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   if (req.method !== "PUT") {
     return res.status(405).json({ error: "Método não permitido. Utilize PUT." });
   }
@@ -122,4 +123,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       details: errorMessage,
     });
   }
-}
+};
+
+export default authMiddleware(handler);

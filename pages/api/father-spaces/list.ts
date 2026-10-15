@@ -1,6 +1,7 @@
 // pages/api/father-spaces/list.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
+import { getSessionUser } from "@/lib/apiAuth";
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,8 +14,8 @@ export default async function handler(
 
   try {
     // Verificação de autenticação
-    const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ error: "Sessão expirada." });
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: "Sessão expirada." });
 
     // 2. BUSCA NO BANCO COM RELACIONAMENTOS E CONTAGENS
     const spaces = await prisma.fatherSpace.findMany({

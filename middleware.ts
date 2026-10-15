@@ -1,7 +1,6 @@
 // middleware.ts
 import { NextResponse, NextRequest } from "next/server";
 import * as jose from "jose";
-// import { UseToast } from "./lib/context/ToastContext";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -9,9 +8,6 @@ const PUBLIC_PATHS = [
   "/api/auth",
   "/api/public",
   "/api/hello",
-  "/api/qrcode",
-  "/api/storage/upload-url",
-  "/qrcode",
   "/initial-setup",
   "/favicon.svg",
   "/logo-inventory.svg",
@@ -23,16 +19,11 @@ function isPublicPath(pathname: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  // const toast = UseToast();
-
-  if (pathname === '/api/storage/upload-url') {
-    return NextResponse.next();
-  }
 
   // --- ESCUDO DE PRIORIDADE 1: APIs PÚBLICAS E ESTÁTICOS ---
   if (
-    pathname.startsWith('/api/public') || 
-    pathname.startsWith('/_next/') || 
+    pathname.startsWith('/api/public') ||
+    pathname.startsWith('/_next/') ||
     pathname.includes('.')
   ) {
     return NextResponse.next();
@@ -45,7 +36,7 @@ export async function middleware(req: NextRequest) {
   //     const baseApiURL = process.env.NEXT_SERVER_API_URL || req.nextUrl.origin;
   //     const apiURL = new URL('/api/public/initial-check', baseApiURL).href;
   //     const response = await fetch(apiURL);
-      
+  //
   //     const contentType = response.headers.get("content-type");
   //     if (response.ok && contentType?.includes("application/json")) {
   //       const data = await response.json();
@@ -57,6 +48,7 @@ export async function middleware(req: NextRequest) {
   //     toast.showError(`Erro no check de setup: ${e}`);
   //   }
   // }
+  // Nota: este escudo está comentado (client-side em pages/login.tsx). Fragilidade conhecida.
 
   // --- ESCUDO DE PRIORIDADE 3: ROTAS PÚBLICAS ---
   if (isPublicPath(pathname)) {
@@ -81,19 +73,22 @@ export async function middleware(req: NextRequest) {
     await jose.jwtVerify(token, secret);
     return NextResponse.next();
   } catch {
-  if (pathname.startsWith("/api/")) {
-    // Em vez de redirect, retornamos um erro JSON puro que o componente consegue ler
-    return new NextResponse(
-      JSON.stringify({ error: "Unauthorized", message: "Sessão expirada. Recarregue a página." }),
-      { status: 401, headers: { 'content-type': 'application/json' } }
-    );
-  }
-  const res = NextResponse.redirect(new URL("/login", req.url));
-  res.cookies.delete("auth_token");
-  return res;
+    if (pathname.startsWith("/api/")) {
+      // Em vez de redirect, retornamos um erro JSON puro que o componente consegue ler
+      return new NextResponse(
+        JSON.stringify({ error: "Unauthorized", message: "Sessão expirada. Recarregue a página." }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      );
+    }
+    const res = NextResponse.redirect(new URL("/login", req.url));
+    res.cookies.delete("auth_token");
+    return res;
   }
 }
 
 export const config = {
-  matcher: ['/((?!api/qrcode|qrcode|_next/static|_next/image|favicon.svg|logo-inventory.svg).*)'],
+  // Apenas estáticos do Next e assets públicos ficam fora do middleware.
+  // `qrcode` e `api/qrcode` saíram da exclusão: com o endpoint tornado privado,
+  // a proteção de rota e a do handler passam a ser coerentes.
+  matcher: ['/((?!_next/static|_next/image|favicon.svg|logo-inventory.svg).*)'],
 };

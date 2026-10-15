@@ -1,14 +1,32 @@
 // components/actives/activeForm.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo } from "react";
-import { X, Copy, Pencil, CirclePlus, ChevronDown, MapPin, Briefcase, Hash, Search, Loader2, Ghost } from "lucide-react";
+import {
+  X,
+  Copy,
+  Pencil,
+  CirclePlus,
+  ChevronDown,
+  MapPin,
+  Briefcase,
+  Hash,
+  Search,
+  Loader2,
+  Ghost,
+} from "lucide-react";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { UseToast } from "@/lib/context/ToastContext";
 import CustomSelect from "../customSelect";
 
-export default function ActiveForm({ mode, initialData, onClose, fatherSpace, activeContainers }: any) {
+export default function ActiveForm({
+  mode,
+  initialData,
+  onClose,
+  fatherSpace,
+  activeContainers,
+}: any) {
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -18,11 +36,15 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   const [applyToSimilar, setApplyToSimilar] = useState(false);
 
   const statusOptions = [
-    { value: "IN-STOCK", label: "Em Estoque", indicatorColor: "bg-emerald-500" },
+    {
+      value: "IN-STOCK",
+      label: "Em Estoque",
+      indicatorColor: "bg-emerald-500",
+    },
     { value: "IN-USE", label: "Em Uso", indicatorColor: "bg-amber-500" },
   ];
   useEscapeKey(onClose);
-  
+
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
     isPhysicalSpace: false,
@@ -38,20 +60,20 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     notes: "",
     imageUrl: null as string | null,
     fileUrl: [] as string[],
-    locationId: "", 
-    locationType: "" as "space" | "active" | "", 
+    locationId: "",
+    locationType: "" as "space" | "active" | "",
   });
 
   useEffect(() => {
     let isMounted = true;
     async function fetchCategories() {
       try {
-        const res = await fetch('/api/categories/list');
+        const res = await fetch("/api/categories/list");
         const data = await res.json();
         if (res.ok && isMounted) {
           setCategories(data);
-          setFormData(prev => {
-            if (mode === 'create' && data.length > 0 && !prev.categoryId) {
+          setFormData((prev) => {
+            if (mode === "create" && data.length > 0 && !prev.categoryId) {
               return { ...prev, categoryId: data[0].id };
             }
             return prev;
@@ -63,30 +85,42 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
       }
     }
     fetchCategories();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [mode]);
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      const locId = initialData.parentId || initialData.parent?.id 
-        ? initialData.parentId || initialData.parent.id 
-        : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
-      
-      const locType = initialData.parentId || initialData.parent?.id ? "active" : "space";
+      const locId =
+        initialData.parentId || initialData.parent?.id
+          ? initialData.parentId || initialData.parent.id
+          : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
 
-      const serialArray = mode === "clone" 
-        ? Array(initialData.quantity || 1).fill("")
-        : (initialData.serialNumber 
-          ? (typeof initialData.serialNumber === 'string' ? initialData.serialNumber.split(',').map((s: string) => s.trim()) : [initialData.serialNumber])
-          : Array(initialData.quantity || 1).fill(""));
+      const locType =
+        initialData.parentId || initialData.parent?.id ? "active" : "space";
+
+      const serialArray =
+        mode === "clone"
+          ? Array(initialData.quantity || 1).fill("")
+          : initialData.serialNumber
+          ? typeof initialData.serialNumber === "string"
+            ? initialData.serialNumber.split(",").map((s: string) => s.trim())
+            : [initialData.serialNumber]
+          : Array(initialData.quantity || 1).fill("");
 
       const fileUrlArray = initialData.fileUrl
-        ? (typeof initialData.fileUrl === 'string'
-          ? initialData.fileUrl.split(',').map((u: string) => u.trim()).filter(Boolean)
-          : Array.isArray(initialData.fileUrl) ? initialData.fileUrl : [initialData.fileUrl])
+        ? typeof initialData.fileUrl === "string"
+          ? initialData.fileUrl
+              .split(",")
+              .map((u: string) => u.trim())
+              .filter(Boolean)
+          : Array.isArray(initialData.fileUrl)
+          ? initialData.fileUrl
+          : [initialData.fileUrl]
         : [];
 
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         ...initialData,
         categoryId: initialData.categoryId || prev.categoryId,
@@ -104,14 +138,16 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     const len = categories.length;
     if (len <= 4) return `grid-cols-${len}`;
     if (len > 4) return "grid-cols-4";
-    return "grid-cols-2 sm:grid-cols-4 justify-center"; 
+    return "grid-cols-2 sm:grid-cols-4 justify-center";
   }, [categories]);
 
   function SearchableSelect({ options, value, onChange, placeholder }: any) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>({});
-    
+    const [expandedSpaces, setExpandedSpaces] = useState<
+      Record<string, boolean>
+    >({});
+
     const selectedOption = options.find((opt: any) => opt.id === value);
 
     const rootElements = useMemo(() => {
@@ -119,9 +155,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     }, [options]);
 
     const filteredAll = useMemo(() => {
-       if (!searchTerm) return [];
-       const term = searchTerm.toLowerCase();
-       return options.filter((opt: any) => opt.name.toLowerCase().includes(term));
+      if (!searchTerm) return [];
+      const term = searchTerm.toLowerCase();
+      return options.filter((opt: any) =>
+        opt.name.toLowerCase().includes(term)
+      );
     }, [searchTerm, options]);
 
     const getDirectChildren = (parentId: string) => {
@@ -143,14 +181,15 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     };
 
     const toggleExpand = (id: string) => {
-      setExpandedSpaces(prev => ({ ...prev, [id]: !prev[id] }));
+      setExpandedSpaces((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
     const renderChildren = (parentId: string, depth: number) => {
       const children = getDirectChildren(parentId);
       if (children.length === 0) return null;
-    
-      const indentClass = depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
+
+      const indentClass =
+        depth > 0 ? "ml-4 border-l-2 dark:border-white/5 pl-2" : "";
 
       return (
         <div className={`${indentClass} flex flex-col`}>
@@ -158,54 +197,79 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
             const grandChildren = getDirectChildren(child.id);
             const hasGrandChildren = grandChildren.length > 0;
             const isExpanded = expandedSpaces[child.id];
-            const isSpace = child.type === 'space';
-    
+            const isSpace = child.type === "space";
+
             return (
               <div key={child.id} className="w-full flex flex-col">
-                <div 
+                <div
                   className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
-                    isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
+                    isSpace
+                      ? "hover:bg-blue-50/50 dark:hover:bg-blue-600/5"
+                      : "hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5"
                   }`}
                 >
-                  <button 
-                    type="button" 
-                    onClick={() => { onChange(child.id, child.type); setIsOpen(false); setSearchTerm(""); }} 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(child.id, child.type);
+                      setIsOpen(false);
+                      setSearchTerm("");
+                    }}
                     className="flex-1 text-left py-3 px-3 min-w-0"
                   >
                     <div className="flex items-center gap-2 w-full min-w-0">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                      <div
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          isSpace ? "bg-blue-500" : "bg-emerald-500"
+                        }`}
+                      />
 
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-xs font-bold dark:text-zinc-200 truncate">{child.name}</span>
+                        <span className="text-xs font-bold dark:text-zinc-200 truncate">
+                          {child.name}
+                        </span>
                         <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
-                          {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
+                          {isSpace ? "Espaço Pai" : "Espaço Físico"}
                         </span>
                       </div>
-        
+
                       {hasGrandChildren && (
-                        <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                          isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
-                        }`}>
+                        <span
+                          className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                            isSpace
+                              ? "text-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                              : "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
+                          }`}
+                        >
                           {grandChildren.length}
                         </span>
                       )}
                     </div>
                   </button>
-                  
+
                   {hasGrandChildren && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => toggleExpand(child.id)}
                       className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
-                        isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                        isSpace
+                          ? "hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                          : "hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
                       }`}
                     >
-                      <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform duration-200 ${
+                          isSpace ? "text-blue-500" : "text-emerald-500"
+                        } ${isExpanded ? "rotate-180" : ""}`}
+                      />
                     </button>
                   )}
                 </div>
-                
-                {hasGrandChildren && isExpanded && renderChildren(child.id, depth + 1)}
+
+                {hasGrandChildren &&
+                  isExpanded &&
+                  renderChildren(child.id, depth + 1)}
               </div>
             );
           })}
@@ -215,41 +279,83 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
 
     return (
       <div className="relative">
-        <button type="button" onClick={() => setIsOpen(!isOpen)} className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm h-[52px] dark:text-white border-2 border-transparent focus:border-blue-600/30 flex items-center justify-between transition-all">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-sm h-[52px] dark:text-white border-2 border-transparent focus:border-blue-600/30 flex items-center justify-between transition-all"
+        >
           <div className="flex items-center gap-2 overflow-hidden">
             {selectedOption ? (
               <>
-                <span className={`shrink-0 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase ${selectedOption.type === 'space' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40'}`}>{selectedOption.type === 'space' ? 'PAI' : 'FÍSICO'}</span>
+                <span
+                  className={`shrink-0 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase ${
+                    selectedOption.type === "space"
+                      ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40"
+                      : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40"
+                  }`}
+                >
+                  {selectedOption.type === "space" ? "PAI" : "FÍSICO"}
+                </span>
                 <span className="truncate">{selectedOption.name}</span>
               </>
-            ) : <span className="text-gray-400">{placeholder}</span>}
+            ) : (
+              <span className="text-gray-400">{placeholder}</span>
+            )}
           </div>
-          <ChevronDown className={`shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} size={16} />
+          <ChevronDown
+            className={`shrink-0 transition-transform duration-300 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            size={16}
+          />
         </button>
-        
+
         {isOpen && (
           <div className="absolute z-[600] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden">
             <div className="p-2 border-b dark:border-white/5 flex items-center gap-2">
               <Search size={14} className="text-gray-400 ml-2" />
-              <input autoFocus className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white" placeholder="Filtrar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input
+                autoFocus
+                className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white"
+                placeholder="Filtrar por nome..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
             <div className="max-h-72 overflow-y-auto overflow-x-hidden custom-scrollbar">
               {searchTerm ? (
                 filteredAll.length > 0 ? (
                   <div>
                     {filteredAll.map((opt: any) => (
-                      <div key={opt.id} className="border-b dark:border-white/5">
+                      <div
+                        key={opt.id}
+                        className="border-b dark:border-white/5"
+                      >
                         <button
                           type="button"
-                          onClick={() => { onChange(opt.id, opt.type); setIsOpen(false); setSearchTerm(""); }}
+                          onClick={() => {
+                            onChange(opt.id, opt.type);
+                            setIsOpen(false);
+                            setSearchTerm("");
+                          }}
                           className="w-full text-left px-3 py-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${opt.type === 'space' ? 'bg-blue-500' : 'bg-emerald-500'} shrink-0`} />
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                opt.type === "space"
+                                  ? "bg-blue-500"
+                                  : "bg-emerald-500"
+                              } shrink-0`}
+                            />
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold dark:text-zinc-200">{opt.name}</span>
+                              <span className="text-sm font-bold dark:text-zinc-200">
+                                {opt.name}
+                              </span>
                               <span className="text-[8px] uppercase font-black text-gray-400">
-                                {opt.type === 'space' ? 'ESP. PAI' : 'ESP. FÍSICO'}
+                                {opt.type === "space"
+                                  ? "ESP. PAI"
+                                  : "ESP. FÍSICO"}
                               </span>
                             </div>
                           </div>
@@ -258,80 +364,122 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                     ))}
                   </div>
                 ) : (
-                  <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+                  <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">
+                    Nenhum local encontrado
+                  </div>
                 )
               ) : (
                 <div>
-                  {rootElements.length > 0 && rootElements.map((item: any) => {
-                    const descendantsCount = getDescendantsCount(item.id);
-                    const isExpanded = expandedSpaces[item.id];
-                    const isSpace = item.type === 'space';
+                  {rootElements.length > 0 &&
+                    rootElements.map((item: any) => {
+                      const descendantsCount = getDescendantsCount(item.id);
+                      const isExpanded = expandedSpaces[item.id];
+                      const isSpace = item.type === "space";
 
-                    return (
-                      <div key={item.id} className="w-full flex flex-col">
-                        <div className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
-                          isSpace ? 'hover:bg-blue-50/50 dark:hover:bg-blue-600/5' : 'hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5'
-                        }`}>
-                          <button 
-                            type="button" 
-                            onClick={() => { onChange(item.id, item.type); setIsOpen(false); setSearchTerm(""); }} 
-                            className="flex-1 text-left py-3 px-3 min-w-0"
+                      return (
+                        <div key={item.id} className="w-full flex flex-col">
+                          <div
+                            className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
+                              isSpace
+                                ? "hover:bg-blue-50/50 dark:hover:bg-blue-600/5"
+                                : "hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5"
+                            }`}
                           >
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSpace ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                              
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <span className="text-sm font-bold dark:text-zinc-200 truncate">{item.name}</span>
-                                <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
-                                  {isSpace ? 'Espaço Pai' : 'Espaço Físico'}
-                                </span>
-                              </div>
-
-                              {descendantsCount > 0 && (
-                                <span className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                                  isSpace ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30'
-                                }`}>{descendantsCount}</span>
-                              )}
-                            </div>
-                          </button>
-
-                          {descendantsCount > 0 && (
-                            <button 
-                              type="button" 
-                              onClick={() => toggleExpand(item.id)}
-                              className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
-                                isSpace ? 'hover:bg-blue-100 dark:hover:bg-blue-900/40' : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
-                              }`}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onChange(item.id, item.type);
+                                setIsOpen(false);
+                                setSearchTerm("");
+                              }}
+                              className="flex-1 text-left py-3 px-3 min-w-0"
                             >
-                              <ChevronDown size={14} className={`transition-transform duration-200 ${isSpace ? 'text-blue-500' : 'text-emerald-500'} ${isExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-                          )}
-                        </div>
+                              <div className="flex items-center gap-2 w-full min-w-0">
+                                <div
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isSpace ? "bg-blue-500" : "bg-emerald-500"
+                                  }`}
+                                />
 
-                        {descendantsCount > 0 && isExpanded && renderChildren(item.id, 1)}
-                      </div>
-                    );
-                  })}
-                  
+                                <div className="flex flex-col flex-1 min-w-0">
+                                  <span className="text-sm font-bold dark:text-zinc-200 truncate">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
+                                    {isSpace ? "Espaço Pai" : "Espaço Físico"}
+                                  </span>
+                                </div>
+
+                                {descendantsCount > 0 && (
+                                  <span
+                                    className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                                      isSpace
+                                        ? "text-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                                        : "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
+                                    }`}
+                                  >
+                                    {descendantsCount}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+
+                            {descendantsCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(item.id)}
+                                className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
+                                  isSpace
+                                    ? "hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                                    : "hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                                }`}
+                              >
+                                <ChevronDown
+                                  size={14}
+                                  className={`transition-transform duration-200 ${
+                                    isSpace
+                                      ? "text-blue-500"
+                                      : "text-emerald-500"
+                                  } ${isExpanded ? "rotate-180" : ""}`}
+                                />
+                              </button>
+                            )}
+                          </div>
+
+                          {descendantsCount > 0 &&
+                            isExpanded &&
+                            renderChildren(item.id, 1)}
+                        </div>
+                      );
+                    })}
+
                   {rootElements.length === 0 && (
-                    <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">Nenhum local encontrado</div>
+                    <div className="p-4 text-center text-[10px] font-black text-gray-400 uppercase">
+                      Nenhum local encontrado
+                    </div>
                   )}
                 </div>
               )}
             </div>
           </div>
         )}
-        {isOpen && <div className="fixed inset-0 z-[590]" onClick={() => setIsOpen(false)} />}
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-[590]"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
       </div>
     );
   }
 
   const handleQuantityChange = (val: number) => {
     const newQty = Math.max(1, val);
-    setFormData(prev => {
+    setFormData((prev) => {
       const newSerials = [...prev.serialNumbers];
       if (newQty > prev.serialNumbers.length) {
-        for (let i = prev.serialNumbers.length; i < newQty; i++) newSerials.push("");
+        for (let i = prev.serialNumbers.length; i < newQty; i++)
+          newSerials.push("");
       } else {
         newSerials.splice(newQty);
       }
@@ -340,7 +488,7 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   };
 
   const handleSerialUpdate = (index: number, value: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const updatedSerials = [...prev.serialNumbers];
       updatedSerials[index] = value;
       return { ...prev, serialNumbers: updatedSerials };
@@ -351,27 +499,30 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     e.preventDefault();
     let finalFatherSpaceId: string;
     let finalParentId: string | null;
-    
+
     if (mode === "edit" && initialData) {
       finalFatherSpaceId = initialData.fatherSpaceId;
       finalParentId = initialData.parentId || null;
     } else {
       finalFatherSpaceId = formData.locationId;
       finalParentId = null;
-      
+
       if (formData.locationType === "space") {
         finalFatherSpaceId = formData.locationId;
         finalParentId = null;
       } else if (formData.locationType === "active") {
-        const selectedLocation = activeContainers?.find((c: any) => c.id === formData.locationId);
-        finalFatherSpaceId = selectedLocation?.fatherSpaceId || formData.locationId;
+        const selectedLocation = activeContainers?.find(
+          (c: any) => c.id === formData.locationId
+        );
+        finalFatherSpaceId =
+          selectedLocation?.fatherSpaceId || formData.locationId;
         finalParentId = formData.locationId;
       }
     }
-    
-    const payload = { 
-      ...formData, 
-      serialNumbers: formData.serialNumbers, 
+
+    const payload = {
+      ...formData,
+      serialNumbers: formData.serialNumbers,
       isPhysicalSpace: !!formData.isPhysicalSpace,
       fatherSpaceId: finalFatherSpaceId,
       parentId: finalParentId,
@@ -395,10 +546,17 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         throw new Error(`${apiError}${apiDetails}`);
       }
 
-      toast.showSuccess(mode === 'edit' ? 'Item updated successfully.' : 'Item created successfully.');
+      toast.showSuccess(
+        mode === "edit"
+          ? "Item updated successfully."
+          : "Item created successfully."
+      );
       onClose();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro inesperado ao conectar com o servidor.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro inesperado ao conectar com o servidor.";
       toast.showError(message);
     }
   };
@@ -408,23 +566,23 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
     if (!newCategoryName.trim()) return;
     setSavingCategory(true);
     try {
-      const res = await fetch('/api/categories/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCategoryName })
+      const res = await fetch("/api/categories/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategoryName }),
       });
       const data = await res.json();
       if (res.ok) {
         setIsCategoryModalOpen(false);
         setNewCategoryName("");
-        setCategories(prev => [...prev, data]);
-        setFormData(prev => ({ ...prev, categoryId: data.id }));
-        toast.showSuccess('Categoria criada com sucesso.');
+        setCategories((prev) => [...prev, data]);
+        setFormData((prev) => ({ ...prev, categoryId: data.id }));
+        toast.showSuccess("Categoria criada com sucesso.");
       } else {
-        toast.showError(data.error || 'Erro ao criar categoria.');
+        toast.showError(data.error || "Erro ao criar categoria.");
       }
     } catch {
-      toast.showError('Erro ao criar categoria.');
+      toast.showError("Erro ao criar categoria.");
     } finally {
       setSavingCategory(false);
     }
@@ -433,35 +591,87 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[500] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border dark:border-white/10">
-        
         {/* HEADER */}
         <div className="p-6 border-b dark:border-white/5 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl text-white shadow-lg ${mode === 'clone' ? 'bg-amber-500 shadow-amber-500/20' : mode === 'edit' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-blue-600 shadow-blue-500/20'}`}>
-              {mode === "create" ? <CirclePlus size={18} /> : mode === "edit" ? <Pencil size={18} /> : <Copy size={18} />}
+            <div
+              className={`p-2.5 rounded-xl text-white shadow-lg ${
+                mode === "clone"
+                  ? "bg-amber-500 shadow-amber-500/20"
+                  : mode === "edit"
+                  ? "bg-emerald-500 shadow-emerald-500/20"
+                  : "bg-blue-600 shadow-blue-500/20"
+              }`}
+            >
+              {mode === "create" ? (
+                <CirclePlus size={18} />
+              ) : mode === "edit" ? (
+                <Pencil size={18} />
+              ) : (
+                <Copy size={18} />
+              )}
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-tighter dark:text-white">
-                {mode === "create" ? "Novo" : mode === "edit" ? "Editar" : "Clonar"} {formData.isPhysicalSpace ? 'Espaço Físico' : 'Ativo'}
+                {mode === "create"
+                  ? "Novo"
+                  : mode === "edit"
+                  ? "Editar"
+                  : "Clonar"}{" "}
+                {formData.isPhysicalSpace ? "Espaço Físico" : "Ativo"}
               </h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"><X size={24} /></button>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar"
+        >
           <div className="flex bg-gray-100 dark:bg-zinc-950 p-1.5 rounded-2xl border dark:border-white/5 shadow-inner">
-            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: false }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${!formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><Briefcase size={14} /> Ativo</button>
-            <button type="button" onClick={() => setFormData(p => ({ ...p, isPhysicalSpace: true }))} className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${formData.isPhysicalSpace ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10" : "text-gray-400 dark:text-zinc-600"}`}><MapPin size={14} /> Espaço Físico</button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, isPhysicalSpace: false }))
+              }
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${
+                !formData.isPhysicalSpace
+                  ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10"
+                  : "text-gray-400 dark:text-zinc-600"
+              }`}
+            >
+              <Briefcase size={14} /> Ativo
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, isPhysicalSpace: true }))
+              }
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase rounded-xl transition-all ${
+                formData.isPhysicalSpace
+                  ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-md border dark:border-white/10"
+                  : "text-gray-400 dark:text-zinc-600"
+              }`}
+            >
+              <MapPin size={14} /> Espaço Físico
+            </button>
           </div>
 
           {/* AREA DE FOCO */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">Categoria</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">
+                Categoria
+              </label>
               {categories.length < 18 && (
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsCategoryModalOpen(true)}
                   className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-600/10 rounded-lg transition-all"
                   title="Criar nova categoria"
@@ -470,139 +680,273 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 </button>
               )}
               {categories.length >= 18 && (
-                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Limite: 18</span>
+                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">
+                  Limite: 18
+                </span>
               )}
             </div>
 
             {loadingCategories ? (
-                <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase"><Loader2 className="animate-spin" size={12}/> Carregando categorias...</div>
-              ) : categories.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">
-                  <Ghost size={24} className="mb-2 text-zinc-400" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
-                    Nenhuma categoria cadastrada
-                  </p>
-                </div>
-              ) : (
-                <div className={`grid gap-2 ${gridConfig}`}>
-                  {categories.map((category) => {
-                    const isSelected = formData.categoryId === category.id;
-                    const color = category.color;
-                    
-                    return (
-                      <button 
-                        key={category.id} 
-                        type="button" 
-                        onClick={() => setFormData(prev => ({ ...prev, categoryId: category.id }))} 
-                        style={isSelected ? { 
-                          borderColor: color, 
-                          backgroundColor: `${color}15`, 
-                          color: color 
-                        } : {}}
-                        className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${!isSelected ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800" : ""}`}
-                      >
-                        {category.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex items-center gap-2 py-4 px-2 text-zinc-500 text-[10px] font-bold italic uppercase">
+                <Loader2 className="animate-spin" size={12} /> Carregando
+                categorias...
+              </div>
+            ) : categories.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">
+                <Ghost size={24} className="mb-2 text-zinc-400" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
+                  Nenhuma categoria cadastrada
+                </p>
+              </div>
+            ) : (
+              <div className={`grid gap-2 ${gridConfig}`}>
+                {categories.map((category) => {
+                  const isSelected = formData.categoryId === category.id;
+                  const color = category.color;
+
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          categoryId: category.id,
+                        }))
+                      }
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: color,
+                              backgroundColor: `${color}15`,
+                              color: color,
+                            }
+                          : {}
+                      }
+                      className={`w-full py-3.5 rounded-2xl text-[9px] font-black transition-all border-2 text-center uppercase tracking-tighter ${
+                        !isSelected
+                          ? "border-transparent bg-gray-50 dark:bg-zinc-800/50 text-gray-400 dark:text-zinc-500 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                          : ""
+                      }`}
+                    >
+                      {category.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Nome do Registro</label>
-              <input required className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white" value={formData.name} onChange={e => setFormData(prev => ({...prev, name: e.target.value}))} />
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                Nome do Registro
+              </label>
+              <input
+                required
+                className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
+              />
             </div>
 
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Status Atual</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                Status Atual
+              </label>
               <CustomSelect
                 options={statusOptions}
                 value={formData.tag}
-                onChange={(newValue) => setFormData(prev => ({ ...prev, tag: newValue }))}
+                onChange={(newValue) =>
+                  setFormData((prev) => ({ ...prev, tag: newValue }))
+                }
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Localização</label>
-              <SearchableSelect 
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                Localização
+              </label>
+              <SearchableSelect
                 options={[
-                  ...(fatherSpace || []).map((s: any) => ({ id: s.id, name: s.name, type: "space", parentId: null })),
-                  ...(activeContainers || []).map((c: any) => ({ id: c.id, name: c.name, type: "active", parentId: c.parentId || c.fatherSpaceId || null }))
+                  ...(fatherSpace || []).map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    type: "space",
+                    parentId: null,
+                  })),
+                  ...(activeContainers || []).map((c: any) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: "active",
+                    parentId: c.parentId || c.fatherSpaceId || null,
+                  })),
                 ]}
                 value={formData.locationId}
-                onChange={(id: string, type: any) => setFormData(prev => ({ ...prev, locationId: id, locationType: type }))}
+                onChange={(id: string, type: any) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    locationId: id,
+                    locationType: type,
+                  }))
+                }
                 placeholder="Selecione local..."
                 required
               />
             </div>
-            <div className={`grid ${mode === 'edit' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+            <div
+              className={`grid ${
+                mode === "edit" ? "grid-cols-1" : "grid-cols-2"
+              } gap-2`}
+            >
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Vlr. Unitário</label>
-                <input type="number" className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.fixedValue} onChange={e => setFormData(prev => ({...prev, fixedValue: parseFloat(e.target.value) || 0}))} />
+                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                  Vlr. Unitário
+                </label>
+                <input
+                  type="number"
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
+                  value={formData.fixedValue}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      fixedValue: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
               </div>
               {mode !== "edit" && (
                 <div>
-                  <label className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block">Quantidade</label>
-                  <input type="number" className="w-full bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl font-black text-blue-600 dark:text-blue-400 border-2 border-blue-600/20 text-sm outline-none focus:border-blue-600" value={formData.quantity} onChange={e => handleQuantityChange(parseInt(e.target.value) || 1)} />
+                  <label className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block">
+                    Quantidade
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl font-black text-blue-600 dark:text-blue-400 border-2 border-blue-600/20 text-sm outline-none focus:border-blue-600"
+                    value={formData.quantity}
+                    onChange={(e) =>
+                      handleQuantityChange(parseInt(e.target.value) || 1)
+                    }
+                  />
                 </div>
               )}
             </div>
           </div>
 
           <div className="space-y-4 pt-4 border-t dark:border-white/5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Fabricante</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.manufacturer} onChange={e => setFormData(prev => ({...prev, manufacturer: e.target.value}))} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Modelo</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30" value={formData.model} onChange={e => setFormData(prev => ({...prev, model: e.target.value}))} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">SKU</label>
-                  <input className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30 font-mono uppercase" value={formData.sku} onChange={e => setFormData(prev => ({...prev, sku: e.target.value}))} placeholder="Código SKU" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2">
-                  <Hash size={12} /> {mode === "edit" ? "Número de Série" : `Números de Série (${formData.quantity})`}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                  Fabricante
                 </label>
-                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2">
-                  {formData.serialNumbers.map((sn, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      {mode !== "edit" && <span className="text-[9px] font-black text-zinc-400 w-4">#{idx + 1}</span>}
-                      <input className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono uppercase placeholder:normal-case text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm" placeholder="Insira o serial..." value={sn} onChange={e => handleSerialUpdate(idx, e.target.value)} />
-                    </div>
-                  ))}
-                </div>
+                <input
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
+                  value={formData.manufacturer}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      manufacturer: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                  Modelo
+                </label>
+                <input
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
+                  value={formData.model}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, model: e.target.value }))
+                  }
+                />
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                  SKU/EAN
+                </label>
+                <input
+                  className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30 font-mono uppercase"
+                  value={formData.sku}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, sku: e.target.value }))
+                  }
+                  placeholder="Código SKU/EAN"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2">
+                <Hash size={12} />{" "}
+                {mode === "edit"
+                  ? "Número de Série"
+                  : `Números de Série (${formData.quantity})`}
+              </label>
+              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2">
+                {formData.serialNumbers.map((sn, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    {mode !== "edit" && (
+                      <span className="text-[9px] font-black text-zinc-400 w-4">
+                        #{idx + 1}
+                      </span>
+                    )}
+                    <input
+                      className="flex-1 bg-white dark:bg-zinc-900 p-3 rounded-lg font-mono uppercase placeholder:normal-case text-xs border border-transparent focus:border-blue-600/30 outline-none dark:text-white shadow-sm"
+                      placeholder="Insira o serial..."
+                      value={sn}
+                      onChange={(e) => handleSerialUpdate(idx, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <ImageUpload value={formData.imageUrl} onChange={(url) => setFormData(prev => ({...prev, imageUrl: url}))} label="Foto do Ativo" />
-            <FileUpload value={formData.fileUrl} onChange={(url) => setFormData(prev => ({...prev, fileUrl: url}))} label="Enviar Documento" />
+            <ImageUpload
+              value={formData.imageUrl}
+              onChange={(url) =>
+                setFormData((prev) => ({ ...prev, imageUrl: url }))
+              }
+              label="Foto do Ativo"
+            />
+            <FileUpload
+              value={formData.fileUrl}
+              onChange={(url) =>
+                setFormData((prev) => ({ ...prev, fileUrl: url }))
+              }
+              label="Enviar Documento"
+            />
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">Notas</label>
-            <textarea className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30" value={formData.notes} onChange={e => setFormData(prev => ({...prev, notes: e.target.value}))} />
+            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+              Notas
+            </label>
+            <textarea
+              className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30"
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
+            />
           </div>
         </form>
 
         {mode === "edit" && (
           <div className="px-6 pb-2">
             <label className="flex items-center gap-3 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 cursor-pointer transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={applyToSimilar}
                 onChange={(e) => setApplyToSimilar(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 dark:border-zinc-700 dark:bg-zinc-800"
@@ -615,9 +959,29 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         )}
 
         <div className="p-6 border-t dark:border-white/5 shrink-0 bg-white dark:bg-zinc-900">
-          <button type="submit" onClick={handleSubmit} className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all ${mode === 'clone' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : mode === 'edit' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'} text-white`}>
-            {mode === "clone" ? <Copy size={18} /> : mode === "edit" ? <Pencil size={18} /> : <CirclePlus size={18} />}
-            {mode === "clone" ? "Gerar Clones" : mode === "edit" ? "Salvar Alterações" : "Confirmar Cadastro"}
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            className={`w-full py-4 rounded-2xl font-black uppercase text-[11px] flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all ${
+              mode === "clone"
+                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
+                : mode === "edit"
+                ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
+                : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
+            } text-white`}
+          >
+            {mode === "clone" ? (
+              <Copy size={18} />
+            ) : mode === "edit" ? (
+              <Pencil size={18} />
+            ) : (
+              <CirclePlus size={18} />
+            )}
+            {mode === "clone"
+              ? "Gerar Clones"
+              : mode === "edit"
+              ? "Salvar Alterações"
+              : "Confirmar Cadastro"}
           </button>
         </div>
       </div>
@@ -627,12 +991,21 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
         <div className="fixed inset-0 z-[600] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border dark:border-white/10">
             <div className="p-6 border-b dark:border-white/5 flex items-center justify-between">
-              <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase italic">Nova Categoria</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"><X size={20} /></button>
+              <h3 className="text-lg font-black text-gray-800 dark:text-white uppercase italic">
+                Nova Categoria
+              </h3>
+              <button
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
             <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
               <div>
-                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">Nome</label>
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">
+                  Nome
+                </label>
                 <input
                   type="text"
                   value={newCategoryName}
@@ -648,7 +1021,11 @@ export default function ActiveForm({ mode, initialData, onClose, fatherSpace, ac
                 disabled={savingCategory || !newCategoryName.trim()}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white disabled:text-gray-600 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-colors duration-300"
               >
-                {savingCategory ? <Loader2 size={16} className="animate-spin" /> : <CirclePlus size={16} />}
+                {savingCategory ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CirclePlus size={16} />
+                )}
                 Criar Categoria
               </button>
             </form>

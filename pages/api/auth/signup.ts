@@ -2,10 +2,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import * as jose from 'jose';
+import { getSessionUser, isPrivileged } from '@/lib/apiAuth';
 
 const saltRounds = 10;
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -25,21 +24,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // 2. Se NÃO existe ADMIN, permitir registro (primeiro ADMIN do sistema)
-    // 3. Se JÁ existe ADMIN, exigir token de ADMIN autenticado
+    // 3. Se JÁ existe ADMIN, exigir sessão de ADMIN **ou DIRECTOR**.
+    //    A tabela de RBAC (SPECS.md §4.2) dá a DIRECTOR "todos" em Gerencia
+    //    usuários, e o ADMIN é quem tem o papel oposto (exceto DIRECTOR).
+    //    Antes, `session.role !== 'ADMIN'` barrava o próprio DIRECTOR.
     if (adminCount > 0) {
-      const token = req.cookies.auth_token || req.headers.authorization?.replace("Bearer ", "");
-      if (!token) {
+      const session = await getSessionUser(req);
+      if (!session) {
         return res.status(401).json({ message: 'Sessão expirada. Faça login.' });
       }
 
-      try {
-        const secret = new TextEncoder().encode(JWT_SECRET!);
-        const { payload } = await jose.jwtVerify(token, secret);
-        if (payload.role !== 'ADMIN') {
-          return res.status(403).json({ message: 'Apenas administradores podem criar novos usuários.' });
-        }
-      } catch {
-        return res.status(401).json({ message: 'Token inválido.' });
+      if (!isPrivileged(session)) {
+        return res.status(403).json({ message: 'Apenas ADMIN e DIRECTOR podem criar novos usuários.' });
       }
     }
 
@@ -62,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const userRole = adminCount === 0 ? "ADMIN" : requestedRole;
-    const userSystem = adminCount === 0 ? true : false;
+    const userIsCreator = adminCount === 0 ? true : false;
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -72,9 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email, 
         password: hashedPassword, 
         role: userRole,
-        isSystem: userSystem,
+        isCreator: userIsCreator,
       },
-      select: { id: true, email: true, name: true, role: true, isSystem: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isCreator: true, createdAt: true },
     });
 
     // SISTEMA DE LOGS: Registro de novo cadastro

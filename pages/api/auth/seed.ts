@@ -38,6 +38,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           password: hashedPassword,
           name: name || "Administrador",
           role: "ADMIN",
+          // O admin master é o criador por definição: sem isso, um sistema
+          // inicializado por seed nunca teria criador e a transferência de título
+          // (que exige já ser criador) ficaria permanentemente travada.
+          isCreator: true,
         },
       });
 

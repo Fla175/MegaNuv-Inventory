@@ -28,8 +28,8 @@ export async function verifyAuthToken(token: string): Promise<AuthTokenPayload |
         email: payload.email as string,
         role: payload.role as UserRole,
         name: payload.name as string | undefined,
-        iat: payload.iat,
-        exp: payload.exp,
+        iat: typeof payload.iat === 'number' ? payload.iat : undefined,
+        exp: typeof payload.exp === 'number' ? payload.exp : undefined,
       };
       return finalDecoded;
     } else {
@@ -40,7 +40,10 @@ export async function verifyAuthToken(token: string): Promise<AuthTokenPayload |
   }
 }
 
-export async function generateAuthToken(payload: Omit<AuthTokenPayload, 'iat' | 'exp'>): Promise<string> {
+export async function generateAuthToken(
+  payload: Omit<AuthTokenPayload, 'iat' | 'exp'>,
+  options?: { expiresIn?: string | number },
+): Promise<string> {
   const tokenPayload = {
     userId: payload.userId,
     email: payload.email,
@@ -49,9 +52,11 @@ export async function generateAuthToken(payload: Omit<AuthTokenPayload, 'iat' | 
   };
   
   const secret = new TextEncoder().encode(JWT_SECRET!);
+  const expiresIn = options?.expiresIn ?? '8h';
   const token = await new jose.SignJWT(tokenPayload)
     .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('8h')
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
     .sign(secret);
     
   return token;

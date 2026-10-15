@@ -7,14 +7,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed. Use POST.' });
   }
 
-  // Limpa o cookie de autenticação settando um valor vazio e maxAge negativo
-  res.setHeader('Set-Cookie', serialize('auth_token', '', {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === 'true',
     path: '/',
-    maxAge: -1, 
-    sameSite: 'lax',
-  }));
+    maxAge: -1,
+    sameSite: 'lax' as const,
+  };
+
+  res.setHeader('Set-Cookie', [
+    serialize('auth_token', '', cookieOptions),
+    serialize('auth_token_creator', '', cookieOptions),
+  ]);
 
   return res.status(200).json({ message: 'Logout realizado com sucesso.' });
 }

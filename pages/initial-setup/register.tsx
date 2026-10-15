@@ -10,7 +10,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role] = useState('ADMIN');
-  const [isSystem] = useState('true');
+  const [isCreator] = useState('true');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -43,7 +43,7 @@ export default function Signup() {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role, isSystem }),
+        body: JSON.stringify({ name, email, password, role, isCreator }),
       });
 
       const data = await response.json();

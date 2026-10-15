@@ -1,8 +1,9 @@
 // pages/api/storage/delete-url.ts
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import { deleteFileFromMinio } from '@/lib/minio';
+import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   // Garante que só aceita requisições do tipo DELETE
   if (req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Método não permitido. Use DELETE.' });
@@ -22,4 +23,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const message = error instanceof Error ? error.message : 'Erro ao eliminar ficheiro.';
     return res.status(500).json({ error: message });
   }
-}
+};
+
+export default authMiddleware(handler);

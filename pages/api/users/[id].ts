@@ -1,23 +1,20 @@
 // pages/api/users/[id].ts
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import * as jose from "jose";
+import { getSessionUser } from "@/lib/apiAuth";
 import bcrypt from 'bcryptjs';
 
 const saltRounds = 10;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
-  const token = req.cookies["auth_token"];
-  
-  if (!token) return res.status(401).json({ message: "Não autorizado" });
+  const session = await getSessionUser(req);
+
+  if (!session) return res.status(401).json({ message: "Não autorizado" });
 
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
-    const { payload } = await jose.jwtVerify(token, secret);
-    const decoded = payload as { email: string };
-    const requester = await prisma.user.findUnique({ where: { email: decoded.email } });
-    
+    const requester = await prisma.user.findUnique({ where: { email: session.email } });
+
     if (!requester) return res.status(401).json({ message: "Usuário não encontrado" });
 
     const targetUser = await prisma.user.findUnique({ where: { id: String(id) } });

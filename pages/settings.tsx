@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Moon, Sun, Monitor, Loader2, Trash2, 
   UserCircle, Users, Pencil, Clock, Mail, Settings, X,
-  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, 
+  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, LogIn,
   CalendarFold, KeyRound, CirclePlus, Activity,
   ClipboardList, Group, Palette, Undo2
 } from "lucide-react";
@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PatternFormat } from 'react-number-format';
 import CustomSelect from "@/components/customSelect";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
+import { ACTION_LABELS, type RevertItem, type RevertSubItem } from "@/lib/revert/types";
 
 // --- INTERFACES ---
 interface User {
@@ -24,6 +25,7 @@ interface User {
   name: string | null; 
   email: string;
   role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
+  isCreator?: boolean;
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
@@ -51,22 +53,6 @@ interface Log {
   details: string;
   createdAt: string;
   user: { name: string; email: string };
-}
-
-interface RevertSubItem {
-  table: string;
-  id: string;
-  timestamp: string;
-}
-
-interface RevertItem {
-  groupId?: string;
-  id?: string;
-  table?: string;
-  name: string;
-  timestamp: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE';
-  items?: RevertSubItem[];
 }
 
 type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
@@ -98,6 +84,17 @@ export default function SettingsPage() {
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   const [role, setRole] = useState(selectedUser?.role || '');
 
+  // Estados do Acesso do Criador
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
+  const [transferConfirmInput, setTransferConfirmInput] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  const [enterTargetUser, setEnterTargetUser] = useState<User | null>(null);
+  const [enterPassword, setEnterPassword] = useState('');
+  const [isEnterModalOpen, setIsEnterModalOpen] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
+
   // Estado do Dialog de Confirmação
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -120,7 +117,7 @@ export default function SettingsPage() {
     {value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500"},
     {value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500"},
     {value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500"},
-    ...(user?.isSystem && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
+    ...(user?.isCreator && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
   ];
 
   useEffect(() => {
@@ -252,6 +249,72 @@ export default function SettingsPage() {
     if (revertItems.length === 0 || isReverting) return;
     // Desfaz a alteração mais recente diretamente
     await handleRevertSelected([revertItems[0]]);
+  };
+
+  // --- HANDLERS ACESSO DO CRIADOR ---
+  const handleEnterAccount = async (targetUser: User) => {
+    if (isEntering) return;
+    if (!enterPassword) {
+      toast.showWarning("Informe sua senha para entrar na conta.");
+      return;
+    }
+    setIsEntering(true);
+    try {
+      const res = await fetch("/api/creator-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetUserId: targetUser.id, password: enterPassword }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.showSuccess("Acesso ativado. Redirecionando...");
+        window.location.assign("/");
+      } else if (res.status === 401) {
+        toast.showWarning(data.error || "Senha incorreta.");
+        setEnterPassword('');
+      } else if (res.status === 400) {
+        toast.showWarning(data.error || "Senha é obrigatória.");
+        setEnterPassword('');
+      } else if (res.status === 409) {
+        toast.showWarning(data.error || "Restaure sua conta antes de entrar em outra.");
+      } else {
+        toast.showError(data.error || "Erro ao acessar conta.");
+      }
+    } catch {
+      toast.showError("Erro de conexão ao acessar conta.");
+    } finally {
+      setIsEntering(false);
+    }
+  };
+
+  const handleTransferCreator = async (targetUser: User) => {
+    if (isTransferring) return;
+    setIsTransferring(true);
+    try {
+      const res = await fetch("/api/creator-access", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newCreatorId: targetUser.id }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.showSuccess("Título de criador transferido com sucesso.");
+        setIsTransferModalOpen(false);
+        setTransferTargetUser(null);
+        setTransferConfirmInput('');
+        window.location.assign("/settings");
+      } else {
+        toast.showError(data.error || "Erro ao transferir título.");
+      }
+    } catch {
+      toast.showError("Erro de conexão ao transferir título.");
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   // --- HANDLERS CRUD ---
@@ -513,7 +576,10 @@ export default function SettingsPage() {
                             {item.name}
                           </p>
                           <p className="text-[9px] text-zinc-400 font-bold uppercase">
-                            {item.action} · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
+                            {item.items
+                              ? ACTION_LABELS[item.action].batch
+                              : ACTION_LABELS[item.action].single}{" "}
+                            · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
                           </p>
                         </div>
                       </button>
@@ -634,7 +700,34 @@ export default function SettingsPage() {
                               </div>
                             </div>
 
-                            <div className={`${showActionButtons && "flex gap-3 mt-6"}`}>
+                            <div className="flex flex-wrap gap-2 mt-6">
+                              {user?.isCreator && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEnterTargetUser(u);
+                                      setEnterPassword('');
+                                      setIsEnterModalOpen(true);
+                                    }}
+                                    className="flex-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-300/40 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-900/60 flex items-center justify-center gap-1.5 transition-all"
+                                    title="Entrar nesta conta (requer sua senha)"
+                                  >
+                                    <LogIn size={14} /> Entrar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setTransferTargetUser(u);
+                                      setTransferConfirmInput('');
+                                      setIsTransferModalOpen(true);
+                                    }}
+                                    className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 flex items-center justify-center gap-1.5 transition-all"
+                                    title="Ceder título de criador"
+                                  >
+                                    <KeyRound size={14} /> Ceder
+                                  </button>
+                                </>
+                              )}
+
                               {showActionButtons && (
                                 <>
                                   <button 
@@ -894,6 +987,138 @@ export default function SettingsPage() {
               {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Modal de Solicitação de Senha para Entrar na Conta */}
+      {isEnterModalOpen && enterTargetUser && (
+        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-amber-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-amber-500 mb-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-950/60 rounded-2xl">
+                <LogIn size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                  Entrar na Conta
+                </h3>
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
+                  Confirmação de segurança
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
+              Para entrar na conta de <strong className="text-zinc-900 dark:text-white">{enterTargetUser.name || enterTargetUser.email}</strong>, confirme a sua senha de criador:
+            </p>
+
+            <input
+              type="password"
+              value={enterPassword}
+              autoComplete="current-password"
+              autoFocus
+              onChange={(e) => setEnterPassword(e.target.value)}
+              placeholder="Sua senha..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 mb-6"
+            />
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEnterModalOpen(false);
+                  setEnterTargetUser(null);
+                  setEnterPassword('');
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isEntering}
+                onClick={() => handleEnterAccount(enterTargetUser)}
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
+              >
+                {isEntering ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <LogIn size={16} />
+                )}
+                Confirmar Entrada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Transferência do Título de Criador */}
+      {isTransferModalOpen && transferTargetUser && (
+        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-red-500 mb-4">
+              <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">
+                <KeyRound size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                  Ceder Título de Criador
+                </h3>
+                <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">
+                  Ação irreversível
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
+              Ao transferir o título para <strong className="text-zinc-900 dark:text-white">{transferTargetUser.name || transferTargetUser.email}</strong>, você perderá a capacidade de entrar nas contas dos usuários. Digite o nome ou e-mail exato do destinatário para confirmar:
+            </p>
+
+            <div className="mb-4 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-200 dark:border-white/5">
+              <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-1">Confirme digitando:</p>
+              <p className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 select-all">
+                {transferTargetUser.name || transferTargetUser.email}
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={transferConfirmInput}
+              onChange={(e) => setTransferConfirmInput(e.target.value)}
+              placeholder="Digite exatamente o texto acima..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-red-500 mb-6"
+            />
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTransferModalOpen(false);
+                  setTransferTargetUser(null);
+                  setTransferConfirmInput('');
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={
+                  transferConfirmInput.trim() !== (transferTargetUser.name || transferTargetUser.email).trim() ||
+                  isTransferring
+                }
+                onClick={() => handleTransferCreator(transferTargetUser)}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
+              >
+                {isTransferring ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <KeyRound size={16} />
+                )}
+                Confirmar Transferência
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

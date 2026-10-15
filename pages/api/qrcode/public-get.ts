@@ -1,8 +1,9 @@
 // pages/api/qrcode/public-get.ts
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { minioPublicClient, BUCKET_NAME } from '@/lib/minio';
 import { getMinioKeyFromUrl } from '@/lib/mediaUrl';
+import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
 
 interface SectionActive {
   id: string;
@@ -108,7 +109,7 @@ async function buildHierarchy(id: string, name: string, isFirstLevel = false, cu
   return sections;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   const { id } = req.query;
   if (!id || typeof id !== 'string') return res.status(400).json({ message: 'ID inválido' });
 
@@ -156,4 +157,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const message = error instanceof Error ? error.message : 'Erro interno';
     return res.status(500).json({ message });
   }
-}
+};
+
+export default authMiddleware(handler);
