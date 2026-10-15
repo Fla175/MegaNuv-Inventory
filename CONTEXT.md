@@ -5,7 +5,7 @@
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
 **Última atualização:** 15/10/2026 · **Branch:** `chore/security-p0-debt` (rebased sobre `fix/revert-classification`)
-**Versão:** `2.22.7` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
+**Versão:** `2.23.0` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
 
@@ -73,10 +73,16 @@ conjunto de correções de segurança.
 7. ~~`refactor/auth-helper`~~ — **feito**: `lib/apiAuth.ts` consolida a verificação de JWT de ~20 arquivos;
    corrigidos de passagem 3 endpoints que não verificavam token e o `revert` que devolvia 500 para 401.
    O gate de RBAC do `signup` voltou a aceitar `DIRECTOR`.
-8. **Bump de versão para `2.22.7`** feito com `npm version --no-git-tag-version`. **Falta criação humana
-   da branch `inventory-v2.22.7` e da tag `v2.22.7`.**
-9. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
-10. `chore/docker-compose-env` — `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`, e o serviço `app`
+8. ~~**Bump de versão para `2.22.7`~~** — **feito**, mas o patch estava errado: o trabalho da branch
+   `refactor/auth-helper` somava correção de segurança, correção de build, refactor de auth em ~20 endpoints
+   e correção de RBAC, com mudança de comportamento observável. Rebaixado para **`2.23.0`** (minor) com
+   `npm version 2.23.0 --no-git-tag-version`. **Falta criação humana da branch `inventory-v2.23.0` e da tag
+   `v2.23.0`** — a branch antiga `inventory-v2.22.7` **não** deve ser criada.
+9. `fix/creator-access-flag` — resolvido nesta sessão junto: `CREATOR_ACCESS_ENABLED` não existia no `.env`
+   nem no `.env.example`, então `/api/creator-access` respondia 403 sempre; e o `seed` criava o admin master
+   sem `isCreator`. Ambos corrigidos e cobertos por teste.
+10. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
+11. `chore/docker-compose-env` — `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`, e o serviço `app`
     usa `command: yarn dev` com bind-mount do código (a imagem construída não é usada).
 
 ---
@@ -176,8 +182,12 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   obrigatório — sem ele o `npm version` cria tag e commit automático, e a IA não cria tag
   (`AGENTS.md` §3.2). O comando **não** altera o `yarn.lock`. Bump em `package.json` é suficiente:
   `lib/version.ts` lê a versão de lá, sem hardcode.
-- **Versão atual: `2.22.7`** ( bumped de `2.22.6`, patch seguindo a convenção histórica da série
-  `2.20.1` → `2.22.6`). A branch `inventory-v2.22.7` e a tag `v2.22.7` são criação humana.
+- **Versão atual: `2.23.0`** (bumped de `2.22.7`, **minor**). O patch para `2.22.7` era incorreto: a série
+  `refactor/auth-helper` carrega correção de segurança, correção de build, refactor de auth em ~20 endpoints
+  e correção de RBAC, com **mudança de comportamento observável** (novo campo `creatorAccessEnabled` em
+  `/api/auth/me`, botões condicionais na UI, novo `isCreator` no seed) — isso é minor, não patch.
+  A branch `inventory-v2.23.0` e a tag `v2.23.0` são criação humana; a `inventory-v2.22.7` **não** deve ser
+  criada.
 - `npm` é proibido para **instalar** dependências (`AGENTS.md` §3.3), mas `npm version` é seguro: ele
   não toca em lockfile nem em `node_modules`.
 

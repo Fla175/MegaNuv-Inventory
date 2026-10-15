@@ -11,6 +11,7 @@ export type User = {
   role: Role;
   theme: Theme;
   isCreator: boolean;
+  creatorAccessEnabled?: boolean;
   lastLogin?: string;
   createdAt: string;
 };

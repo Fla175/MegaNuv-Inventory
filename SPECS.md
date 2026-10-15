@@ -355,6 +355,25 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   `categories/list`, `father-spaces/list`) chegou a checar apenas se o token existia, sem verificar a
   assinatura — qualquer string não-vazia passava. Regra: presença de token não é autenticação.
 
+**Recurso de Acesso do Criador (feature flag obrigatória)**
+- `CREATOR_ACCESS_ENABLED` é **obrigatória** para o recurso de Acesso do Criador, e não opcional como o nome
+  sugere. `pages/api/creator-access.ts` compara `process.env.CREATOR_ACCESS_ENABLED !== 'true'` (comparação
+  **estrita**: só a string exata `"true"` liga) e devolve **403** em `POST`, `DELETE` e `PATCH` quando a
+  variável está ausente ou tem qualquer outro valor. Ausência de configuração **não pode** ser um default
+  silencioso que finge que o recurso existe.
+- Consequência de projeto: a variável **precisa estar declarada no `.env`** e **listada no `.env.example`**.
+  Uma flag de segurança ausente do exemplo é uma flag que ninguém descobre — foi exatamente o que aconteceu.
+- `/api/auth/me` expõe `creatorAccessEnabled: boolean` no objeto do usuário (`creatorAccessEnabled =
+  process.env.CREATOR_ACCESS_ENABLED === 'true'`), e a UI **exige esse campo além de `isCreator`** para
+  exibir os botões "Entrar"/"Ceder" em `pages/settings.tsx`. Botão que depende de flag desligada deve ser
+  **escondido**, não exibido para falhar com 403.
+- `CREATOR_ACCESS_REQUIRE_PASSWORD` (booleana, padrão `false`) só é lida **depois** do kill switch e exige a
+  senha do criador quando `"true"`.
+- Regra para testes: **nenhuma flag de kill switch pode ser semeada globalmente** em `vitest.config.ts`
+  (`test.env`). Ambiente global de teste é exatamente o que faz a suíte passar enquanto a produção falha —
+  foi o caso de `CREATOR_ACCESS_ENABLED: 'true'` até ser removido. Cada suíte define a flag no seu próprio
+  `beforeEach`, incluindo um caso explícito para a flag **ausente**.
+
 **Upload e mídia**
 - ✅ Limite de 10 MB e tipos aceitos **são validados no servidor** em `lib/uploadPolicy.ts`, aplicado por
   `pages/api/storage/upload-url.ts`. A checagem do cliente (`components/FileUpload.tsx`) é só UX.
@@ -382,7 +401,7 @@ Tratar como dado sensível: não logar em chat de IA, não enviar a serviço ext
 
 ### 5.2 Testing Strategy & Coverage Thresholds
 
-**Estado atual:** `vitest` instalado e rodando — **101 testes passando** (5 pulados: integração opt-in do
+**Estado atual:** `vitest` instalado e rodando — **143 testes passando** (5 pulados: integração opt-in do
 revert, que exige `REVERT_PROBE_DATABASE_URL`). Cobertura medida: **83% de linhas / 80% de branches /
 100% de funções** na superfície de segurança.
 

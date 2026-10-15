@@ -11,10 +11,60 @@
 
 ## [Unreleased]
 
-> **Próxima release: `2.22.7`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
-> hardcode). O bump foi feito com `npm version 2.22.7 --no-git-tag-version`: o `--no-git-tag-version` é
+> **Próxima release: `2.23.0`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
+> hardcode). O bump foi feito com `npm version 2.23.0 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
-> `yarn.lock` não foi tocado. A branch `inventory-v2.22.7` e a tag `v2.22.7` são criação humana.
+> `yarn.lock` não foi tocado. A branch `inventory-v2.23.0` e a tag `v2.23.0` são criação humana.
+
+### 🤖 OpenCode Operations
+
+#### Security
+* **Recurso de Acesso do Criador inoperante em produção (403 em todo POST/DELETE/PATCH)** —
+  `pages/api/creator-access.ts:22` abria com `if (process.env.CREATOR_ACCESS_ENABLED !== 'true') return 403`,
+  mas a variável **não era declarada nem no `.env` nem no `.env.example`**. Com a flag ausente,
+  `undefined !== 'true'` é sempre verdadeiro: o botão "Entrar" aparecia para a conta criadora e a API
+  recusava com 403 — falha funcional e, sobretudo, um *fail-open* de configuração documentada como se fosse
+  um *feature flag* opcional, quando na prática era obrigatória. Quatro correções encadeadas:
+  1. `.env.example` passa a declarar `CREATOR_ACCESS_ENABLED=true` e `CREATOR_ACCESS_REQUIRE_PASSWORD=false`,
+     com comentário explicando que, se a primeira estiver ausente ou for diferente de `"true"`,
+     `POST`/`DELETE`/`PATCH` respondem 403 — a flag deixou de ser invisível para quem lê o exemplo;
+  2. `/api/auth/me` passou a expor `creatorAccessEnabled: boolean` no objeto do usuário, para que o cliente
+     saiba se o recurso está ativo;
+  3. `pages/settings.tsx` passou a exigir `user.creatorAccessEnabled` além de `user.isCreator` no bloco
+     "Entrar"/"Ceder" — a UI não exibe mais botões que necessariamente falhariam. O campo foi adicionado à
+     `interface User` local e ao tipo `User` de `lib/context/UserContext.tsx` (`creatorAccessEnabled?:
+     boolean`), que é a origem dos dados vindos de `/api/auth/me`;
+  4. `vitest.config.ts` teve `CREATOR_ACCESS_ENABLED: 'true'` **removido** de `test.env`: a flag global
+     mascarava exatamente este defeito — a suíte passava enquanto a produção falhava. Cada teste de
+     creator-access define a flag no próprio `beforeEach`, então a remoção não depende dela.
+* **Admin master criado pelo seed nunca era criador** — `pages/api/auth/seed.ts` criava o primeiro `ADMIN`
+  sem `isCreator`, e o schema aplicava o default `false`. Como o único caminho para tornar-se criador
+  (`PATCH /api/creator-access`) exige que o solicitante **já** seja `isCreator`, um sistema inicializado por
+  `seed` ficava permanentemente sem criador. `pages/api/auth/signup` já fazia certo
+  (`adminCount === 0` → `isCreator: true`); o seed agora grava `isCreator: true`, com o comentário de que o
+  admin master é o criador por definição.
+
+#### Fixed
+* **Cobertura de regressão para os dois bugs acima** — `__tests__/api/creator-access.test.ts` ganhou casos
+  explícitos para a flag **ausente** (`delete process.env.CREATOR_ACCESS_ENABLED`, e a asserção de que ela
+  está `undefined`), tanto para `POST` quanto para `DELETE`/`PATCH`, preservando os 18 casos anteriores;
+  e 5 casos para o novo `creatorAccessEnabled` de `/api/auth/me` (flag `"true"` e os valores ausente,
+  `"false"`, `"TRUE"` e `"1"`, este último para travar a comparação estrita).
+* **`__tests__/api/seed-creator.test.ts`** (novo, 6 casos) — com Prisma mockado no estilo de
+  `signup-rbac.test.ts` e `security-auth.test.ts`, trava que o `user.create` do seed recebe
+  `role: 'ADMIN'` **e** `isCreator: true`, que `isCreator: false` enviado no body não sobrepõe o valor,
+  que o log `SYSTEM_INITIALIZED` é gravado com o id do novo creator, e preserva as travas existentes
+  (403 com base já populada, 400 sem email/senha e o redirecionamento do `GET`).
+
+#### Changed
+* **Versão `2.22.7` → `2.23.0`** via `npm version 2.23.0 --no-git-tag-version`. O patch para `2.22.7` estava
+  errado: o conjunto acumula correção de segurança (credenciais MinIO removidas do código, endpoints de
+  listagem sem verificação de assinatura, `/api/database/revert` devolvendo 500 em vez de 401), correção de
+  build da imagem, refactor da verificação de JWT em ~20 endpoints e correção de RBAC no signup — com
+  **mudança de comportamento observável** em endpoints, não apenas correção interna. Isso é **minor**
+  (novo campo em resposta de API, botões condicionais na UI, novo campo `creatorAccessEnabled`), não patch.
+  Apenas `package.json` mudou; `yarn.lock` intacto, nenhuma tag criada (`--no-git-tag-version`) e nenhum
+  commit automático. `lib/version.ts` lê a versão de `package.json`, não há hardcode para atualizar.
 
 ### 🤖 OpenCode Operations
 

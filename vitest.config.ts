@@ -8,9 +8,13 @@ export default defineConfig({
     // Valores fictícios de teste. Nenhum segredo real aqui — ver __tests__/setup.ts
     // e AGENTS.md §3.1. `lib/minio.ts` e `lib/auth.ts` falham no import quando as
     // variáveis obrigatórias estão ausentes, então o ambiente precisa ser semeado.
+    //
+    // `CREATOR_ACCESS_ENABLED` NÃO é semeado aqui de propósito: a flag global
+    // mascarava o bug em que a variável ausente na produção fazia /api/creator-access
+    // responder 403 sempre, enquanto a suíte passava. Cada teste de creator-access
+    // define a flag no seu próprio `beforeEach`.
     env: {
       JWT_SECRET: 'test-secret-key-1234567890',
-      CREATOR_ACCESS_ENABLED: 'true',
       MINIO_ENDPOINT: 'minio.test.local',
       MINIO_ACCESS_KEY: 'test-access-key',
       MINIO_SECRET_KEY: 'test-secret-key',

@@ -26,6 +26,7 @@ interface User {
   email: string;
   role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
   isCreator?: boolean;
+  creatorAccessEnabled?: boolean;
   createdAt: string | Date;
   lastLogin?: string | Date | null;
   theme?: string;
@@ -682,7 +683,7 @@ export default function SettingsPage() {
                             </div>
 
                             <div className="flex flex-wrap gap-2 mt-6">
-                              {user?.isCreator && (
+                              {user?.isCreator && user.creatorAccessEnabled && (
                                 <>
                                   <button
                                     onClick={() => handleEnterAccount(u)}
