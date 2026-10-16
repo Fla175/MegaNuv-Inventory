@@ -3,10 +3,14 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
 import { createLog } from "@/lib/logger";
 import { planRevert, type VersionRow } from "@/lib/revert/history";
-import { batchActivities, toSubItems, type PlannedItem } from "@/lib/revert/batch";
+import { parseSystemVersioningError } from "@/lib/revert/errors";
+import {
+  batchActivities,
+  toSubItems,
+  type PlannedItem,
+} from "@/lib/revert/batch";
 import type { AllowedTable, RevertSubItem } from "@/lib/revert/types";
 import { getSessionUser } from "@/lib/apiAuth";
-
 
 const ALLOWED_TABLES: Record<
   AllowedTable,
@@ -26,7 +30,9 @@ const ALLOWED_TABLES: Record<
   },
 };
 
-type PrismaClientOrTx = typeof db | Parameters<Parameters<typeof db["$transaction"]>[0]>[0];
+type PrismaClientOrTx =
+  | typeof db
+  | Parameters<Parameters<(typeof db)["$transaction"]>[0]>[0];
 
 interface RevertBody {
   groupId?: string;
@@ -262,7 +268,8 @@ async function resolveRevertAt(
 
   const derived = plan.revertAt.getTime();
   const client = new Date(clientTimestamp).getTime();
-  const tolerance = mode === "HISTORY" ? HISTORY_TOLERANCE_MS : QUICK_TOLERANCE_MS;
+  const tolerance =
+    mode === "HISTORY" ? HISTORY_TOLERANCE_MS : QUICK_TOLERANCE_MS;
 
   if (Math.abs(client - derived) > tolerance) {
     throw new Error("STALE_REVERT_LIST");
@@ -359,7 +366,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  const { groupId, items, table, id, timestamp, mode = "QUICK" }: RevertBody = req.body || {};
+  const {
+    groupId,
+    items,
+    table,
+    id,
+    timestamp,
+    mode = "QUICK",
+  }: RevertBody = req.body || {};
 
   // Normalização do payload: aceita lista `items` ou registro único (`table`, `id`, `timestamp`)
   let itemsToRevert: RevertSubItem[] = [];
@@ -370,7 +384,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     itemsToRevert = [{ table: table as AllowedTable, id, timestamp }];
   } else {
     return res.status(400).json({
-      error: "Forneça os campos 'table', 'id' e 'timestamp' ou um array em 'items'.",
+      error:
+        "Forneça os campos 'table', 'id' e 'timestamp' ou um array em 'items'.",
     });
   }
 
@@ -400,7 +415,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
       if (elapsed < -1000 || elapsed > 11000) {
         return res.status(410).json({
-          error: "O período de 10 segundos para desfazer esta alteração expirou.",
+          error:
+            "O período de 10 segundos para desfazer esta alteração expirou.",
         });
       }
     }
@@ -444,7 +460,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
     if (req.method === "GET") {
       return await handleGet(req, res);
@@ -473,6 +492,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             "O histórico mudou desde que esta lista foi carregada. Atualize e tente novamente.",
         });
       }
+    }
+
+    // Falha de infraestrutura do banco (MariaDB 4124): a tabela reversível não
+    // tem `WITH SYSTEM_VERSIONING`, então `FOR SYSTEM_TIME AS OF` não tem o que
+    // ler. É uma condição **acionável e persistente** — retry não resolve — por
+    // isso 503 com o comando de correção, e não 500 genérico.
+    //
+    // O app nunca aplica o DDL: ganhar privilégio de `ALTER TABLE` em produção
+    // para consertar o próprio schema seria inverter a separação de
+    // responsabilidades. A correção é um script operacional idempotente
+    // (`scripts/system-v.ts`), executado por quem tem acesso
+    // ao banco. Ver SPECS.md §5.5.
+    const systemVersioningError = parseSystemVersioningError(error);
+
+    if (systemVersioningError) {
+      const target = systemVersioningError.table
+        ? `A tabela \`${systemVersioningError.table}\` não está com "system versioning" habilitado.`
+        : 'Uma ou mais tabelas usadas pelo Revert não estão com "system versioning" habilitado.';
+
+      // Sem stack e sem a mensagem crua do Prisma/MariaDB: o corpo do 503 é
+      // lido pelo frontend e não pode vazar detalhe do driver.
+      return res.status(503).json({
+        error:
+          `${target} O Revert depende do histórico do MariaDB (WITH SYSTEM VERSIONING), ` +
+          `que não é modelado pelo Prisma. Para corrigir, execute no servidor: ` +
+          `node scripts/system-v.ts --aplicar`,
+      });
     }
 
     return res.status(500).json({
