@@ -33,7 +33,7 @@ e a divergência deve ser registrada em `CHANGELOG.md` na mesma alteração.
 |---|---|
 | Nome | MegaNuv Inventory |
 | Slug (`project.id`) | `meganuv-inventory` |
-| Versão atual | `2.25.0` (fonte da verdade: `package.json:3`, exposta via `lib/version.ts`) |
+| Versão atual | `2.25.1` (fonte da verdade: `package.json:3`, exposta via `lib/version.ts`) |
 | Branch corrente | `inventory-v2.22.6` |
 | Repositório | `Fla175/MegaNuv-Inventory` |
 | Stack | Next.js 15.3.3 (**Pages Router**) · React 19 · TypeScript 5.9 (strict) · Tailwind v4 · Prisma 6 + MariaDB · MinIO (S3) |
