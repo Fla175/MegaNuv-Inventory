@@ -11,10 +11,15 @@
 
 ## [Unreleased]
 
-> **Próxima release: `2.23.0`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
-> hardcode). O bump foi feito com `npm version 2.23.0 --no-git-tag-version`: o `--no-git-tag-version` é
+> **Próxima release: `2.25.0`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
+> hardcode). O bump foi feito com `npm version 2.25.0 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
-> `yarn.lock` não foi tocado. A branch `inventory-v2.23.0` e a tag `v2.23.0` são criação humana.
+> `yarn.lock` não foi tocado. A branch `inventory-v2.25.0` e a tag `v2.25.0` são criação humana.
+>
+> **Por que minor e não patch:** a série desde `2.22.7` soma correção de segurança P0, correção de
+> build, refactor de auth em ~20 endpoints, correção de RBAC, o script de system versioning e agora o
+> **auditor de órfãos do MinIO** — que adiciona um caminho de código novo e uma credencial nova no
+> servidor. Isso é mudança de comportamento observável, não correção pontual.
 
 ### 🤖 OpenCode Operations
 
@@ -92,6 +97,20 @@
 > Nenhum comando de remoção foi executado em nenhum ambiente. O que falta para validação manual:
 > criar a credencial de auditoria, rodar `node scripts/auditar-orfãos.ts --saida relatorio.json`
 > e conferir a lista contra anexos conhecidos de um ativo antes de qualquer `--apagar --confirmar`.
+
+### 🤖 OpenCode Operations
+
+#### Added
+* **Bump de versão `2.23.0` → `2.25.0`** (minor) via `npm version 2.25.0 --no-git-tag-version`.
+  Verificado: `package.json:3` = `2.25.0`, `git diff --stat yarn.lock` **vazio**, `git tag --list "v2.25.0"`
+  **vazio**, nenhum commit automático. Minor e não patch porque a série desde `2.22.7` soma correção de
+  segurança P0, correção de build, refactor de auth, correção de RBAC, o script de system versioning e o
+  auditor de órfãos — caminho de código novo **e** credencial nova a criar no servidor.
+  A branch `inventory-v2.25.0` e a tag `v2.25.0` são criação humana.
+
+#### Docs
+* Versão atualizada para `2.25.0` em `AGENTS.md` (linha "Versão atual"), `CONTEXT.md` (cabeçalho
+  "Versão:" e §4), `README.md` ("Current Version") e nesta nota de release.
 
 ### 🤖 OpenCode Operations
 

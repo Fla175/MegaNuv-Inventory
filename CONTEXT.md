@@ -5,7 +5,7 @@
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
 **Última atualização:** 15/10/2026 · **Branch:** `integration/security-build-auth`
-**Versão:** `2.23.0` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
+**Versão:** `2.25.0` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
 
@@ -84,9 +84,17 @@ conjunto de correções de segurança.
    as duas feature flags foram **removidas do código**. O Acesso do Criador é agora **sempre ativo** e
    **sempre exige a senha do criador** (o dono guarda as senhas no Bitwarden, então não há atrito).
    Causa raiz registrada: flag obrigatória disfarçada de opcional degradou em silêncio.
-10. `test/coverage-baseline` — elevar a cobertura: o gate hoje se aplica só à superfície de segurança (§3.3 #1).
+10. ~~`test/coverage-baseline`~~ — **parcial**: `lib/mediaReferences.ts` entrou com 25 testes unitários
+    (puro, sem I/O). O gate de cobertura em si **continua** se aplicando só à superfície de segurança
+    (§3.3 #1) e o alvo de 70–80% em todo `pages/api/**` segue pendente.
 11. `chore/docker-compose-env` — `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`, e o serviço `app`
     usa `command: yarn dev` com bind-mount do código (a imagem construída não é usada).
+12. **Criar a credencial do auditor de órfãos no MinIO** — §3.3 #17. **Ação humana, anterior ao primeiro uso
+    de `scripts/auditar-orfãos.ts`:** (a) usuário MinIO separado, (b) aplicar
+    `inventory-policy-auditor.json`, (c) `MINIO_AUDIT_ACCESS_KEY` / `MINIO_AUDIT_SECRET_KEY` no ambiente.
+    Não há MinIO local, e o de produção **não tem versioning** — por isso a auditoria foi validada só por
+    unidade. Fazer uma execução de leitura com `--saida`, conferir a lista contra anexos conhecidos de um
+    ativo, e só então considerar `--apagar --confirmar`.
 
 ---
 
@@ -206,13 +214,16 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   obrigatório — sem ele o `npm version` cria tag e commit automático, e a IA não cria tag
   (`AGENTS.md` §3.2). O comando **não** altera o `yarn.lock`. Bump em `package.json` é suficiente:
   `lib/version.ts` lê a versão de lá, sem hardcode.
-- **Versão atual: `2.23.0`** (bumped de `2.22.7`, **minor**). O patch para `2.22.7` era incorreto: a série
-  `refactor/auth-helper` carrega correção de segurança, correção de build, refactor de auth em ~20 endpoints
-  e correção de RBAC, com **mudança de comportamento observável** (botões condicionais na UI, novo
-  `isCreator` no seed, exigência de senha do criador em toda entrada) — isso é minor, não patch.
+- **Versão atual: `2.25.0`** (bumped de `2.23.0`, **minor**). O patch seria incorreto: a série desde
+  `2.22.7` carrega correção de segurança P0, correção de build, refactor de auth em ~20 endpoints,
+  correção de RBAC, o script `garantir-system-versioning.ts` e agora o **auditor de órfãos do MinIO**
+  (`scripts/auditar-orfãos.ts`) com `lib/mediaReferences.ts` e a policy separada
+  `inventory-policy-auditor.json` — caminho de código novo **e** credencial nova a criar no servidor.
+  `refactor/auth-helper` já era minor pelos botões condicionais na UI, pelo `isCreator` no seed e pela
+  exigência de senha do criador em toda entrada.
   O campo `creatorAccessEnabled` que chegou a ser adicionado em `/api/auth/me` foi **removido** na
   sequência (§2.3 item 9), junto com as duas feature flags do Acesso do Criador.
-  A branch `inventory-v2.23.0` e a tag `v2.23.0` são criação humana; a `inventory-v2.22.7` **não** deve ser
+  A branch `inventory-v2.25.0` e a tag `v2.25.0` são criação humana; a `inventory-v2.22.7` **não** deve ser
   criada.
 - `npm` é proibido para **instalar** dependências (`AGENTS.md` §3.3), mas `npm version` é seguro: ele
   não toca em lockfile nem em `node_modules`.
