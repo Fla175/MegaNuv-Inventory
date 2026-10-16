@@ -22,9 +22,9 @@
 // A extensão `.ts` no import é necessária, e não descuido: o type-stripping
 // nativo do Node resolve especificadores ESM e **não** faz a resolução de
 // bundler que o Next faz, então `'./mediaUrl'` só acha o arquivo dentro do
-// bundle. `scripts/auditar-orfãos.ts` importa este módulo direto pelo Node
+// bundle. `scripts/audit-minio.ts` importa este módulo direto pelo Node
 // (`allowImportingTsExtensions` em `tsconfig.json` autoriza a forma).
-import { getMinioKeyFromUrl } from './mediaUrl.ts';
+import { getMinioKeyFromUrl } from "./mediaUrl.ts";
 
 /**
  * Lê `Active.fileUrl` nos dois formatos legados e devolve a lista de URLs.
@@ -66,7 +66,7 @@ function readAsJsonArray(fileUrl: string): string[] | null {
 
 function readAsCsv(fileUrl: string): string[] {
   return fileUrl
-    .split(',')
+    .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
@@ -170,7 +170,8 @@ export function findOrphans({
     if (referencedKeys.has(key)) continue;
 
     const lastModified = objectAges.get(key);
-    const age = lastModified instanceof Date ? lastModified.getTime() : Number.NaN;
+    const age =
+      lastModified instanceof Date ? lastModified.getTime() : Number.NaN;
 
     if (Number.isNaN(age) || age >= graceCutoff.getTime()) {
       protectedByGrace.push(key);

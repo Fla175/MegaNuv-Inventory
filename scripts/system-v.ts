@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/garantir-system-versioning.ts
+ * scripts/system-v.ts
  *
  * Verifica (e, com `--aplicar`, habilita) o `WITH SYSTEM VERSIONING` nas
  * tabelas que o Revert exige. Existe porque o Prisma **não modela** system
@@ -19,9 +19,9 @@
  *
  * Uso (sem build, sem runner — Node 22 executa `.ts` por type-stripping):
  *
- *   node scripts/garantir-system-versioning.ts            # somente leitura (padrão)
- *   node scripts/garantir-system-versioning.ts --aplicar  # habilita o que falta
- *   node scripts/garantir-system-versioning.ts --tabela Active
+ *   node scripts/system-v.ts            # somente leitura (padrão)
+ *   node scripts/system-v.ts --aplicar  # habilita o que falta
+ *   node scripts/system-v.ts --tabela Active
  *
  * Sem argumentos nada é alterado. O script é idempotente: rodar `--aplicar`
  * duas vezes não executa DDL na segunda vez, porque só entra no `ALTER` o que
@@ -34,8 +34,8 @@
  * o **nome do schema** selecionado. Nenhuma credencial e nenhum host de banco
  * são lidos, derivados ou exibidos.
  */
-import db from '../lib/prisma.ts';
-import { REVERTABLE_TABLES } from '../lib/revert/history.ts';
+import db from "../lib/prisma.ts";
+import { REVERTABLE_TABLES } from "../lib/revert/history.ts";
 
 // O import acima é relativo, e não `@/lib/prisma`, por uma razão concreta:
 // o type-stripping nativo do Node resolve especificadores ESM e **não** lê os
@@ -43,7 +43,7 @@ import { REVERTABLE_TABLES } from '../lib/revert/history.ts';
 // módulo importado continua sendo o singleton sancionado (SPECS.md §1.2); o
 // que muda é só a forma de escrever o caminho para fora do bundle do Next.
 
-type Situation = 'OK' | 'AUSENTE' | 'PENDENTE';
+type Situation = "OK" | "AUSENTE" | "PENDENTE";
 
 interface TableStatus {
   table: string;
@@ -73,7 +73,7 @@ function expectedTables(): string[] {
 class UsageError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'UsageError';
+    this.name = "UsageError";
   }
 }
 
@@ -83,16 +83,16 @@ function parseArgs(argv: readonly string[]): Options {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
 
-    if (arg === '--aplicar') {
+    if (arg === "--aplicar") {
       options.apply = true;
       continue;
     }
 
-    if (arg === '--tabela') {
+    if (arg === "--tabela") {
       const value = argv[index + 1];
 
       if (!value) {
-        throw new UsageError('--tabela exige o nome de uma tabela.');
+        throw new UsageError("--tabela exige o nome de uma tabela.");
       }
 
       options.onlyTable = value;
@@ -137,10 +137,14 @@ function quoteIdentifier(name: string): string {
  * ele pergunta ao schema que o `DATABASE_URL` já selecionou, sem que o nome
  * do schema precise ser repetido (ou exposto) no código.
  */
-async function readStatus(tables: readonly string[]): Promise<Map<string, string | null>> {
-  const placeholders = tables.map(() => '?').join(', ');
+async function readStatus(
+  tables: readonly string[]
+): Promise<Map<string, string | null>> {
+  const placeholders = tables.map(() => "?").join(", ");
 
-  const rows = await db.$queryRawUnsafe<Array<{ TABLE_NAME: string; TABLE_TYPE: string }>>(
+  const rows = await db.$queryRawUnsafe<
+    Array<{ TABLE_NAME: string; TABLE_TYPE: string }>
+  >(
     `SELECT TABLE_NAME, TABLE_TYPE
        FROM information_schema.tables
       WHERE TABLE_SCHEMA = DATABASE()
@@ -151,7 +155,10 @@ async function readStatus(tables: readonly string[]): Promise<Map<string, string
   const found = new Map<string, string | null>();
 
   for (const row of rows) {
-    found.set(row.TABLE_NAME, row.TABLE_TYPE === 'SYSTEM VERSIONED' ? 'YES' : 'NO');
+    found.set(
+      row.TABLE_NAME,
+      row.TABLE_TYPE === "SYSTEM VERSIONED" ? "YES" : "NO"
+    );
   }
 
   return found;
@@ -159,13 +166,13 @@ async function readStatus(tables: readonly string[]): Promise<Map<string, string
 
 function toStatus(table: string, systemVersioning: string | null): TableStatus {
   if (systemVersioning === null) {
-    return { table, systemVersioning: null, situation: 'AUSENTE' };
+    return { table, systemVersioning: null, situation: "AUSENTE" };
   }
 
   return {
     table,
     systemVersioning,
-    situation: systemVersioning === 'YES' ? 'OK' : 'PENDENTE',
+    situation: systemVersioning === "YES" ? "OK" : "PENDENTE",
   };
 }
 
@@ -178,7 +185,9 @@ function toStatus(table: string, systemVersioning: string | null): TableStatus {
  */
 async function applyPending(pending: readonly TableStatus[]): Promise<void> {
   for (const { table } of pending) {
-    console.log(`  aplicando: ALTER TABLE ${quoteIdentifier(table)} ADD SYSTEM VERSIONING`);
+    console.log(
+      `  aplicando: ALTER TABLE ${quoteIdentifier(table)} ADD SYSTEM VERSIONING`
+    );
     await db.$executeRawUnsafe(
       `ALTER TABLE ${quoteIdentifier(table)} ADD SYSTEM VERSIONING`
     );
@@ -186,10 +195,10 @@ async function applyPending(pending: readonly TableStatus[]): Promise<void> {
 }
 
 function printTable(statuses: readonly TableStatus[]): void {
-  const header = ['TABELA', 'SYSTEM VERSIONING', 'SITUAÇÃO'];
+  const header = ["TABELA", "SYSTEM VERSIONING", "SITUAÇÃO"];
   const rows = statuses.map((status) => [
     status.table,
-    status.systemVersioning ?? '(ausente)',
+    status.systemVersioning ?? "(ausente)",
     status.situation,
   ]);
   const widths = header.map((cell, column) =>
@@ -197,10 +206,10 @@ function printTable(statuses: readonly TableStatus[]): void {
   );
 
   const line = (cells: readonly string[]) =>
-    cells.map((cell, column) => cell.padEnd(widths[column])).join('  ');
+    cells.map((cell, column) => cell.padEnd(widths[column])).join("  ");
 
   console.log(line(header));
-  console.log(widths.map((width) => '-'.repeat(width)).join('  '));
+  console.log(widths.map((width) => "-".repeat(width)).join("  "));
 
   for (const row of rows) {
     console.log(line(row));
@@ -208,7 +217,7 @@ function printTable(statuses: readonly TableStatus[]): void {
 }
 
 function isResolved(status: TableStatus): boolean {
-  return status.systemVersioning === 'YES';
+  return status.systemVersioning === "YES";
 }
 
 async function main(): Promise<void> {
@@ -218,46 +227,54 @@ async function main(): Promise<void> {
   if (options.onlyTable !== null && !all.includes(options.onlyTable)) {
     throw new UsageError(
       `Tabela '${options.onlyTable}' não é uma tabela do Revert. ` +
-        `Esperadas: ${all.join(', ')}.`
+        `Esperadas: ${all.join(", ")}.`
     );
   }
 
   const tables = options.onlyTable === null ? all : [options.onlyTable];
 
-  const schemaRows = await db.$queryRawUnsafe<Array<{ DATABASE_NAME: string | null }>>(
-    'SELECT DATABASE() AS DATABASE_NAME'
-  );
+  const schemaRows = await db.$queryRawUnsafe<
+    Array<{ DATABASE_NAME: string | null }>
+  >("SELECT DATABASE() AS DATABASE_NAME");
   const schema = schemaRows[0]?.DATABASE_NAME ?? null;
 
   console.log(
-    `Schema inspecionado: ${schema ?? '(desconhecido)'} · ` +
-      `modo: ${options.apply ? 'aplicar' : 'somente leitura'}`
+    `Schema inspecionado: ${schema ?? "(desconhecido)"} · ` +
+      `modo: ${options.apply ? "aplicar" : "somente leitura"}`
   );
 
   const before = await readStatus(tables);
-  const statuses = tables.map((table) => toStatus(table, before.get(table) ?? null));
+  const statuses = tables.map((table) =>
+    toStatus(table, before.get(table) ?? null)
+  );
 
-  console.log('');
+  console.log("");
   printTable(statuses);
-  console.log('');
+  console.log("");
 
   if (options.apply) {
-    const pending = statuses.filter((status) => status.situation === 'PENDENTE');
+    const pending = statuses.filter(
+      (status) => status.situation === "PENDENTE"
+    );
 
     if (pending.length === 0) {
-      console.log('Nada a aplicar.');
+      console.log("Nada a aplicar.");
     } else {
-      console.log(`Habilitando system versioning em ${pending.length} tabela(s):`);
+      console.log(
+        `Habilitando system versioning em ${pending.length} tabela(s):`
+      );
       await applyPending(pending);
     }
 
     // Releitura: o estado final é sempre medido, nunca presumido.
     const after = await readStatus(tables);
-    const final = tables.map((table) => toStatus(table, after.get(table) ?? null));
+    const final = tables.map((table) =>
+      toStatus(table, after.get(table) ?? null)
+    );
 
-    console.log('');
+    console.log("");
     printTable(final);
-    console.log('');
+    console.log("");
     check(final);
     return;
   }
@@ -273,29 +290,29 @@ function check(statuses: readonly TableStatus[]): void {
     const scope =
       statuses.length === 1
         ? `A tabela '${statuses[0].table}' está`
-        : 'Todas as tabelas do Revert estão';
+        : "Todas as tabelas do Revert estão";
 
     console.log(`${scope} com system versioning habilitado.`);
     return;
   }
 
-  const missing = unresolved.filter((status) => status.situation === 'AUSENTE');
+  const missing = unresolved.filter((status) => status.situation === "AUSENTE");
 
   console.error(
     `FALHA: ${unresolved.length} tabela(s) do Revert sem system versioning: ` +
-      unresolved.map((status) => status.table).join(', ') +
-      '.'
+      unresolved.map((status) => status.table).join(", ") +
+      "."
   );
 
   if (missing.length > 0) {
     console.error(
       `As tabelas ausentes precisam existir antes: ${missing
         .map((status) => status.table)
-        .join(', ')} (rode as migrations do Prisma).`
+        .join(", ")} (rode as migrations do Prisma).`
     );
   }
 
-  console.error('Para corrigir: node scripts/garantir-system-versioning.ts --aplicar');
+  console.error("Para corrigir: node scripts/system-v.ts --aplicar");
   process.exitCode = 1;
 }
 
@@ -307,8 +324,8 @@ main()
       console.error(`Erro de uso: ${error.message}`);
     } else {
       console.error(
-        'Erro ao executar o script (verifique DATABASE_URL e a conectividade):',
-        error instanceof Error ? error.name : 'desconhecido'
+        "Erro ao executar o script (verifique DATABASE_URL e a conectividade):",
+        error instanceof Error ? error.name : "desconhecido"
       );
     }
 

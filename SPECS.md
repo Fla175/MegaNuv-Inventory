@@ -14,25 +14,26 @@ Sistema interno de **gestão de inventário de ativos físicos** da empresa Mega
 Permite cadastrar ativos (equipamentos, espaços físicos, containers), organizá-los em uma
 **hierarquia recursiva de espaços** (`FatherSpace` → `Active` filho → `Active` filho), localizá-los
 fisicamente, Controlar **movimentações** entre locais, anexar arquivos/imagens em **MinIO (S3)**,
-imprimir **etiquetas com QR Code** e **reverter alterações** usando *system-versioning* do MariaDB.
+imprimir **etiquetas com QR Code** e **reverter alterações** usando _system-versioning_ do MariaDB.
 
 Não é: ERP, sistema financeiro (só armazena `fixedValue` como número), ou CRM.
 
 ### 1.2 Domain Boundaries (Bounded Contexts)
 
-| Contexto | Responsabilidade | Código |
-|---|---|---|
-| **Identidade & Acesso** | Login, JWT, papéis (RBAC de 4 níveis), tema, bootstrap do 1º ADMIN | `pages/api/auth/**`, `lib/auth.ts`, `lib/middlewares/authMiddleware.ts`, `pages/login.tsx`, `pages/initial-setup/` |
-| **Inventário** | CRUD de ativos, clonagem em lote, movimentação, "alterar ativos semelhantes" | `pages/api/actives/**`, `components/actives/activeForm.tsx` |
-| **Espaços** | CRUD de `FatherSpace` e da hierarquia de locais | `pages/api/father-spaces/**`, `components/AddLocationModal.tsx` |
-| **Taxonomia** | Categorias (ex-"Áreas") com paleta de 18 cores persistidas | `pages/api/categories/**`, `lib/constants/colors.ts` |
-| **Armazenamento de Mídia** | Upload multipart → MinIO, presigned URL, proxy autenticado, exclusão | `pages/api/storage/**`, `lib/minio.ts`, `lib/mediaUrl.ts`, `lib/mediaReferences.ts` |
-| **Auditoria** | Log imutável de CRUD, logins e signups | `lib/logger.ts`, `pages/api/logs/**`, model `Log` |
-| **Realtime do Banco** | Reversão temporal de alterações via *system-versioning* | `pages/api/database/revert.ts` |
-| **Apresentação** | Dashboard, listagem, busca, modais, impressão, context menu, toasts | `pages/*.tsx`, `components/**`, `lib/context/**` |
-| **Plataforma** | Roteamento protegido, config de build, estilo global | `middleware.ts`, `next.config.ts`, `styles/globals.css` |
+| Contexto                   | Responsabilidade                                                             | Código                                                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Identidade & Acesso**    | Login, JWT, papéis (RBAC de 4 níveis), tema, bootstrap do 1º ADMIN           | `pages/api/auth/**`, `lib/auth.ts`, `lib/middlewares/authMiddleware.ts`, `pages/login.tsx`, `pages/initial-setup/` |
+| **Inventário**             | CRUD de ativos, clonagem em lote, movimentação, "alterar ativos semelhantes" | `pages/api/actives/**`, `components/actives/activeForm.tsx`                                                        |
+| **Espaços**                | CRUD de `FatherSpace` e da hierarquia de locais                              | `pages/api/father-spaces/**`, `components/AddLocationModal.tsx`                                                    |
+| **Taxonomia**              | Categorias (ex-"Áreas") com paleta de 18 cores persistidas                   | `pages/api/categories/**`, `lib/constants/colors.ts`                                                               |
+| **Armazenamento de Mídia** | Upload multipart → MinIO, presigned URL, proxy autenticado, exclusão         | `pages/api/storage/**`, `lib/minio.ts`, `lib/mediaUrl.ts`, `lib/mediaReferences.ts`                                |
+| **Auditoria**              | Log imutável de CRUD, logins e signups                                       | `lib/logger.ts`, `pages/api/logs/**`, model `Log`                                                                  |
+| **Realtime do Banco**      | Reversão temporal de alterações via _system-versioning_                      | `pages/api/database/revert.ts`                                                                                     |
+| **Apresentação**           | Dashboard, listagem, busca, modais, impressão, context menu, toasts          | `pages/*.tsx`, `components/**`, `lib/context/**`                                                                   |
+| **Plataforma**             | Roteamento protegido, config de build, estilo global                         | `middleware.ts`, `next.config.ts`, `styles/globals.css`                                                            |
 
 **Fronteiras invioláveis:**
+
 - Nenhum componente React importa de `pages/api/**` (só via `fetch`).
 - Nenhuma página `pages/*.tsx` importa de outro `pages/*.tsx` (exceto `_app`/`_document`).
 - `lib/` nunca importa de `pages/` nem de `components/`.
@@ -44,38 +45,38 @@ Não é: ERP, sistema financeiro (só armazena `fixedValue` como número), ou CR
 
 ### 2.1 Runtime, Languages & Ecosystem
 
-| Item | Versão | Fonte da verdade |
-|---|---|---|
-| Node.js | `v22.20.0` (alpine no Docker) | `Dockerfile:2,12` |
-| TypeScript | `5.9.3`, `strict: true` | `tsconfig.json:7` |
-| Target / Lib | `ES2017` / `["dom","dom.iterable","esnext"]` | `tsconfig.json:2,4` |
-| Module resolution | `bundler` | `tsconfig.json:11` |
-| Path alias | `@/*` → `./*` (raiz, não `src/`) | `tsconfig.json:16-18` |
-| Gerenciador | **Yarn 1** (`yarn.lock` rastreado) | `package.json`, `yarn.lock` |
-| Gerenciador proibido | `npm` — `package-lock.json` é artefato acidental | `AGENTS.md` §3.3 |
-| Módulos | **CommonJS** (sem campo `type` em `package.json`) | `package.json` |
+| Item                 | Versão                                            | Fonte da verdade            |
+| -------------------- | ------------------------------------------------- | --------------------------- |
+| Node.js              | `v22.20.0` (alpine no Docker)                     | `Dockerfile:2,12`           |
+| TypeScript           | `5.9.3`, `strict: true`                           | `tsconfig.json:7`           |
+| Target / Lib         | `ES2017` / `["dom","dom.iterable","esnext"]`      | `tsconfig.json:2,4`         |
+| Module resolution    | `bundler`                                         | `tsconfig.json:11`          |
+| Path alias           | `@/*` → `./*` (raiz, não `src/`)                  | `tsconfig.json:16-18`       |
+| Gerenciador          | **Yarn 1** (`yarn.lock` rastreado)                | `package.json`, `yarn.lock` |
+| Gerenciador proibido | `npm` — `package-lock.json` é artefato acidental  | `AGENTS.md` §3.3            |
+| Módulos              | **CommonJS** (sem campo `type` em `package.json`) | `package.json`              |
 
 ### 2.2 Frameworks & Hard Dependencies
 
 **Usadas (obrigatórias):**
 
-| Pacote | Versão | Papel |
-|---|---|---|
-| `next` | `15.3.3` (fixo) | Framework, **Pages Router** |
-| `react` / `react-dom` | `^19.0.0` (instalado 19.1.0) | UI |
-| `@prisma/client` | `6.18.0` (fixo) | ORM |
-| `prisma` (dev) | `^6.18.0` | CLI de migrations |
-| `tailwindcss` + `@tailwindcss/postcss` | `^4` (instalado 4.1.11) | Estilos, config CSS-first |
-| `@tailwindcss/container-queries` | `^0.1.1` | Plugin de container queries |
-| `jose` | `^6.1.0` | JWT HS256 (`sign`/`verify`) — **única lib de auth real** |
-| `bcryptjs` | `^3.0.3` | Hash de senha (10 rounds) |
-| `minio` | `^8.0.6` | Cliente S3 para MinIO |
-| `formidable` | `^3.5.4` | Parse multipart do upload |
-| `lucide-react` | `^0.525.0` | Ícones |
-| `react-qr-code` | `^2.0.18` | Render de QR Code |
-| `react-number-format` | `^5.4.5` | Máscara numérica em `/settings` |
-| `cookie` | `^1.0.2` | `serialize()` do cookie de sessão |
-| `eslint` + `eslint-config-next` | `^9` / `15.3.3` | Flat config via `FlatCompat` |
+| Pacote                                 | Versão                       | Papel                                                    |
+| -------------------------------------- | ---------------------------- | -------------------------------------------------------- |
+| `next`                                 | `15.3.3` (fixo)              | Framework, **Pages Router**                              |
+| `react` / `react-dom`                  | `^19.0.0` (instalado 19.1.0) | UI                                                       |
+| `@prisma/client`                       | `6.18.0` (fixo)              | ORM                                                      |
+| `prisma` (dev)                         | `^6.18.0`                    | CLI de migrations                                        |
+| `tailwindcss` + `@tailwindcss/postcss` | `^4` (instalado 4.1.11)      | Estilos, config CSS-first                                |
+| `@tailwindcss/container-queries`       | `^0.1.1`                     | Plugin de container queries                              |
+| `jose`                                 | `^6.1.0`                     | JWT HS256 (`sign`/`verify`) — **única lib de auth real** |
+| `bcryptjs`                             | `^3.0.3`                     | Hash de senha (10 rounds)                                |
+| `minio`                                | `^8.0.6`                     | Cliente S3 para MinIO                                    |
+| `formidable`                           | `^3.5.4`                     | Parse multipart do upload                                |
+| `lucide-react`                         | `^0.525.0`                   | Ícones                                                   |
+| `react-qr-code`                        | `^2.0.18`                    | Render de QR Code                                        |
+| `react-number-format`                  | `^5.4.5`                     | Máscara numérica em `/settings`                          |
+| `cookie`                               | `^1.0.2`                     | `serialize()` do cookie de sessão                        |
+| `eslint` + `eslint-config-next`        | `^9` / `15.3.3`              | Flat config via `FlatCompat`                             |
 
 **Declaradas e NUNCA importadas (12) — remover sob escopo próprio:**
 
@@ -90,21 +91,21 @@ MinIO externo ao compose · `output: "standalone"` no Next.
 
 ### 2.3 Structural Limits
 
-| Limite | Valor | Onde |
-|---|---|---|
-| Tamanho de upload | **10 MB** por arquivo (validado **só no cliente**) | `components/FileUpload.tsx:134` |
-| Arquivos por ativo | até **5** | `components/FileUpload.tsx:54` |
-| Validade do JWT | **8 h**, sem refresh token | `lib/auth.ts:43-58` |
-| Validade da presigned URL | **1 h** | `pages/api/qrcode/public-get.ts` |
-| Logs listados | `take: 200` | `pages/api/logs/list` |
-| Itens do dashboard | 20 recentes / 20 movimentos | `pages/api/dashboard/stats` |
-| Janela do Revert `QUICK` | **10 s** (validada server-side) | `pages/api/database/revert.ts` |
-| Tolerância do timestamp no Revert | QUICK **11 s** · HISTORY **5 ms** (servidor deriva o instante via `planRevert`; divergência → `409`) | `pages/api/database/revert.ts` (`resolveRevertAt`) |
-| `SYSTEM_TIME_MAX` | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB) | `lib/revert/history.ts` (`TIMESTAMP_MAX`) |
-| Tabelas reversíveis | `Active`, `FatherSpace`, `Category` (whitelist) | `lib/revert/history.ts` (`REVERTABLE_TABLES`) |
-| Escala do inventário | `Active.id` = 4 chars hex (65.536 combinações) — colisão provável em inventário grande | `lib/prisma.ts:8-24` |
-| Tamanho máximo de arquivo de componente | **1.927 linhas** em `components/ListSection.tsx` | — |
-| Threads de conexão Prisma | 1 (singleton com hot-reload guard) | `lib/prisma.ts:46-54` |
+| Limite                                  | Valor                                                                                                | Onde                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Tamanho de upload                       | **10 MB** por arquivo (validado **só no cliente**)                                                   | `components/FileUpload.tsx:134`                    |
+| Arquivos por ativo                      | até **5**                                                                                            | `components/FileUpload.tsx:54`                     |
+| Validade do JWT                         | **8 h**, sem refresh token                                                                           | `lib/auth.ts:43-58`                                |
+| Validade da presigned URL               | **1 h**                                                                                              | `pages/api/qrcode/public-get.ts`                   |
+| Logs listados                           | `take: 200`                                                                                          | `pages/api/logs/list`                              |
+| Itens do dashboard                      | 20 recentes / 20 movimentos                                                                          | `pages/api/dashboard/stats`                        |
+| Janela do Revert `QUICK`                | **10 s** (validada server-side)                                                                      | `pages/api/database/revert.ts`                     |
+| Tolerância do timestamp no Revert       | QUICK **11 s** · HISTORY **5 ms** (servidor deriva o instante via `planRevert`; divergência → `409`) | `pages/api/database/revert.ts` (`resolveRevertAt`) |
+| `SYSTEM_TIME_MAX`                       | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB)                                        | `lib/revert/history.ts` (`TIMESTAMP_MAX`)          |
+| Tabelas reversíveis                     | `Active`, `FatherSpace`, `Category` (whitelist)                                                      | `lib/revert/history.ts` (`REVERTABLE_TABLES`)      |
+| Escala do inventário                    | `Active.id` = 4 chars hex (65.536 combinações) — colisão provável em inventário grande               | `lib/prisma.ts:8-24`                               |
+| Tamanho máximo de arquivo de componente | **1.927 linhas** em `components/ListSection.tsx`                                                     | —                                                  |
+| Threads de conexão Prisma               | 1 (singleton com hot-reload guard)                                                                   | `lib/prisma.ts:46-54`                              |
 
 ---
 
@@ -115,18 +116,19 @@ MinIO externo ao compose · `output: "standalone"` no Next.
 Estilo: **monólito modular em camadas**, sem `src/`, sem barrel files, sem DI container.
 Serverless-first (Pages Router → cada `pages/api/**` é uma função independente).
 
-| Pattern | Aplicação |
-|---|---|
-| Singleton | `lib/prisma.ts` — guarda em `global.prismaGlobal` para hot-reload |
-| Repository implícito | Acessos Prisma ficam no handler; não há camada de repositório |
-| Middleware chain | `middleware.ts` (rota) → auth dentro do handler |
-| HOC | `lib/middlewares/authMiddleware.ts` — `authMiddleware(handler, requiredRoles?)` |
-| Context Provider | `UserContext` (usuário+tema), `ToastContext` (notificações) |
-| Hook | `useEscapeKey`, `useMediaQuery` |
-| Extension hook | `$extends` com query hook gerando IDs hex em `active.create` e `fatherSpace.create` |
-| Anti-corrupção | `lib/mediaUrl.ts` reescreve URL do MinIO → proxy local autenticado |
+| Pattern              | Aplicação                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| Singleton            | `lib/prisma.ts` — guarda em `global.prismaGlobal` para hot-reload                   |
+| Repository implícito | Acessos Prisma ficam no handler; não há camada de repositório                       |
+| Middleware chain     | `middleware.ts` (rota) → auth dentro do handler                                     |
+| HOC                  | `lib/middlewares/authMiddleware.ts` — `authMiddleware(handler, requiredRoles?)`     |
+| Context Provider     | `UserContext` (usuário+tema), `ToastContext` (notificações)                         |
+| Hook                 | `useEscapeKey`, `useMediaQuery`                                                     |
+| Extension hook       | `$extends` com query hook gerando IDs hex em `active.create` e `fatherSpace.create` |
+| Anti-corrupção       | `lib/mediaUrl.ts` reescreve URL do MinIO → proxy local autenticado                  |
 
 **Convenção de branch (referenciado em `AGENTS.md` §3.2):**
+
 - Branch de trabalho da IA: `<tipo>/<slug-curto>`, com `<tipo> ∈ {feat, fix, perf, refactor, chore, docs, test}`.
 - Branch de release: `inventory-vX.Y.Z` — **proibida para a IA** (ver `CONTEXT.md` §4).
 
@@ -177,8 +179,8 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 ├── styles/globals.css       # 123 L — @media print p/ etiquetas
 ├── scripts/
 │   ├── build-optimized.sh  # build standalone + montagem dos assets p/ o runner
-│   ├── garantir-system-versioning.ts  # habilita WITH SYSTEM VERSIONING (idempotente)
-│   └── auditar-orfãos.ts    # órfãos do bucket MinIO (leitura por padrão; --apagar --confirmar)
+│   ├── system-v.ts  # habilita WITH SYSTEM VERSIONING (idempotente)
+│   └── audit-minio.ts    # órfãos do bucket MinIO (leitura por padrão; --apagar --confirmar)
 └── public/                  # 7 SVG (6 são boilerplate do Next, sem uso)
 ```
 
@@ -195,6 +197,7 @@ prisma/schema.prisma → (nenhum)
 ```
 
 **Proibido:**
+
 - `lib/**` → `pages/**` ou `components/**` (inverte a dependência).
 - `pages/api/**` → outro `pages/api/**`.
 - Import de valor (não só tipo) de `@prisma/client` em componente de UI.
@@ -220,18 +223,19 @@ Active 1──N Active           ("ActiveHierarchy", onDelete: Cascade)  ← rec
 Active 1──N Movement         (onDelete: Cascade)
 ```
 
-| Model | PK | Campos-chave | Índices |
-|---|---|---|---|
-| `User` | `id` uuid | `email` @unique, `password`, `name?`, `role`, `theme`, `lastLogin?`, **`isCreator`** | `email` @unique |
-| `Movement` | `id` uuid | `activeId` FK, `fromSpaceId?`, `toSpaceId?` (Strings **sem FK** — desnormalizadas para preservar histórico) | — |
-| `Category` | `id` uuid | `name` @unique, **`color` @unique nullable**, 18 cores na paleta | `name`, `color` @unique |
-| `Log` | `id` uuid | `action`, `details` @db.Text, `ip?`, `userAgent?` @db.Text, `userId?` | `@@index([userId])`, `@@index([action])` |
-| `FatherSpace` | `id` String (**sem default**) | `name` @unique, `notes?`, `address?`, `imageUrl?`, `phone?`, `responsible?`, `parentId?`, `createdById?` | `@@index([parentId])`, `@@index([createdById])` |
-| `Active` | `id` String (**sem default**) | `name`, **`categoryId` obrigatório**, `sku?`, `manufacturer?`, `model?`, **`serialNumber?` @unique**, `fixedValue` Float, **`fatherSpaceId` obrigatório**, `parentId?`, `isPhysicalSpace`, `tag` @default("IN-STOCK"), `notes?` @db.Text, `imageUrl?`, **`fileUrl?` @db.Text** | `@@index([fatherSpaceId])`, `@@index([parentId])`, `@@index([createdById])`, `@@index([categoryId])` |
+| Model         | PK                            | Campos-chave                                                                                                                                                                                                                                                                   | Índices                                                                                              |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `User`        | `id` uuid                     | `email` @unique, `password`, `name?`, `role`, `theme`, `lastLogin?`, **`isCreator`**                                                                                                                                                                                           | `email` @unique                                                                                      |
+| `Movement`    | `id` uuid                     | `activeId` FK, `fromSpaceId?`, `toSpaceId?` (Strings **sem FK** — desnormalizadas para preservar histórico)                                                                                                                                                                    | —                                                                                                    |
+| `Category`    | `id` uuid                     | `name` @unique, **`color` @unique nullable**, 18 cores na paleta                                                                                                                                                                                                               | `name`, `color` @unique                                                                              |
+| `Log`         | `id` uuid                     | `action`, `details` @db.Text, `ip?`, `userAgent?` @db.Text, `userId?`                                                                                                                                                                                                          | `@@index([userId])`, `@@index([action])`                                                             |
+| `FatherSpace` | `id` String (**sem default**) | `name` @unique, `notes?`, `address?`, `imageUrl?`, `phone?`, `responsible?`, `parentId?`, `createdById?`                                                                                                                                                                       | `@@index([parentId])`, `@@index([createdById])`                                                      |
+| `Active`      | `id` String (**sem default**) | `name`, **`categoryId` obrigatório**, `sku?`, `manufacturer?`, `model?`, **`serialNumber?` @unique**, `fixedValue` Float, **`fatherSpaceId` obrigatório**, `parentId?`, `isPhysicalSpace`, `tag` @default("IN-STOCK"), `notes?` @db.Text, `imageUrl?`, **`fileUrl?` @db.Text** | `@@index([fatherSpaceId])`, `@@index([parentId])`, `@@index([createdById])`, `@@index([categoryId])` |
 
 **Enums:** `UserRole { DIRECTOR, ADMIN, MANAGER, VIEWER }` · `Theme { DARK, LIGHT, SYSTEM }`
 
 **Invariantes:**
+
 - Exclusão de `FatherSpace` ou `Active` pai faz **cascade** em toda a subárvore. Endpoint de delete **deve** avisar sobre o tamanho da subárvore.
 - `fileUrl` é `TEXT` e aceita **dois formatos legados**: JSON array **ou** CSV separado por vírgula.
   A leitura dos dois vive em `lib/mediaReferences.ts` (`parseFileUrls`) — **cópia única**, consumida pelo
@@ -243,7 +247,7 @@ Active 1──N Movement         (onDelete: Cascade)
 
 ### 4.2 API Contracts & Payload Schemas
 
-**Envelope de erro (consistente em todo `pages/api/**`):**
+**Envelope de erro (consistente em todo `pages/api/**`):\*\*
 
 ```ts
 type ApiError = { error: string };
@@ -256,34 +260,34 @@ Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é
 
 **RBAC (matriz de referência):**
 
-| Papel | Leitura | CRUD de ativos/espaços/categorias | Gerencia usuários | Vê `fixedValue` | Logs | Revert |
-|---|---|---|---|---|---|---|
-| `DIRECTOR` | total | sim | todos | sim | sim (inclusive edita/deleta) | sim |
-| `ADMIN` | total | sim | exceto DIRECTOR | **não** (só total agregado) | sim | sim |
-| `MANAGER` | total | sim | só `VIEWER` | **não** | sim | sim |
-| `VIEWER` | total | **não** | não | **não** | não | não |
+| Papel      | Leitura | CRUD de ativos/espaços/categorias | Gerencia usuários | Vê `fixedValue`             | Logs                         | Revert |
+| ---------- | ------- | --------------------------------- | ----------------- | --------------------------- | ---------------------------- | ------ |
+| `DIRECTOR` | total   | sim                               | todos             | sim                         | sim (inclusive edita/deleta) | sim    |
+| `ADMIN`    | total   | sim                               | exceto DIRECTOR   | **não** (só total agregado) | sim                          | sim    |
+| `MANAGER`  | total   | sim                               | só `VIEWER`       | **não**                     | sim                          | sim    |
+| `VIEWER`   | total   | **não**                           | não               | **não**                     | não                          | não    |
 
 `DIRECTOR` é o único papel que pode ser criado por `signup` (`pages/api/auth/signup.ts:54-60`).
 
 **Endpoints sensíveis (contrato de segurança — ver §5.1 e `CONTEXT.md` §3):**
 
-| Endpoint | Método | Hoje | Deve ser |
-|---|---|---|---|
-| `/api/auth/login` | POST | público | público (credenciais) |
-| `/api/auth/logout` | POST | público | público (limpa auth_token e auth_token_creator) |
-| `/api/auth/me` | GET | privado | privado (retorna user e impersonation) |
-| `/api/auth/seed` | GET, POST | público | público (bloqueado se `user.count() > 0`) |
-| `/api/auth/signup` | POST | público | público (só cria DIRECTOR) |
-| `/api/creator-access` | POST, DELETE, PATCH | privado (criador) | privado (exclusivo do criador) |
-| `/api/public/initial-check` | GET | público | público (`requiresSetup: userCount === 0`) |
-| `/api/qrcode/public-get` | GET | ✅ **privado** (exige sessão) | privado |
-| `/api/storage/upload-url` | POST | ✅ **privado** (exige sessão) | **privado** |
-| `/api/storage/delete-url` | DELETE | ✅ **privato** (exige sessão) | **privado** |
-| `/api/storage/file` | GET | privado | privado (proxy autenticado) |
-| `/api/users` | GET | ✅ **privado** (`authMiddleware`) | **privado** |
-| `/api/users/check-director` | GET | ✅ **privado** (`authMiddleware`) | privado |
-| `/api/database/revert` | GET, POST | privado, bloqueia VIEWER | privado, bloqueia VIEWER · POST valida o `timestamp` do cliente contra o derivado do histórico (`409` se divergir) |
-| `/api/actives/update` | PUT | ✅ **privado** (`authMiddleware`) | privado |
+| Endpoint                    | Método              | Hoje                              | Deve ser                                                                                                           |
+| --------------------------- | ------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `/api/auth/login`           | POST                | público                           | público (credenciais)                                                                                              |
+| `/api/auth/logout`          | POST                | público                           | público (limpa auth_token e auth_token_creator)                                                                    |
+| `/api/auth/me`              | GET                 | privado                           | privado (retorna user e impersonation)                                                                             |
+| `/api/auth/seed`            | GET, POST           | público                           | público (bloqueado se `user.count() > 0`)                                                                          |
+| `/api/auth/signup`          | POST                | público                           | público (só cria DIRECTOR)                                                                                         |
+| `/api/creator-access`       | POST, DELETE, PATCH | privado (criador)                 | privado (exclusivo do criador)                                                                                     |
+| `/api/public/initial-check` | GET                 | público                           | público (`requiresSetup: userCount === 0`)                                                                         |
+| `/api/qrcode/public-get`    | GET                 | ✅ **privado** (exige sessão)     | privado                                                                                                            |
+| `/api/storage/upload-url`   | POST                | ✅ **privado** (exige sessão)     | **privado**                                                                                                        |
+| `/api/storage/delete-url`   | DELETE              | ✅ **privato** (exige sessão)     | **privado**                                                                                                        |
+| `/api/storage/file`         | GET                 | privado                           | privado (proxy autenticado)                                                                                        |
+| `/api/users`                | GET                 | ✅ **privado** (`authMiddleware`) | **privado**                                                                                                        |
+| `/api/users/check-director` | GET                 | ✅ **privado** (`authMiddleware`) | privado                                                                                                            |
+| `/api/database/revert`      | GET, POST           | privado, bloqueia VIEWER          | privado, bloqueia VIEWER · POST valida o `timestamp` do cliente contra o derivado do histórico (`409` se divergir) |
+| `/api/actives/update`       | PUT                 | ✅ **privado** (`authMiddleware`) | privado                                                                                                            |
 
 > Os seis endpoints marcados com ✅ foram fechados na branch `chore/security-p0-debt`. **A proteção
 > está no handler**, não só no middleware: `authMiddleware` envolve o handler e devolve `401` sem
@@ -295,25 +299,26 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
 ### 4.3 State Management & Idempotency Rules
 
 **Estado cliente:** React Context API. Sem Redux/Zustand.
+
 - `UserContext` (`lib/context/UserContext.tsx`) — usuário + tema. Aplica `.dark` e `colorScheme` no `<html>`; listener de `prefers-color-scheme`. `useUser()` **lança** se usado fora do provider.
 - `ToastContext` (`lib/context/ToastContext.tsx`) — 4 tipos: `success | error | warning | info`.
 - `BUILD_DATE` em `lib/version.ts` é calculado **só no cliente** para evitar hydration mismatch.
 
 **Regras de idempotência e concorrência:**
 
-| Regra | Implementação / Status |
-|---|---|
-| Login→refresh de contexto | Flag `localStorage.setItem("justLoggedIn")` (`lib/context/UserContext.tsx:69-77`) |
-| Bootstrap idempotente | `GET /api/internal/ensure-location-item` garante categoria `ESTRUTURA` + `FatherSpace` id `0000` + `Active` id `ffff` |
-| Criação do 1º ADMIN | `user.count() > 0` → 403 (`pages/api/auth/seed.ts:28-31`) |
-| ID único de `Active`/`FatherSpace` | Loop `randomBytes(2)` + `findUnique` até não colidir (`lib/prisma.ts:8-24`) — **não é transacional** |
-| Serial duplicado | 409 + tratamento de `P2002` (`pages/api/actives/create.ts`, `actives/update.ts`) |
-| Log de auditoria | `lib/logger.ts` **nunca lança** — falha de log não pode derrubar a operação |
-| Revert `QUICK` | Valida `elapsed ≤ 10 s` antes de executar; o instante de reversão é **derivado no servidor** (`planRevert`) e o `timestamp` do cliente só é comparado (tolerância 11 s) — nunca usado no `FOR SYSTEM_TIME AS OF` |
-| Revert `HISTORY` | `timestamp` do GET comparado ao derivado (tolerância 5 ms); divergência → `409` "lista desatualizada" |
-| Revert em transação | `db.$transaction` (`pages/api/database/revert.ts`) |
-| Logout | Só limpa o cookie — **o JWT continua válido até 8 h** (sem revogação) |
-| Upload | Sem idempotência: cada POST gera `Date.now()-filename` como objectName |
+| Regra                              | Implementação / Status                                                                                                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login→refresh de contexto          | Flag `localStorage.setItem("justLoggedIn")` (`lib/context/UserContext.tsx:69-77`)                                                                                                                                |
+| Bootstrap idempotente              | `GET /api/internal/ensure-location-item` garante categoria `ESTRUTURA` + `FatherSpace` id `0000` + `Active` id `ffff`                                                                                            |
+| Criação do 1º ADMIN                | `user.count() > 0` → 403 (`pages/api/auth/seed.ts:28-31`)                                                                                                                                                        |
+| ID único de `Active`/`FatherSpace` | Loop `randomBytes(2)` + `findUnique` até não colidir (`lib/prisma.ts:8-24`) — **não é transacional**                                                                                                             |
+| Serial duplicado                   | 409 + tratamento de `P2002` (`pages/api/actives/create.ts`, `actives/update.ts`)                                                                                                                                 |
+| Log de auditoria                   | `lib/logger.ts` **nunca lança** — falha de log não pode derrubar a operação                                                                                                                                      |
+| Revert `QUICK`                     | Valida `elapsed ≤ 10 s` antes de executar; o instante de reversão é **derivado no servidor** (`planRevert`) e o `timestamp` do cliente só é comparado (tolerância 11 s) — nunca usado no `FOR SYSTEM_TIME AS OF` |
+| Revert `HISTORY`                   | `timestamp` do GET comparado ao derivado (tolerância 5 ms); divergência → `409` "lista desatualizada"                                                                                                            |
+| Revert em transação                | `db.$transaction` (`pages/api/database/revert.ts`)                                                                                                                                                               |
+| Logout                             | Só limpa o cookie — **o JWT continua válido até 8 h** (sem revogação)                                                                                                                                            |
+| Upload                             | Sem idempotência: cada POST gera `Date.now()-filename` como objectName                                                                                                                                           |
 
 ---
 
@@ -325,12 +330,14 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
 ### 5.1 Security, Encryption & Compliance Standards
 
 **Autenticação e sessão**
+
 - JWT HS256 via `jose`. Expiração 8 h. Payload mínimo: `{ userId, email, role }`.
 - Senhas com `bcryptjs`, **10 rounds** (`lib/auth.ts` consumidor + `pages/api/auth/login.ts`).
 - `JWT_SECRET` é **obrigatório** — `lib/auth.ts:8` lança se ausente. Nunca usar valor padrão.
 - Toda verificação de token passa por `verifyAuthToken()`. **Proibido** `jwtDecode` sem verificação de assinatura.
 
 **Segredos**
+
 - `.env` **nunca** é rastreado (`.gitignore` usa `.env*` com `!.env.example`).
 - **Nenhuma** credencial, IP ou host de produção pode ser escrito em código. `process.env.X` **sem fallback**.
 - `lib/minio.ts` usa `requireEnv()`, que **lança no import** se `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`,
@@ -343,6 +350,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   variáveis e placeholders**; nenhum valor real pode entrar nele.
 
 **Controle de acesso**
+
 - Duas camadas: `middleware.ts` (rota) **e** verificação no handler. O handler **não** pode assumir que o
   middleware rodou — qualquer endpoint listado em `PUBLIC_PATHS` é alcançável sem sessão.
 - `PUBLIC_PATHS` é lista de allow: **cada entrada exige justificativa**. Endpoint novo → privado por padrão.
@@ -363,12 +371,13 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   assinatura — qualquer string não-vazia passava. Regra: presença de token não é autenticação.
 
 **Recurso de Acesso do Criador (incondicional e sempre autenticado por senha)**
+
 - O acesso do criador é **sempre ativo** e **não existe mais nenhuma flag de ambiente** para ligá-lo ou
   desligá-lo. Decisão do dono do projeto: exigir a senha do criador não é atrito — as senhas ficam no
   Bitwarden. **Não reintroduzir `CREATOR_ACCESS_ENABLED` nem `CREATOR_ACCESS_REQUIRE_PASSWORD`.**
 - Causa raiz do bug anterior (403 silencioso em produção) foi ter uma flag **obrigatória disfarçada de
   opcional**: quem configurou omitiu a linha e o recurso degradou sem sinalizar. Feature flag de segurança
- cujo valor padrão desliga o recurso é armadilha, não controle.
+  cujo valor padrão desliga o recurso é armadilha, não controle.
 - `POST /api/creator-access` **exige sempre** a senha do criador, validada com
   `bcrypt.compare(password, creator.password)` **após** resolver o `creator` e o `targetUser`:
   `targetUserId` ausente → `400 { error: 'targetUserId é obrigatório.' }`;
@@ -385,6 +394,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   valor **ausente**.
 
 **Upload e mídia**
+
 - ✅ Limite de 10 MB e tipos aceitos **são validados no servidor** em `lib/uploadPolicy.ts`, aplicado por
   `pages/api/storage/upload-url.ts`. A checagem do cliente (`components/FileUpload.tsx`) é só UX.
 - A validação exige **coerência**: extensão presente precisa estar na allowlist **e** MIME presente precisa
@@ -395,7 +405,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
 - ✅ `inventory-policy.json` restringida a `GetObject`/`PutObject`/`DeleteObject` (sem `s3:*`).
   ⚠️ **A policy só tem efeito depois de aplicada no servidor** — ação humana, ver `CONTEXT.md` §3.1 item 9.
 - **`inventory-policy-auditor.json` — credencial SEPARADA da aplicação, só para
-  `scripts/auditar-orfãos.ts`.** Concede `s3:ListBucket` em `arn:aws:s3:::inventory`
+  `scripts/audit-minio.ts`.** Concede `s3:ListBucket` em `arn:aws:s3:::inventory`
   (enumerate) e `s3:DeleteObject` em `arn:aws:s3:::inventory/*` (limpar). Sem
   `GetObject` — o auditor nunca lê conteúdo — e **sem `s3:*`**, pelo mesmo motivo de
   `inventory-policy.json`.
@@ -414,6 +424,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
     `CONTEXT.md` §3.3.
 
 **Remoção de anexo**
+
 - `deleteFileFromMinio()` (`lib/minio.ts`) **extrai a chave com `getMinioKeyFromUrl()`** de
   `lib/mediaUrl.ts` — regex `/^https?:\/\/[^/]+\/inventory\/(.+)$/`, que captura o caminho
   **completo**, subpastas incluídas.
@@ -433,6 +444,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   `undefined` (`Active.imageUrl`), não só `null`.
 
 **Validação de entrada**
+
 - Sem biblioteca de validação (Zod etc.) no projeto. Handlers validam manualmente.
 - ✅ `String()` sem argumento corrigido: `upload-url.ts` lê `activeId` do formulário e vincula o arquivo ao
   ativo quando informado.
@@ -440,6 +452,7 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   testável sem passar por `formidable`/HTTP. `lib/uploadPolicy.ts` é o padrão.
 
 **Histórico do Git**
+
 - O histórico **contém segredos**. **Nunca** reescrever com `rebase`/`filter-branch`/`filter-repo`.
   Remediação correta: rotacionar a credencial no servidor, não reescrever a história.
 
@@ -461,13 +474,14 @@ exige `REVERT_PROBE_DATABASE_URL`. Cobertura medida: **83% de linhas / 80% de br
 
 **Alvo (obrigatório a partir deste setup):**
 
-| Camada | Ferramenta | Cobertura mínima |
-|---|---|---|
-| Unitário — `lib/**` | `vitest` | **80%** de linhas / **80%** de branches em `lib/` |
-| Integração — `pages/api/**` | `vitest` + mock de `lib/prisma` | **70%** de linhas por domínio |
-| E2E — fluxos críticos | `@playwright/test` | 5 fluxos: login · CRUD de ativo · movimentação · upload · revert |
+| Camada                      | Ferramenta                      | Cobertura mínima                                                 |
+| --------------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| Unitário — `lib/**`         | `vitest`                        | **80%** de linhas / **80%** de branches em `lib/`                |
+| Integração — `pages/api/**` | `vitest` + mock de `lib/prisma` | **70%** de linhas por domínio                                    |
+| E2E — fluxos críticos       | `@playwright/test`              | 5 fluxos: login · CRUD de ativo · movimentação · upload · revert |
 
 **Fluxos E2E obrigatórios:**
+
 1. `initial-setup` → criar 1º ADMIN → login.
 2. Login com papel `VIEWER` → tentativa de criar ativo → 403.
 3. CRUD completo de `Active` com hierarquia de 3 níveis.
@@ -475,6 +489,7 @@ exige `REVERT_PROBE_DATABASE_URL`. Cobertura medida: **83% de linhas / 80% de br
 5. Revert `QUICK` de uma alteração recém-feita.
 
 **Regras:**
+
 - **Todo** caminho novo de lógica de negócio **precisa** de teste. Não há exceção "é pequeno".
 - Bug corrigido → teste de regressão obrigatório.
 - Regra de RBAC nova → tabela de testes parametrizada sobre os 4 papéis.
@@ -500,6 +515,7 @@ yarn test            # testes + coverage acima do threshold
 **Estado atual: os 5 passam** (verificados na branch `chore/security-p0-debt`).
 
 > **Requisitos de ambiente por gate** (verificado empiricamente):
+>
 > - `npx prisma validate` exige apenas `DATABASE_URL` presente (não conecta ao banco).
 > - `yarn lint`, `npx tsc --noEmit`, `yarn test` e **`yarn build:opt` não exigem nenhuma variável de
 >   ambiente.** As rotas de API (`pages/api/**`) só são avaliadas em runtime, não em tempo de build, então
@@ -512,6 +528,7 @@ yarn test            # testes + coverage acima do threshold
 >   passar por variáveis `NEXT_PUBLIC_`.
 
 **Requisitos da imagem Docker** (`Dockerfile`, verificados com `docker build` completo):
+
 - O builder precisa de **bash**: `yarn build:opt` executa `bash scripts/build-optimized.sh`, e
   `node:22-alpine` não traz bash (`/bin/sh: bash: not found`).
 - O builder precisa de **`npx prisma generate` explícito depois de `COPY . .`**: a layer de dependências
@@ -533,12 +550,14 @@ yarn test            # testes + coverage acima do threshold
 ```
 
 **Regras de pipeline:**
+
 - `--frozen-lockfile` obrigatório — CI **nunca** altera `yarn.lock`.
 - `npx prisma migrate diff` contra o schema deve reportar **zero** drift.
 - Nenhum segredo em log de build. `.dockerignore` já exclui `.env` — manter.
 - Build de imagem usa `yarn build:opt` (**não** `yarn build`, que não existe — ver `CONTEXT.md` §3.4).
 
 **Versionamento e release** (convenção em `AGENTS.md` §3.2, detalhado em `CONTEXT.md` §4):
+
 - Versão é a **fonte da verdade** em `package.json:3`, exposta via `lib/version.ts`.
 - Release cria branch `inventory-vX.Y.Z` e faz merge para `main`. Branch de versão é **proibida para a IA**.
 - A IA **nunca** executa `push`, `tag` ou merge em `main`.
@@ -561,19 +580,18 @@ opção de tabela, e o Prisma geraria DDL sem ela. Logo:
   nem a `migrate reset`; o estado do system versioning é responsabilidade **operacional**.
 - As migrations existentes são **imutáveis** (`AGENTS.md` §3.3). Não "corrigir" nenhuma delas.
 
-**Verificar e aplicar** — `scripts/garantir-system-versioning.ts` (idempotente, sem I/O além do
+**Verificar e aplicar** — `scripts/system-v.ts` (idempotente, sem I/O além do
 banco, roda direto no Node 22 por type-stripping):
 
 ```bash
-node scripts/garantir-system-versioning.ts            # somente leitura — imprime TABELA | SYSTEM VERSIONING | SITUAÇÃO
-node scripts/garantir-system-versioning.ts --aplicar  # ALTER TABLE ADD SYSTEM VERSIONING só no que está 'NO'
-node scripts/garantir-system-versioning.ts --tabela Active
+node scripts/system-v.ts            # somente leitura — imprime TABELA | SYSTEM VERSIONING | SITUAÇÃO
+node scripts/system-v.ts --aplicar  # ALTER TABLE ADD SYSTEM VERSIONING só no que está 'NO'
+node scripts/system-v.ts --tabela Active
 ```
 
 > **Como o estado é lido (verificado no MariaDB 10.11.14):** por
 > `information_schema.tables.TABLE_TYPE`, que vale `'SYSTEM VERSIONED'` para uma tabela com
-> `WITH SYSTEM VERSIONING`. A coluna `SYSTEM_VERSIONING` de `information_schema.tables`
-> **não existe no MariaDB 10.11** — ela é do MySQL 8 — e consultá-la devolve
+> `WITH SYSTEM VERSIONING`. A coluna `SYSTEM_VERSIONING` de `information_schema.tables` > **não existe no MariaDB 10.11** — ela é do MySQL 8 — e consultá-la devolve
 > `ERROR 1054 (42S22): Unknown column 'SYSTEM_VERSIONING' in 'SELECT'`. Equivalência
 > cross-checkada com `SHOW CREATE TABLE`.
 
@@ -592,7 +610,7 @@ passo operacional, executado por quem tem acesso ao banco.
 `parseSystemVersioningError` (`lib/revert/errors.ts`, módulo puro) o reconhece e o handler
 responde **503** com `{ error }` em português, nomeando a tabela — ou falando em "uma ou mais
 tabelas" quando o nome não veio — e **incluindo o comando exato de correção**
-(`node scripts/garantir-system-versioning.ts --aplicar`). O corpo **não** carrega stack,
+(`node scripts/system-v.ts --aplicar`). O corpo **não** carrega stack,
 `details` nem a mensagem crua do Prisma/MariaDB. 503 e não 500 porque a condição é persistente:
 retry não resolve, é configuração. Os sentinels `"UNAUTHORIZED"`, `"USER_NOT_FOUND"` e
 `"STALE_REVERT_LIST"` passam **antes** dessa checagem e continuam produzindo 401/401/409 — o

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/auditar-orfãos.ts
+ * scripts/audit-minio.ts
  *
  * Encontra objetos do bucket MinIO que **nenhuma linha do MariaDB referencia**
  * e, com confirmação explícita, os apaga. O bucket `inventory` acumula órfãos
@@ -18,10 +18,10 @@
  *
  * Uso (sem build, sem runner — Node 22 executa `.ts` por type-stripping):
  *
- *   node scripts/auditar-orfãos.ts                          # só leitura (padrão)
- *   node scripts/auditar-orfãos.ts --minutos 4320           # graça de 3 dias
- *   node scripts/auditar-orfãos.ts --saida relatorio.json   # grava o relatório
- *   node scripts/auditar-orfãos.ts --apagar --confirmar     # APAGA (ver abaixo)
+ *   node scripts/audit-minio.ts                          # só leitura (padrão)
+ *   node scripts/audit-minio.ts --minutos 4320           # graça de 3 dias
+ *   node scripts/audit-minio.ts --saida relatorio.json   # grava o relatório
+ *   node scripts/audit-minio.ts --apagar --confirmar     # APAGA (ver abaixo)
  *
  * Opções: `--apagar`, `--confirmar`, `--minutos <n>` (padrão 1440 = 24 h),
  * `--bucket <nome>` (padrão `BUCKET_NAME` de `lib/minio.ts`), `--saida <arquivo>`.
@@ -52,11 +52,11 @@
  * Privacidade: o script não imprime credencial, endpoint nem DSN — apenas nomes
  * de objeto, que são dados de inventário e não segredo (`AGENTS.md` §3.1).
  */
-import { writeFileSync } from 'node:fs';
-import * as Minio from 'minio';
-import db from '../lib/prisma.ts';
-import { BUCKET_NAME } from '../lib/minio.ts';
-import { collectReferencedKeys, findOrphans } from '../lib/mediaReferences.ts';
+import { writeFileSync } from "node:fs";
+import * as Minio from "minio";
+import db from "../lib/prisma.ts";
+import { BUCKET_NAME } from "../lib/minio.ts";
+import { collectReferencedKeys, findOrphans } from "../lib/mediaReferences.ts";
 
 /** Objetos removidos por requisição ao MinIO. Lote único deixaria o processo pendurado em bucket grande. */
 const DELETE_BATCH_SIZE = 100;
@@ -75,7 +75,7 @@ interface Options {
 class UsageError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'UsageError';
+    this.name = "UsageError";
   }
 }
 
@@ -99,17 +99,17 @@ function buildAuditClient(): Minio.Client {
 
   if (appAccessKey && appSecretKey) {
     console.warn(
-      'AVISO: usando MINIO_ACCESS_KEY/MINIO_SECRET_KEY (credencial da aplicação).\n' +
-        '       A policy da aplicação não tem ListBucket, então a listagem deve falhar\n' +
-        '       com AccessDenied. Defina MINIO_AUDIT_ACCESS_KEY e\n' +
-        '       MINIO_AUDIT_SECRET_KEY (policy: inventory-policy-auditor.json).'
+      "AVISO: usando MINIO_ACCESS_KEY/MINIO_SECRET_KEY (credencial da aplicação).\n" +
+        "       A policy da aplicação não tem ListBucket, então a listagem deve falhar\n" +
+        "       com AccessDenied. Defina MINIO_AUDIT_ACCESS_KEY e\n" +
+        "       MINIO_AUDIT_SECRET_KEY (policy: inventory-policy-auditor.json)."
     );
     return buildClient(appAccessKey, appSecretKey);
   }
 
   throw new UsageError(
-    'Nenhuma credencial de auditoria encontrada. Defina MINIO_AUDIT_ACCESS_KEY e\n' +
-      'MINIO_AUDIT_SECRET_KEY (recomendado) ou MINIO_ACCESS_KEY e MINIO_SECRET_KEY.'
+    "Nenhuma credencial de auditoria encontrada. Defina MINIO_AUDIT_ACCESS_KEY e\n" +
+      "MINIO_AUDIT_SECRET_KEY (recomendado) ou MINIO_ACCESS_KEY e MINIO_SECRET_KEY."
   );
 }
 
@@ -117,13 +117,13 @@ function buildClient(accessKey: string, secretKey: string): Minio.Client {
   const endPoint = process.env.MINIO_ENDPOINT;
 
   if (!endPoint) {
-    throw new UsageError('MINIO_ENDPOINT não está definida. Verifique o .env.');
+    throw new UsageError("MINIO_ENDPOINT não está definida. Verifique o .env.");
   }
 
   return new Minio.Client({
     endPoint,
     port: Number(process.env.MINIO_PORT) || 9000,
-    useSSL: process.env.MINIO_USE_SSL === 'true',
+    useSSL: process.env.MINIO_USE_SSL === "true",
     accessKey,
     secretKey,
   });
@@ -141,21 +141,21 @@ function parseArgs(argv: readonly string[]): Options {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
 
-    if (arg === '--apagar') {
+    if (arg === "--apagar") {
       options.delete = true;
       continue;
     }
 
-    if (arg === '--confirmar') {
+    if (arg === "--confirmar") {
       options.confirm = true;
       continue;
     }
 
-    if (arg === '--minutos') {
+    if (arg === "--minutos") {
       const value = Number(argv[index + 1]);
 
       if (!Number.isInteger(value) || value < 0) {
-        throw new UsageError('--minutos exige um inteiro >= 0.');
+        throw new UsageError("--minutos exige um inteiro >= 0.");
       }
 
       options.graceMinutes = value;
@@ -163,11 +163,11 @@ function parseArgs(argv: readonly string[]): Options {
       continue;
     }
 
-    if (arg === '--bucket') {
+    if (arg === "--bucket") {
       const value = argv[index + 1];
 
       if (!value) {
-        throw new UsageError('--bucket exige um nome de bucket.');
+        throw new UsageError("--bucket exige um nome de bucket.");
       }
 
       options.bucket = value;
@@ -175,11 +175,11 @@ function parseArgs(argv: readonly string[]): Options {
       continue;
     }
 
-    if (arg === '--saida') {
+    if (arg === "--saida") {
       const value = argv[index + 1];
 
       if (!value) {
-        throw new UsageError('--saida exige um caminho de arquivo.');
+        throw new UsageError("--saida exige um caminho de arquivo.");
       }
 
       options.reportPath = value;
@@ -189,14 +189,14 @@ function parseArgs(argv: readonly string[]): Options {
 
     throw new UsageError(
       `Opção desconhecida: ${arg}. Use --apagar --confirmar, --minutos <n>, ` +
-        '--bucket <nome> e/ou --saida <arquivo>.'
+        "--bucket <nome> e/ou --saida <arquivo>."
     );
   }
 
   if (options.delete && !options.confirm) {
     throw new UsageError(
-      '--apagar exige --confirmar junto. Nenhum comando de uma linha apaga objeto\n' +
-        'no bucket sem as duas flags.'
+      "--apagar exige --confirmar junto. Nenhum comando de uma linha apaga objeto\n" +
+        "no bucket sem as duas flags."
     );
   }
 
@@ -220,18 +220,21 @@ async function listObjectsWithAges(
   const ages = new Map<string, Date | undefined>();
 
   await new Promise<void>((resolve, reject) => {
-    const stream = client.listObjects(bucket, '', true);
+    const stream = client.listObjects(bucket, "", true);
 
-    stream.on('data', (item: Minio.BucketItem) => {
+    stream.on("data", (item: Minio.BucketItem) => {
       // `BucketItem` tipa `name` como opcional porque também descreve o prefixo
       // de uma listagem não recursiva; nesse stream toda entrada é objeto.
       if (!item.name) return;
 
       keys.push(item.name);
-      ages.set(item.name, item.lastModified instanceof Date ? item.lastModified : undefined);
+      ages.set(
+        item.name,
+        item.lastModified instanceof Date ? item.lastModified : undefined
+      );
     });
-    stream.on('end', resolve);
-    stream.on('error', reject);
+    stream.on("end", resolve);
+    stream.on("error", reject);
   });
 
   return { keys, ages };
@@ -242,7 +245,7 @@ interface Report {
   generatedAt: string;
   graceMinutes: number;
   graceCutoff: string;
-  mode: 'leitura' | 'apagar';
+  mode: "leitura" | "apagar";
   counts: {
     referencedKeys: number;
     objectsInBucket: number;
@@ -257,7 +260,11 @@ interface Report {
 function writeReport(options: Options, report: Report): void {
   if (!options.reportPath) return;
 
-  writeFileSync(options.reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    options.reportPath,
+    `${JSON.stringify(report, null, 2)}\n`,
+    "utf8"
+  );
   console.log(`Relatório gravado em ${options.reportPath}`);
 }
 
@@ -274,7 +281,7 @@ function buildReport(
     generatedAt: new Date().toISOString(),
     graceMinutes: options.graceMinutes,
     graceCutoff: graceCutoff.toISOString(),
-    mode: options.delete ? 'apagar' : 'leitura',
+    mode: options.delete ? "apagar" : "leitura",
     counts: {
       referencedKeys,
       objectsInBucket,
@@ -297,7 +304,11 @@ function buildReport(
  * remoção. Silenciar isso faria o script reportar sucesso depois de perder
  * metade dos órfãos, então a primeira falha interrompe o lote.
  */
-async function deleteInBatches(client: Minio.Client, bucket: string, keys: string[]): Promise<void> {
+async function deleteInBatches(
+  client: Minio.Client,
+  bucket: string,
+  keys: string[]
+): Promise<void> {
   for (let offset = 0; offset < keys.length; offset += DELETE_BATCH_SIZE) {
     const batch = keys.slice(offset, offset + DELETE_BATCH_SIZE);
     const results = await client.removeObjects(bucket, batch);
@@ -307,7 +318,7 @@ async function deleteInBatches(client: Minio.Client, bucket: string, keys: strin
     if (failure?.Error) {
       throw new Error(
         `Falha ao remover ${JSON.stringify(failure.Error.Key)}: ` +
-          `${failure.Error.Code ?? 'erro desconhecido'}`
+          `${failure.Error.Code ?? "erro desconhecido"}`
       );
     }
   }
@@ -318,8 +329,12 @@ async function main(): Promise<void> {
   const graceCutoff = new Date(Date.now() - options.graceMinutes * 60_000);
 
   console.log(
-    `Bucket: ${options.bucket} · modo: ${options.delete ? 'APAGAR' : 'somente leitura'} · ` +
-      `graça: ${options.graceMinutes} min (preserva o que é mais novo que ${graceCutoff.toISOString()})`
+    `Bucket: ${options.bucket} · modo: ${
+      options.delete ? "APAGAR" : "somente leitura"
+    } · ` +
+      `graça: ${
+        options.graceMinutes
+      } min (preserva o que é mais novo que ${graceCutoff.toISOString()})`
   );
 
   // As três colunas que guardam referência — ver o cabeçalho.
@@ -349,12 +364,12 @@ async function main(): Promise<void> {
     protectedByGrace
   );
 
-  console.log('');
+  console.log("");
   console.log(`Chaves referenciadas no banco : ${referencedKeys.size}`);
   console.log(`Objetos no bucket             : ${keys.length}`);
   console.log(`Órfãos                       : ${orphans.length}`);
   console.log(`Protegidos pelo período de graça: ${protectedByGrace.length}`);
-  console.log('');
+  console.log("");
 
   // Relatório antes de remover: se o processo morrer no meio de um lote, a
   // lista do que foi pedido a remoção já está no disco.
@@ -362,29 +377,33 @@ async function main(): Promise<void> {
 
   if (!options.delete) {
     if (orphans.length > 0) {
-      console.log('Primeiros órfãos (use --saida relatorio.json para a lista completa):');
+      console.log(
+        "Primeiros órfãos (use --saida relatorio.json para a lista completa):"
+      );
       for (const key of orphans.slice(0, 20)) {
         console.log(`  ${key}`);
       }
       if (orphans.length > 20) {
         console.log(`  ... e mais ${orphans.length - 20}`);
       }
-      console.log('');
-      console.log('Nada foi removido. Para aplicar: --apagar --confirmar');
+      console.log("");
+      console.log("Nada foi removido. Para aplicar: --apagar --confirmar");
     } else {
-      console.log('Nenhum órfão. Nada a fazer.');
+      console.log("Nenhum órfão. Nada a fazer.");
     }
 
     return;
   }
 
-  console.log('⚠️  APAGANDO. O bucket não tem versioning: esta operação é IRREVERSÍVEL.');
+  console.log(
+    "⚠️  APAGANDO. O bucket não tem versioning: esta operação é IRREVERSÍVEL."
+  );
 
   for (const key of orphans) {
     console.log(`  ${key}`);
   }
 
-  console.log('');
+  console.log("");
   await deleteInBatches(client, options.bucket, orphans);
   console.log(`${orphans.length} objeto(s) removido(s).`);
 }
@@ -397,9 +416,9 @@ main()
       // A mensagem do driver pode carregar endpoint ou DSN: só o tipo é
       // impresso por extenso.
       console.error(
-        'Erro ao executar o script (verifique DATABASE_URL, MINIO_ENDPOINT e as',
-        'credenciais de auditoria):',
-        error instanceof Error ? error.name : 'desconhecido'
+        "Erro ao executar o script (verifique DATABASE_URL, MINIO_ENDPOINT e as",
+        "credenciais de auditoria):",
+        error instanceof Error ? error.name : "desconhecido"
       );
     }
 
