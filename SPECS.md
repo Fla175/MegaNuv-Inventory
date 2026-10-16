@@ -448,8 +448,10 @@ Tratar como dado sensível: não logar em chat de IA, não enviar a serviço ext
 
 ### 5.2 Testing Strategy & Coverage Thresholds
 
-**Estado atual:** `vitest` instalado e rodando — **143 testes passando** (5 pulados: integração opt-in do
-revert, que exige `REVERT_PROBE_DATABASE_URL`). Cobertura medida: **83% de linhas / 80% de branches /
+**Estado atual:** `vitest` instalado e rodando; a suíte passa na íntegra na branch atual. **A contagem
+exata de testes não é fixada aqui de propósito** — um número fixo envelhece a cada commit e vira mentira
+em silêncio; a fonte é a saída de `yarn test`. Os testes pulados são a integração opt-in do revert, que
+exige `REVERT_PROBE_DATABASE_URL`. Cobertura medida: **83% de linhas / 80% de branches /
 100% de funções** na superfície de segurança.
 
 > ⚠️ **O gate de cobertura hoje se aplica só a** `lib/middlewares/**`, `lib/uploadPolicy.ts`,

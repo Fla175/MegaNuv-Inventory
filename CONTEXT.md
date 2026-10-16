@@ -5,7 +5,7 @@
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
 **Última atualização:** 15/10/2026 · **Branch:** `integration/security-build-auth`
-**Versão:** `2.25.1` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
+**Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
 
@@ -27,8 +27,16 @@ em segurança, testes e manutenção. Ver §3.
 
 ### 2.1 Foco atual
 
-> **Correção de deleção de anexo no MinIO — implementada e verificada nesta branch.**
-> Foco da sessão: `deleteFileFromMinio` (`lib/minio.ts`) derivava a chave do objeto com
+> **Release de documentação `2.25.2` — só documentação, nenhum caminho de código.**
+> Foco da sessão: (a) **correção do drift de contagem de testes** no `SPECS.md` §5.2, que fixava um número
+> envelhecido em vez de apontar para a saída de `yarn test`, e em duas células do `CONTEXT.md` (§2.1 e
+> §3.3 #1); (b) **consolidação da dívida #17** em linha de tabela legível + nova subseção §3.3.1 com o
+> **passo a passo de criação da credencial do auditor** (`mc admin user add` / `policy create` /
+> `policy attach`). A credencial do auditor **continua não criada** — status permanece
+> **PENDENTE, ação humana**. Bump para **`2.25.2`** (patch) na mesma branch.
+
+> **Contexto herdado — correção de deleção de anexo no MinIO — implementada e verificada antes:**
+> `deleteFileFromMinio` (`lib/minio.ts`) derivava a chave do objeto com
 > `split('/').pop()`, o que apagava o **objeto errado** com subpasta e transformava um **link
 > externo** em chave de deleção dentro do bucket `inventory`. A chave agora é extraída pela função
 > canônica `getMinioKeyFromUrl()` (`lib/mediaUrl.ts`), link externo é ignorado sem erro, o `catch`
@@ -47,8 +55,9 @@ Estado: **implementado na branch `chore/security-p0-debt`**, que foi **rebaseada
 `CONTEXT.md`, `SPECS.md` foram criados depois; sem eles a regra `AGENTS.md` §3.4 não podia ser cumprida).
 
 Gates executados e verdes: `yarn lint` (0 erros), `npx tsc --noEmit` (0 erros), `npx prisma validate`
-(schema válido), `yarn build:opt` (standalone 90M), `yarn test` (**101 passando, 5 pulados** — a integração
-opt-in) e cobertura da superfície de segurança em **83% de linhas / 80% de branches**, acima do gate de 70%.
+(schema válido), `yarn build:opt` (standalone 90M), `yarn test` (suíte inteira passando, incluindo os
+pulados da integração opt-in) e cobertura da superfície de segurança em **83% de linhas / 80% de
+branches**, acima do gate de 70%. A contagem exata de testes não é fixada aqui — ver `SPECS.md` §5.2.
 
 Corrigido nesta branch (detalhe no `CHANGELOG.md`): credenciais MinIO e hosts de produção removidos do
 código; `authMiddleware` aceitando cookie além de Bearer; autenticação no handler de
@@ -152,7 +161,7 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 
 | #   | Problema                                                                       | Onde                                                                                                                                               |
 | --- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Cobertura de testes ainda parcial** — runner instalado, mas longe do alvo | projeto inteiro                                                                                                                                    | `vitest` está instalado e roda (**101 testes**), mas o gate de cobertura se aplica hoje **só à superfície de segurança** (`lib/middlewares`, `lib/uploadPolicy.ts`, `pages/api/users/{index,check-director}.ts` — 83% linhas / 80% branches). O alvo de `SPECS.md` §5.2 (70–80% por domínio em todo `pages/api/**`) permanece **pendente** e exige cobrir os 36 endpoints. |
+| 1   | **Cobertura de testes ainda parcial** — runner instalado, mas longe do alvo | projeto inteiro                                                                                                                                    | `vitest` está instalado e roda, mas o gate de cobertura se aplica hoje **só à superfície de segurança** (`lib/middlewares`, `lib/uploadPolicy.ts`, `pages/api/users/{index,check-director}.ts` — 83% linhas / 80% branches). O alvo de `SPECS.md` §5.2 (70–80% por domínio em todo `pages/api/**`) permanece **pendente** e exige cobrir os 36 endpoints. |
 | 2   | **Nenhuma CI**                                                                 | sem `.github/`                                                                                                                                     |
 | 3   | ~~**Verificação de JWT replicada**~~ — **consolidada**           | `lib/apiAuth.ts` (`getSessionUser`)                                 | A sequência `req.cookies.auth_token \|\| authorization.replace("Bearer ") → jwtVerify` estava replicada em ~20 arquivos de `pages/api/**`, com o prefixo `Bearer` não validado e a leitura do id divergente. Todos passaram a usar `getSessionUser()`, que delega a `verifyAuthToken()` (`lib/auth.ts`, fonte de verdade). `authMiddleware` continua sendo o wrapper para handlers que querem o 401 padronizado. |
 | 4   | **`components/ListSection.tsx` tem 1.927 linhas**                              | UI + modais + impressão + context menu + upload + revert                                                                                           |
@@ -168,8 +177,51 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 | 14  | `README.md` desatualizado (versão, `yarn dev`, stack duplicada, nº de anexos)  | `README.md:6,30-38,44`                                                                                                                             |
 | 15  | 6 SVG de boilerplate do Next sem uso                                           | `public/file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`                                                                             |
 | 16  | **`ListSectionProps.onMove?` declarado mas nunca usado**                        | `lib/types.ts:15` vs `components/ListSection.tsx:411`                                                                                              | A prop `onMove?: (item: Active) => void` está declarada na interface `ListSectionProps`, mas `ListSection` não a desestrutura na assinatura do componente e nenhum chamador a fornece (`grep -c onMove components/ListSection.tsx` → 0). É tipagem morta. **Pendente de investigação** (nenhum teste em runtime foi feito): confirmar se a movimentação de ativos perdeu o atalho que usava essa via — ou se a prop é apenas um resíduo de uma refatoração e pode ser removida. Não registrar como comportamento quebrado sem verificação. |
-| 17  | **Credencial do auditor de órfãos não existe no MinIO**                         | `inventory-policy-auditor.json` (novo) · `scripts/auditar-orfãos.ts`                                                                                | 🟡 **PENDENTE — ação humana.** O bucket `inventory` acumulava ~532 objetos sem referência no banco. O script que os encontra está pronto (`scripts/auditar-orfãos.ts`, leitura por padrão), mas **não roda** até que alguém: **(a)** crie um usuário MinIO separado da aplicação, **(b)** aplique `inventory-policy-auditor.json` (`ListBucket` no bucket + `DeleteObject` nos objetos — a credencial da aplicação não serve, ver `SPECS.md` §5.1), e **(c)** defina `MINIO_AUDIT_ACCESS_KEY` / `MINIO_AUDIT_SECRET_KEY` no ambiente onde o script roda. Sem (b), o fallback para `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` avisa e falha na listagem com `AccessDenied` — que é o comportamento esperado, não um bug. **⚠️ O bucket não tem versioning: a remoção é irreversível. Nenhuma remoção foi executada — a auditoria foi validada só por unidade, sem MinIO.** |
+| 17  | **Credencial do auditor de órfãos não existe no MinIO**                         | `inventory-policy-auditor.json` (novo) · `scripts/auditar-orfãos.ts`                                                                                | 🟡 **PENDENTE — ação humana.** O script está pronto e não roda até a credencial existir. Detalhes, razão e passo a passo: **§3.3.1**. |
 | 18  | ~~**`deleteFileFromMinio` derivava a chave com `split('/').pop()`**~~ — **corrigido** | `lib/minio.ts:39`                                                                                                                                    | ✅ **Corrigido nesta branch.** Dois defeitos: (1) com **subpasta**, o banco guarda a URL completa e o bucket a chave nua, então o `pop()` devolvia `1792-foto.jpg` em vez de `subpasta/1792-foto.jpg` e apagava o objeto errado — ou nada, sem sinalizar, porque o `catch` era mudo; (2) com **link externo** ("Cole um link", ex.: Google Drive), `.../file/d/x/view` virava `removeObject('inventory', 'view')` — remoção no bucket que o usuário nunca pediu. A chave agora sai de `getMinioKeyFromUrl()` (`lib/mediaUrl.ts`), que devolve `null` para o que não é do bucket `inventory` e aí **não remove**; o `catch` virou `console.warn` com URL e motivo, e a função segue **sem lançar** porque `removeObject` é idempotente e os chamadores de delete dependem disso. 11 testes de regressão em `__tests__/lib/minio-delete.test.ts` (6 falham contra a implementação antiga). Regras em `SPECS.md` §5.1. |
+
+### 3.3.1 Credencial do auditor de órfãos — o que falta e como criar
+
+Detalhe do item **17** da tabela acima.
+
+**Estado:** o bucket `inventory` acumulava ~532 objetos sem referência no banco. O script que os
+encontra está pronto (`scripts/auditar-orfãos.ts`, leitura por padrão), mas **não roda** até que a
+credencial exista no servidor. **A credencial ainda não foi criada** — `MINIO_AUDIT_ACCESS_KEY` e
+`MINIO_AUDIT_SECRET_KEY` não estão definidos no ambiente. O arquivo `inventory-policy-auditor.json`
+está versionado e pronto para ser aplicado.
+
+**Por que a credencial da aplicação não serve.** A credencial do app é `GetObject`/`PutObject`/
+`DeleteObject`, e **`ListBucket` não está entre elas** — sem o direito de listar não há como enumerar o
+bucket, e um `DeleteObject` que só apaga o que alguém já nomeia não encontra órfão. Conceder
+`ListBucket` à aplicação resolveria isso, mas ampliaria o alcance de todo o app no bucket e passaria a
+expor o **nome** de todos os objetos para qualquer vazamento dessa credencial. Regras completas em
+`SPECS.md` §5.1.
+
+**O que acontece sem ela.** O script cai para `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` com aviso explícito
+e a listagem falha com `AccessDenied` — **comportamento esperado, não bug**.
+
+**Passo a passo para criar a credencial** (`mc` = MinIO Client, apontado para o servidor real):
+
+1. Criar o usuário separado da aplicação:
+   ```bash
+   mc admin user add <alias> inventory-auditor <SENHA_FORTE>
+   ```
+2. Aplicar a policy versionada no repositório:
+   ```bash
+   mc admin policy create <alias> inventory-auditor inventory-policy-auditor.json
+   mc admin policy attach <alias> inventory-auditor --user inventory-auditor
+   ```
+3. Definir `MINIO_AUDIT_ACCESS_KEY` e `MINIO_AUDIT_SECRET_KEY` no ambiente onde o script roda
+   (`.env`, **não versionado**; ver `AGENTS.md` §3.1 — segredos nunca em arquivo commitado).
+4. Primeira execução **só de leitura**, gravando relatório:
+   ```bash
+   node scripts/auditar-orfãos.ts --saida relatorio.json
+   ```
+5. Conferir a lista contra anexos conhecidos de um ativo antes de qualquer remoção.
+
+⚠️ **`--apagar` exige `--confirmar` junto** (`node scripts/auditar-orfãos.ts --apagar --confirmar`) e
+o **bucket não tem versioning**: a remoção é **irreversível**. Nenhuma remoção foi executada até agora —
+a auditoria foi validada só por unidade, sem MinIO.
 
 ### 3.4 Estado do Working Tree
 
@@ -225,10 +277,14 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   obrigatório — sem ele o `npm version` cria tag e commit automático, e a IA não cria tag
   (`AGENTS.md` §3.2). O comando **não** altera o `yarn.lock`. Bump em `package.json` é suficiente:
   `lib/version.ts` lê a versão de lá, sem hardcode.
-- **Versão atual: `2.25.1`** (patch sobre `2.25.0`). O patch é o correto aqui: a única mudança desde
-  `2.25.0` é a correção de `deleteFileFromMinio` (`split('/').pop()` → `getMinioKeyFromUrl()`,
-  §3.3 #18), que é correção pontual de comportamento com bug — não caminho de código novo nem
-  credencial nova no servidor, que foi o que justificou o minor anterior.
+- **Versão atual: `2.25.2`** (patch sobre `2.25.1`). O patch é o correto aqui: a única mudança desde
+  `2.25.1` é de **documentação** — correção do drift de contagem de testes no `SPECS.md` §5.2 (número
+  fixo envelhecido, removido em favor da referência à saída de `yarn test`) e consolidação da dívida
+  #17 (§3.3.1) com o passo a passo de criação da credencial do auditor. Nenhum caminho de código novo,
+  nenhuma credencial criada, nenhuma mudança de comportamento observável.
+  **Sessão anterior (`2.25.1`, patch):** a única mudança desde `2.25.0` foi a correção de
+  `deleteFileFromMinio` (`split('/').pop()` → `getMinioKeyFromUrl()`, §3.3 #18) — correção pontual
+  de comportamento com bug.
   **Histórico do minor anterior (`2.23.0` → `2.25.0`):** a série desde
   `2.22.7` carrega correção de segurança P0, correção de build, refactor de auth em ~20 endpoints,
   correção de RBAC, o script `garantir-system-versioning.ts` e agora o **auditor de órfãos do MinIO**
@@ -238,7 +294,7 @@ no servidor (item 9) — as duas são ações humanas, não de código.
   exigência de senha do criador em toda entrada.
   O campo `creatorAccessEnabled` que chegou a ser adicionado em `/api/auth/me` foi **removido** na
   sequência (§2.3 item 9), junto com as duas feature flags do Acesso do Criador.
-  A branch `inventory-v2.25.1` e a tag `v2.25.1` são criação humana; a `inventory-v2.22.7` **não** deve ser
+  A branch `inventory-v2.25.2` e a tag `v2.25.2` são criação humana; a `inventory-v2.22.7` **não** deve ser
   criada.
 - `npm` é proibido para **instalar** dependências (`AGENTS.md` §3.3), mas `npm version` é seguro: ele
   não toca em lockfile nem em `node_modules`.

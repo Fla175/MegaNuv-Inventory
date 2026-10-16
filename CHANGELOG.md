@@ -11,20 +11,51 @@
 
 ## [Unreleased]
 
-> **Próxima release: `2.25.1`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
-> hardcode). O bump foi feito com `npm version 2.25.1 --no-git-tag-version`: o `--no-git-tag-version` é
+> **Próxima release: `2.25.2`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
+> hardcode). O bump foi feito com `npm version 2.25.2 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
-> `yarn.lock` não foi tocado. A branch `inventory-v2.25.1` e a tag `v2.25.1` são criação humana.
+> `yarn.lock` não foi tocado. A branch `inventory-v2.25.2` e a tag `v2.25.2` são criação humana.
 >
-> **Por que patch:** a única mudança desde `2.25.0` é a correção de `deleteFileFromMinio`
-> (`split('/').pop()` → `getMinioKeyFromUrl()`, §5.1) — correção pontual de comportamento com bug, sem
-> caminho de código novo e sem credencial nova no servidor. O minor anterior (`2.25.0`) é que somava
-> caminho novo e credencial a criar.
+> **Por que patch:** release **exclusivamente de documentação** — nenhuma mudança de caminho de código,
+> nenhuma credencial nova, nenhum comportamento observável. Duas correções documentais: o drift de
+> contagem de testes no `SPECS.md` e a consolidação da dívida #17 do `CONTEXT.md`. O minor anterior
+> (`2.25.1`, patch sobre `2.25.0`) somava a correção de `deleteFileFromMinio` (`split('/').pop()` →
+> `getMinioKeyFromUrl()`, §5.1); o minor `2.25.0` é que somava caminho novo e credencial a criar.
 >
 > **Sessão anterior (bumpara `2.25.0`, minor):** a série desde `2.22.7` soma correção de segurança P0,
 > correção de build, refactor de auth em ~20 endpoints, correção de RBAC, o script de system versioning e
 > o **auditor de órfãos do MinIO** — que adiciona um caminho de código novo e uma credencial nova no
 > servidor. Isso é mudança de comportamento observável, não correção pontual.
+
+### 🤖 OpenCode Operations
+
+#### Docs
+* **Correção do drift de contagem de testes no `SPECS.md` §5.2.** O "Estado atual" fixava
+  **143 testes passando** — número envelhecido que envelhecia a cada commit e já era mentira. A frase
+  agora **não fixa número**: `vitest` instalado e rodando, suíte passando na íntegra na branch atual, e a
+  contagem explícita fica sendo a **saída de `yarn test`**. A mesma correção foi aplicada nas duas
+  ocorrências do `CONTEXT.md` que fixavam **101** (§2.1, registro de gates da sessão de security P0, e
+  §3.3 item 1). O que era informação útil foi preservado: o gate de cobertura se aplica **só** à
+  superfície de segurança e o alvo global de `SPECS.md` §5.2 permanece **pendente** (baseline 0%, 36
+  endpoints a cobrir). As contagens **por arquivo** (`__tests__/lib/minio-delete.test.ts`,
+  `lib/mediaReferences.ts`) foram mantidas: não envelhecem como a global.
+* **Dívida #17 do `CONTEXT.md` §3.3 consolidada.** A linha da tabela — desproporcionalmente longa para
+  uma célula — ficou só com problema, onde e status (**🟡 PENDENTE — ação humana**) + ponte para a nova
+  subseção. A explicação longa migrou para **§3.3.1**, que acrescenta o **passo a passo com `mc`** para
+  criar a credencial do auditor (`admin user add` → `policy create` → `policy attach` → variáveis de
+  ambiente → primeira execução só de leitura com `--saida`), o motivo pelo qual a credencial da
+  aplicação não serve, o comportamento esperado sem ela (`AccessDenied`), a referência a `SPECS.md` §5.1
+  e ao `inventory-policy-auditor.json`, e o aviso de que `--apagar` exige `--confirmar` e é
+  **irreversível** (o bucket não tem versioning).
+* **Status do auditor preservado como pendente.** A credencial **não existe** no servidor:
+  `MINIO_AUDIT_ACCESS_KEY` e `MINIO_AUDIT_SECRET_KEY` não estão definidos no ambiente. O que é
+  verificável e está registrado: o arquivo de policy está versionado e o script existe e está pronto.
+  A criação da credencial permanece **ação humana pendente** — nada nesta sessão tocou o MinIO.
+* **Versão `2.25.2`** propagada para `AGENTS.md` §1 ("Versão atual") e `CONTEXT.md` (cabeçalho
+  "Versão:" e §4, com a justificativa patch). `lib/version.ts` continua lendo `package.json` — sem
+  hardcode.
+* Gates da sessão: `yarn lint`, `npx tsc --noEmit` e `yarn test` verdes — baseline mantido, nenhuma
+  regressão (release só de documentação).
 
 ### 🤖 OpenCode Operations
 
