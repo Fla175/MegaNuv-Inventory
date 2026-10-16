@@ -26,7 +26,7 @@ Não é: ERP, sistema financeiro (só armazena `fixedValue` como número), ou CR
 | **Inventário** | CRUD de ativos, clonagem em lote, movimentação, "alterar ativos semelhantes" | `pages/api/actives/**`, `components/actives/activeForm.tsx` |
 | **Espaços** | CRUD de `FatherSpace` e da hierarquia de locais | `pages/api/father-spaces/**`, `components/AddLocationModal.tsx` |
 | **Taxonomia** | Categorias (ex-"Áreas") com paleta de 18 cores persistidas | `pages/api/categories/**`, `lib/constants/colors.ts` |
-| **Armazenamento de Mídia** | Upload multipart → MinIO, presigned URL, proxy autenticado, exclusão | `pages/api/storage/**`, `lib/minio.ts`, `lib/mediaUrl.ts` |
+| **Armazenamento de Mídia** | Upload multipart → MinIO, presigned URL, proxy autenticado, exclusão | `pages/api/storage/**`, `lib/minio.ts`, `lib/mediaUrl.ts`, `lib/mediaReferences.ts` |
 | **Auditoria** | Log imutável de CRUD, logins e signups | `lib/logger.ts`, `pages/api/logs/**`, model `Log` |
 | **Realtime do Banco** | Reversão temporal de alterações via *system-versioning* | `pages/api/database/revert.ts` |
 | **Apresentação** | Dashboard, listagem, busca, modais, impressão, context menu, toasts | `pages/*.tsx`, `components/**`, `lib/context/**` |
@@ -140,7 +140,8 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 ├── SPECS.md  CONTEXT.md  CHANGELOG.md
 ├── middleware.ts            # guarda de rotas (99 L)
 ├── next.config.ts           # standalone, strict mode, webpack fallback, remotePatterns
-├── inventory-policy.json    # policy IAM do usuário MinIO (formato AWS S3 v1)
+├── inventory-policy.json           # policy IAM do usuário MinIO da aplicação (AWS S3 v1)
+├── inventory-policy-auditor.json   # policy IAM do auditor de órfãos — credencial separada (ListBucket + DeleteObject)
 ├── compose.yml              # serviço `app` + `banco` (MariaDB)
 ├── Dockerfile               # 2 estágios (node:22-alpine), runner non-root sobre output:"standalone"
 ├── eslint.config.mjs        # flat config: next/core-web-vitals + next/typescript
@@ -166,7 +167,7 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │   └── ui/  ConfirmDialog.tsx  Toast.tsx  ToastContainer.tsx
 ├── lib/                     # nunca importa de pages/ ou components/
 │   ├── prisma.ts  auth.ts  apiAuth.ts  minio.ts  logger.ts
-│   ├── mediaUrl.ts  version.ts  types.ts  uploadPolicy.ts
+│   ├── mediaUrl.ts  mediaReferences.ts  version.ts  types.ts  uploadPolicy.ts
 │   ├── revert/             # classificação e agrupamento do revert (puros)
 │   ├── constants/colors.ts  context/  hooks/  middlewares/
 ├── types/inventory.ts       # tipos de dominio
@@ -174,7 +175,10 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │   ├── schema.prisma        # 6 models, 2 enums, 124 L
 │   └── migrations/          # 16 migrations, 2026-01-12 → 2026-05-30 (imutáveis)
 ├── styles/globals.css       # 123 L — @media print p/ etiquetas
-├── scripts/build-optimized.sh  # build standalone + montagem dos assets p/ o runner
+├── scripts/
+│   ├── build-optimized.sh  # build standalone + montagem dos assets p/ o runner
+│   ├── garantir-system-versioning.ts  # habilita WITH SYSTEM VERSIONING (idempotente)
+│   └── auditar-orfãos.ts    # órfãos do bucket MinIO (leitura por padrão; --apagar --confirmar)
 └── public/                  # 7 SVG (6 são boilerplate do Next, sem uso)
 ```
 
@@ -229,7 +233,10 @@ Active 1──N Movement         (onDelete: Cascade)
 
 **Invariantes:**
 - Exclusão de `FatherSpace` ou `Active` pai faz **cascade** em toda a subárvore. Endpoint de delete **deve** avisar sobre o tamanho da subárvore.
-- `fileUrl` é `TEXT` e aceita **dois formatos legados**: JSON array **ou** CSV separado por vírgula. Ler ambos — ver `pages/api/qrcode/public-get.ts:41-52`.
+- `fileUrl` é `TEXT` e aceita **dois formatos legados**: JSON array **ou** CSV separado por vírgula.
+  A leitura dos dois vive em `lib/mediaReferences.ts` (`parseFileUrls`) — **cópia única**, consumida pelo
+  QR Code (`pages/api/qrcode/public-get.ts`) e pela auditoria de órfãos. Duas cópias divergindo
+  significariam apagar anexo que a tela ainda mostra.
 - O frontend envia `serialNumbers[]`, mas **só o primeiro** é persistido (`pages/api/actives/update.ts:44-46,74`). Não assumir array.
 - `isCreator: true` marca o único Admin Criador (out-of-band / cessão).
 - `Category.color` é @unique e nullable — `null` é permitido em múltiplas categorias (MySQL permite múltiplos NULL em índice único).
@@ -387,6 +394,24 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   quando a variável não está definida em tempo de build. **Não reintroduzir host fixo; não ampliar sem revisão.**
 - ✅ `inventory-policy.json` restringida a `GetObject`/`PutObject`/`DeleteObject` (sem `s3:*`).
   ⚠️ **A policy só tem efeito depois de aplicada no servidor** — ação humana, ver `CONTEXT.md` §3.1 item 9.
+- **`inventory-policy-auditor.json` — credencial SEPARADA da aplicação, só para
+  `scripts/auditar-orfãos.ts`.** Concede `s3:ListBucket` em `arn:aws:s3:::inventory`
+  (enumerate) e `s3:DeleteObject` em `arn:aws:s3:::inventory/*` (limpar). Sem
+  `GetObject` — o auditor nunca lê conteúdo — e **sem `s3:*`**, pelo mesmo motivo de
+  `inventory-policy.json`.
+  - **Por que a credencial da aplicação não serve:** ela é `GetObject`/`PutObject`/
+    `DeleteObject`, e **`ListBucket` está entre elas** — sem o direito de listar não há
+    como enumerar o bucket, e um `DeleteObject` que só apaga o que alguém já nomeia não
+    encontra órfão. Conceder `ListBucket` à credencial da aplicação para resolver isso
+    ampliaria o alcance de todo o app no bucket, e `ListBucket` expõe o **nome** de todos
+    os objetos — inclusive anexos de inventário de outros Thermal Ribbon printers — para
+    qualquer vazamento dessa credencial. O custo é uma credencial a mais; o benefício é
+    que a aplicação continua sem poder enumerar nada.
+  - **Ambiente:** `MINIO_AUDIT_ACCESS_KEY` / `MINIO_AUDIT_SECRET_KEY`. O script **só** cai
+    para `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` com aviso explícito no log, e a listagem
+    deve falhar com `AccessDenied` — o fallback é diagnóstico, não atalho.
+  - ⚠️ **A policy só tem efeito depois de aplicada no servidor** — ação humana, ver
+    `CONTEXT.md` §3.3.
 
 **Validação de entrada**
 - Sem biblioteca de validação (Zod etc.) no projeto. Handlers validam manualmente.

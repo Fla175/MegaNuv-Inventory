@@ -19,6 +19,83 @@
 ### 🤖 OpenCode Operations
 
 #### Added
+* **`lib/mediaReferences.ts` — módulo puro de referência de mídia** (sem I/O, sem Prisma, sem MinIO),
+  com três funções testáveis sem tocar em infraestrutura:
+  - `parseFileUrls(fileUrl)` lê `Active.fileUrl` nos **dois formatos legados** da mesma coluna
+    (`SPECS.md` §4.1): JSON array (dados antigos) ou CSV (o que `pages/api/actives/update.ts:49`
+    grava). Tentativa em ordem JSON array → CSV, dedup preservando ordem, e **nunca lança** — um
+    único registro corrompido não pode abortar uma auditoria que varre a tabela inteira.
+  - `collectReferencedKeys(activeRows, fatherSpaceRows)` junta as **três** colunas que guardam
+    referência viva — `Active.fileUrl`, `Active.imageUrl` e `FatherSpace.imageUrl` — aplicando
+    `getMinioKeyFromUrl()` de `lib/mediaUrl.ts` (**reutilizado, não reescrito**). Auditar só
+    `fileUrl` apagaria fotos. URL externa (Google Drive) devolve `null` no helper e é ignorada.
+  - `findOrphans({ minioKeys, referencedKeys, graceCutoff, objectAges })` decide: órfão = **não
+    referenciado E mais antigo que `graceCutoff`**. O resto vai para `protectedByGrace`, que existe
+    por uma corrida real (upload termina antes do commit no banco). Objeto sem `LastModified`
+    legível é **protegido**: sem data não há como provar que é antigo.
+* **`scripts/auditar-orfãos.ts` — auditor de órfãos do bucket MinIO** (ADR-002). Roda por
+  type-stripping do Node 22 (`node scripts/auditar-orfãos.ts`, sem build), lê o banco pelo
+  singleton `db` de `lib/prisma.ts` (`SPECS.md` §1.2) e enumera o bucket **recursivamente**
+  capturando nome e `LastModified` — recursivo para que subpasta futura seja auditada sem mudança
+  no script.
+  - **Modo leitura é o PADRÃO.** Imprime referenciados no banco, objetos no bucket, órfãos e
+    protegidos pela graça. `--apagar` **exige `--confirmar` junto**: nenhum comando de uma linha
+    apaga objeto por acidente. O relatório JSON (`--saida`) é gravado **antes** de qualquer
+    remoção, para que a lista exista mesmo se o processo morrer no meio de um lote; a remoção vai
+    em lotes de 100 e a **primeira falha interrompe** em vez de reportar sucesso parcial.
+  - Opções: `--apagar`, `--confirmar`, `--minutos <n>` (padrão 1440 = 24 h), `--bucket <nome>`
+    (padrão `BUCKET_NAME` de `lib/minio.ts` — fonte única, sem literal repetido), `--saida <arquivo>`.
+  - Fecha o pool em `finally` e define `process.exitCode = 1` em erro. O `catch` final imprime
+    **só o tipo** da exceção: mensagem do driver pode carregar endpoint ou DSN.
+  - ⚠️ **A credencial da aplicação NÃO serve** — `inventory-policy.json` não tem `ListBucket`, e
+    sem listar não há como enumerar o bucket. O script prefere
+    `MINIO_AUDIT_ACCESS_KEY`/`MINIO_AUDIT_SECRET_KEY` e só cai para
+    `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` **com aviso explícito**, porque esse fallback deve
+    falhar com `AccessDenied` — é diagnóstico, não atalho.
+* **`inventory-policy-auditor.json` — credencial SEPARADA da aplicação**, só para o auditor:
+  `s3:ListBucket` em `arn:aws:s3:::inventory` (enumerar) e `s3:DeleteObject` em
+  `arn:aws:s3:::inventory/*` (limpar). **Sem `GetObject`** (o auditor nunca lê conteúdo) e
+  **sem `s3:*`**. A política da aplicação não foi ampliada de propósito: `ListBucket` expõe o
+  **nome** de todos os objetos do bucket, e dar isso ao app ampliaria o alcance de qualquer
+  vazamento daquela credencial.
+* **`__tests__/lib/mediaReferences.test.ts` — 25 testes** de lógica pura. Cobrem os dois formatos
+  de `fileUrl`, JSON válido que não é array, duplicatas, `null`/`undefined`/`""`/espaços, valor
+  malformado que não pode lançar; as três colunas em `collectReferencedKeys`, URL externa
+  ignorada, union sem duplicata, extração da chave nua e subpasta preservada; e em `findOrphans`:
+  órfão verdadeiro, referenciado preservado, órfão novo protegido pela graça, exato no cutoff,
+  `LastModified` ausente e data inválida. **Nenhum teste toca MinIO ou MariaDB reais.**
+
+#### Changed
+* **`pages/api/qrcode/public-get.ts` — a lógica duplicada de `signFileUrl` foi removida** e
+  passou a importar `parseFileUrls` de `lib/mediaReferences.ts`. Comportamento idêntico (a função
+  nova é a antiga com a extração do parser), e a duplicação deixou de existir: duas cópias do
+  parser divergindo significariam a auditoria apagar um anexo que a tela do QR Code ainda mostra.
+* `SPECS.md` §4.1 apontava para `public-get.ts:41-52` como fonte da leitura de `fileUrl`; passou a
+  apontar para `lib/mediaReferences.ts`, que é agora a cópia única. §1.2 e §3.2 registraram o
+  módulo, o script e a policy nova no mapa do projeto.
+
+#### Docs
+* `README.md`: nova seção **Storage Maintenance — MinIO Orphan Auditor**, em inglês — o que o
+  script faz, o padrão de leitura, os comandos de leitura e de aplicação, `--apagar` exigindo
+  `--confirmar`, o motivo do período de graça e o aviso de irreversibilidade (o bucket não tem
+  versioning), e a necessidade da credencial própria com `ListBucket`.
+* `SPECS.md` §5.1 (Upload e mídia): `inventory-policy-auditor.json` registrada como credencial
+  separada, com o motivo de a da aplicação não servir (sem `ListBucket`).
+* `CONTEXT.md` §3.3 #17: pendência de criar/aplicar a credencial do auditor no MinIO, com os três
+  passos (usuário, policy, variáveis) e o registro de que **nenhuma remoção foi executada** — a
+  auditoria foi validada só por unidade, sem MinIO.
+* `CONTEXT.md` §3.1 #9 permanece: a `inventory-policy.json` restrita continua **pendente de ser
+  aplicada no servidor**.
+
+> **Validação pendente (deliberada).** Não há MinIO local, e o único acessível é o de produção,
+> cujo bucket **não tem versioning** — rodar `--apagar` lá seria irreversível e fora de escopo.
+> Nenhum comando de remoção foi executado em nenhum ambiente. O que falta para validação manual:
+> criar a credencial de auditoria, rodar `node scripts/auditar-orfãos.ts --saida relatorio.json`
+> e conferir a lista contra anexos conhecidos de um ativo antes de qualquer `--apagar --confirmar`.
+
+### 🤖 OpenCode Operations
+
+#### Added
 * **`lib/revert/errors.ts` — reconhecimento puro do erro MariaDB 4124** (``Table `X` is not
   system-versioned``). Módulo sem I/O, sem Prisma, sem Next: `parseSystemVersioningError(error)`
   devolve `{ table }`, `{ table: '' }` quando o 4124 vem sem nome, ou `null`. O código é procurado

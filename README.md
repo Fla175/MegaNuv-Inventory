@@ -8,7 +8,7 @@
 ## 🚀 Features
 
 * **Role-Based Access Control (RBAC):** Hierarchical permissions for `DIRECTOR`, `ADMIN`, `MANAGER`, and `VIEWER`.
-* **Creator Access:** The creator admin can sign into other accounts **without knowing their credentials** (impersonation with an audit trail and a session stash), and can hand the creator title over to another user. **The creator's own password is required on every entry.** No feature flag: it is always active.
+* [<ins>***NEW***</ins>] **Creator Access:** The creator admin can sign into other accounts **without knowing their credentials** (impersonation with an audit trail and a session stash), and can hand the creator title over to another user. **The creator's own password is required on every entry.** No feature flag: it is always active.
 * **Theme:** Persistent theme selection (Light, Dark, or System).
 * **Inventory Management:** Complete CRUD for items and locations using a nested hierarchy with Father Spaces, Physical Spaces and Actives.
 * **Category Management:** Dynamic categories (formerly Areas) with 18 pastel color options, managed via database.
@@ -19,17 +19,17 @@
 * **Toast Notifications:** Global feedback system with 4 types (success/error/warning/info).
 * **Context Menu:** Right-click actions for quick operations (edit, clone, move, delete) with viewport collision detection.
 * **Image Attachment**: Attachment of until 5 images for a active.
-* **Attachments on the server:** Up to **5 files per active**, **10 MB** each, restricted to PDF / DOC / DOCX / PNG / JPG / WEBP. Type **and** extension are validated **on the server** (`lib/uploadPolicy.ts`), not only in the browser.
+* [<ins>***NEW***</ins>] **Attachments on the server:** Up to **5 files per active**, **10 MB** each, restricted to PDF / DOC / DOCX / PNG / JPG / WEBP. Type **and** extension are validated **on the server** (`lib/uploadPolicy.ts`), not only in the browser.
 * **QR Code labels:** Per-active QR code labels rendered and printed from the app (`pages/qrcode/view.tsx`).
 * **Searchable *Select***: Custom component for Select type Inputs with build-in Search.
 * **Custom *Select***: Custom component for Select type Inputs.
 * ***`ESC`* Key**: ***`ESC`*** key closes open modals.
 * **Clone in Batch**: A function that clones selected actives in batches.
 * **Modify Similar Assets**: A checkbox in the Active Update Form that gives the function of modify similar assets (same name, manufacturer, model and sku).
-* [<ins>***NEW***</ins>] **Revert Button**: Button that reverts recents changes.
-* **Point-in-time Revert:** Time travel on the data itself, powered by MariaDB **system-versioning** (`lib/revert/`), in two modes: `QUICK` (short popup) and `HISTORY` (full history in Settings). `VIEWER` is blocked.
-* **Docker Deployment:** `docker build -t inventory .` and `docker run -p 3000:3000 --env-file .env inventory`. The image is multi-stage on the Next.js `output: "standalone"` bundle, runs as a **non-root** user (`node`, uid 1000), and is ~341 MB.
-* **Tests:** `yarn test` runs the Vitest suite (`__tests__/`).
+* **Revert Button**: Button that reverts recents changes.
+* [<ins>***NEW***</ins>] **Point-in-time Revert:** Time travel on the data itself, powered by MariaDB **system-versioning** (`lib/revert/`), in two modes: `QUICK` (short popup) and `HISTORY` (full history in Settings). `VIEWER` is blocked.
+* [<ins>***NEW***</ins>] **Docker Deployment:** `docker build -t inventory .` and `docker run -p 3000:3000 --env-file .env inventory`. The image is multi-stage on the Next.js `output: "standalone"` bundle, runs as a **non-root** user (`node`, uid 1000), and is ~341 MB.
+* [<ins>***NEW***</ins>] **Tests:** `yarn test` runs the Vitest suite (`__tests__/`).
 
 ---
 
@@ -46,10 +46,6 @@
 * **Container:** [Docker](https://docker.com) multi-stage image on the Next.js `output: "standalone"` bundle (`Dockerfile`)
 
 ---
-
-## Project Characteristic (Don't be afraided)
-
-* **Without `node_modules` in the project *root***: The project uses the next.js option `standalone`, that gives the same use of `node_modules` also the `yarn dev` is configured to use the comands `cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node server.js && cd ../../`, that make the project runs in `.next/standalone` and keep the navegation in terminal to the project root.
 
 ## 🏁 Getting Started
 
@@ -152,6 +148,31 @@ The system implements a strict permission logic:
 * **Viewers:** Read-only. Can't run any CRUD process, can't access the management tools, and can't see the individual value of actives.
 * **Creator Admin:** Full access like an Admin, except the total assets value, and the **only role authorized to use Creator Access** (signing into other accounts). A creator title can be transferred to another user.
 * **Owners:** Users can always edit their own profile.
+
+---
+
+## 🧹 Storage Maintenance — MinIO Orphan Auditor
+
+The `inventory` bucket accumulates objects that **no MariaDB row references any more**: uploads from tests, actives that were deleted, attachments replaced by a newer version. The bucket has **no versioning**, so those objects cost storage silently and forever, and deleting one is irreversible.
+
+`scripts/auditar-orfaios.ts` cross-references the bucket against the three columns that hold a live media reference (`Active.fileUrl`, `Active.imageUrl` and `FatherSpace.imageUrl`) and reports what nothing points to any more.
+
+**Read-only is the default.** Nothing is deleted unless you ask for it, twice:
+
+```bash
+# report only — lists what would be deleted, deletes nothing
+node scripts/auditar-orfaios.ts
+node scripts/auditar-orfaios.ts --minutos 4320 --saida relatorio-orfãos.json
+
+# apply — IRREVERSIBLE, requires BOTH flags
+node scripts/auditar-orfãos.ts --apagar --confirmar
+```
+
+* `--apagar` alone is a usage error: `--confirmar` is required with it, so no one-liner can delete objects by accident. The JSON report is always written **before** the first removal, so the list survives even if the run dies mid-batch.
+* The **grace period** (default 1440 min = 24 h, `--minutos <n>`) exists because of a real race: an upload finishes before its database row commits. Anything newer than the cutoff is reported as `protectedByGrace`, never as an orphan. An object with no readable `LastModified` is also protected — there is no proof it is old.
+* Other options: `--bucket <nome>` (defaults to `BUCKET_NAME` from `lib/minio.ts`) and `--saida <arquivo>` (JSON report).
+
+**Credential:** the auditor needs `ListBucket` to *enumerate* the bucket, and the application credential does **not** have it — `inventory-policy.json` grants only `GetObject`/`PutObject`/`DeleteObject`. Create a separate user with `inventory-policy-auditor.json` and set `MINIO_AUDIT_ACCESS_KEY` / `MINIO_AUDIT_SECRET_KEY`. The script falls back to the application credential with an explicit warning, and the listing is expected to fail with `AccessDenied`.
 
 ---
 

@@ -3,6 +3,7 @@ import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { minioPublicClient, BUCKET_NAME } from '@/lib/minio';
 import { getMinioKeyFromUrl } from '@/lib/mediaUrl';
+import { parseFileUrls } from '@/lib/mediaReferences';
 import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
 
 interface SectionActive {
@@ -39,16 +40,13 @@ const signMedia = async (url: string | null | undefined): Promise<string | null>
   }
 };
 
+// `fileUrl` tem DOIS formatos legados na mesma coluna (SPECS.md §4.1): JSON array
+// ou CSV. O parser mora em `lib/mediaReferences.ts` porque a auditoria de órfãos
+// precisa ler exatamente o mesmo conjunto de anexos que esta tela mostra — duas
+// cópias do parser divergindo significariam apagar um anexo ainda visível.
 const signFileUrl = async (fileUrl: string | null | undefined): Promise<string | null> => {
   if (!fileUrl) return null;
-  let urls: string[];
-  try {
-    const parsed = JSON.parse(fileUrl);
-    urls = Array.isArray(parsed) ? parsed.map(String) : fileUrl.split(',').map(s => s.trim()).filter(Boolean);
-  } catch {
-    urls = fileUrl.split(',').map(s => s.trim()).filter(Boolean);
-  }
-  const signed = await Promise.all(urls.map(u => signMedia(u)));
+  const signed = await Promise.all(parseFileUrls(fileUrl).map(u => signMedia(u)));
   return signed.filter((u): u is string => u !== null).join(',');
 };
 
