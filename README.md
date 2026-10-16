@@ -91,6 +91,20 @@ MINIO_PUBLIC_ENDPOINT="SEU_HOST_PUBLICO_MINIO"
 > credentials or production hosts. `.env.example` documents **every** supported
 > variable (ports, SSL flags, session and base-URL settings) with comments.
 
+> ### ⚠️ MariaDB system versioning is required for the Revert feature.
+>
+> The tables used by Revert (`Active`, `FatherSpace`, `Category`) must have
+> `WITH SYSTEM VERSIONING`. Check and enable it with:
+>
+> ```bash
+> node scripts/garantir-system-versioning.ts            # read-only check
+> node scripts/garantir-system-versioning.ts --aplicar  # enable
+> ```
+>
+> Prisma does not model system versioning, so this is applied outside the Prisma
+> migration system — do NOT put it in a migration file. Without it,
+> `/api/database/revert` fails with MariaDB error 4124.
+
 4. **Database Migration:**
 ```bash
 npx prisma migrate dev --name init

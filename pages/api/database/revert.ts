@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma";
 import { createLog } from "@/lib/logger";
 import { planRevert, type VersionRow } from "@/lib/revert/history";
+import { parseSystemVersioningError } from "@/lib/revert/errors";
 import { batchActivities, toSubItems, type PlannedItem } from "@/lib/revert/batch";
 import type { AllowedTable, RevertSubItem } from "@/lib/revert/types";
 import { getSessionUser } from "@/lib/apiAuth";
@@ -473,6 +474,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             "O histórico mudou desde que esta lista foi carregada. Atualize e tente novamente.",
         });
       }
+    }
+
+    // Falha de infraestrutura do banco (MariaDB 4124): a tabela reversível não
+    // tem `WITH SYSTEM_VERSIONING`, então `FOR SYSTEM_TIME AS OF` não tem o que
+    // ler. É uma condição **acionável e persistente** — retry não resolve — por
+    // isso 503 com o comando de correção, e não 500 genérico.
+    //
+    // O app nunca aplica o DDL: ganhar privilégio de `ALTER TABLE` em produção
+    // para consertar o próprio schema seria inverter a separação de
+    // responsabilidades. A correção é um script operacional idempotente
+    // (`scripts/garantir-system-versioning.ts`), executado por quem tem acesso
+    // ao banco. Ver SPECS.md §5.5.
+    const systemVersioningError = parseSystemVersioningError(error);
+
+    if (systemVersioningError) {
+      const target = systemVersioningError.table
+        ? `A tabela \`${systemVersioningError.table}\` não está com "system versioning" habilitado.`
+        : "Uma ou mais tabelas usadas pelo Revert não estão com \"system versioning\" habilitado.";
+
+      // Sem stack e sem a mensagem crua do Prisma/MariaDB: o corpo do 503 é
+      // lido pelo frontend e não pode vazar detalhe do driver.
+      return res.status(503).json({
+        error:
+          `${target} O Revert depende do histórico do MariaDB (WITH SYSTEM VERSIONING), ` +
+          `que não é modelado pelo Prisma. Para corrigir, execute no servidor: ` +
+          `node scripts/garantir-system-versioning.ts --aplicar`,
+      });
     }
 
     return res.status(500).json({

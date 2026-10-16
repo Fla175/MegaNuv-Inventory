@@ -161,9 +161,28 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 ### 3.5 Dependências do ambiente
 
 - **MariaDB** precisa de **system-versioning** habilitado. Sem isso, `/api/database/revert` quebra.
-- **⚠️ Produção:** a tabela `Active` **não** tem `WITH SYSTEM VERSIONING` em produção
-  (`prisma/schema.prisma` sem systemVersioning, nenhuma migration) — o `GET /api/database/revert`
-  falharia em produção. O `revert_probe` é o único banco com system-versioning ativo.
+- **✅ Produção — `Active` corrigida manualmente.** A tabela `Active` foi habilitada
+  (`ALTER TABLE Active ADD SYSTEM VERSIONING`) por operação humana, e não por migration. O
+  `prisma/schema.prisma` segue sem `systemVersioning` e **continua assim por desenho**: o Prisma
+  não modela a opção de tabela, então o DDL é aplicado **fora** do sistema de migrations e
+  **não deve virar migration** (`SPECS.md` §5.5).
+- **⚠️ `FatherSpace` e `Category` ainda NÃO foram verificadas em produção.** A correção manual
+  acima foi feita em `Active` porque era a única tabela do `GET` no momento do incidente; o `POST`
+  também aceita `FatherSpace` e `Category`, que podem seguir sem versionamento. **Pendência
+  aberta:** rodar `node scripts/garantir-system-versioning.ts --aplicar` contra o banco de
+  produção e confirmar as três. O `revert_probe` é o único banco local com system-versioning ativo.
+- **⚠️ Evidência local de que a pendência é real (16/10/2026):** o script rodou contra o banco de
+  desenvolvimento local (`banco`) e reportou `Active = YES`, **`FatherSpace = NO`** e
+  **`Category = NO`**. Ou seja, a falha 4124 não é um evento de produção: ela acontece em
+  qualquer schema que não teve o `ALTER` rodado, e só `Active` foi corrigida até agora. Confirmar
+  em produção antes de considerar o item encerrado.
+- **Como verificar de agora em diante:** `scripts/garantir-system-versioning.ts` cobre a lacuna
+  de forma idempotente e legível por máquina — modo leitura imprime
+  `TABELA | SYSTEM VERSIONING | SITUAÇÃO`, sai com código 1 se alguma tabela esperada ficar de
+  fora (dá para usar como gate de CI), e `--aplicar` só emite `ALTER` no que voltou `'NO'`. O
+  endpoint deixou de devolver 500 genérico nesse cenário e passou a responder **503** com a
+  tabela nomeada e o comando de correção. O `revert_probe` local não é substituto para essa
+  verificação: o incidente só apareceu em produção.
 - **MinIO** é **externo** ao `compose.yml`. `compose.yml` não declara `MINIO_*` nem `JWT_SECRET`.
 - Sem `JWT_SECRET` definido, o app **crasha** em `lib/auth.ts:8`.
 - `next.config.ts` só libera `next/image` para `minio.meganuv.com:80`.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
@@ -10,13 +10,15 @@ import type { NextApiRequest, NextApiResponse } from 'next';
  * enquanto a classificação ainda mora dentro do handler.
  */
 
-const probe = vi.hoisted(() => ({ rows: [] as unknown[] }));
+const probe = vi.hoisted(() => ({ rows: [] as unknown[], error: null as unknown }));
 
 vi.mock('@/lib/prisma', () => {
   const client = {
     // Queries com `WHERE id = ?` recebem o id como último parâmetro (o AS OF
     // vem antes); o GET não passa parâmetros e recebe o histórico completo.
     $queryRawUnsafe: vi.fn(async (_sql: string, ...params: unknown[]) => {
+      // Simula a falha do driver (MariaDB 4124) para os casos de 503.
+      if (probe.error) throw probe.error;
       const id = params[params.length - 1];
       if (typeof id === 'string') {
         return probe.rows.filter((row) => (row as { id: string }).id === id);
@@ -102,6 +104,15 @@ async function getToken() {
     email: 'root@example.com',
     role: 'ADMIN',
     name: 'Root',
+  });
+}
+
+async function getViewerToken() {
+  return generateAuthToken({
+    userId: 'U2',
+    email: 'viewer@example.com',
+    role: 'VIEWER',
+    name: 'Viewer',
   });
 }
 
@@ -285,5 +296,121 @@ describe('POST /api/database/revert — servidor é a autoridade do timestamp', 
     });
 
     expect(state.statusCode).toBe(410);
+  });
+});
+
+describe('POST/GET /api/database/revert — MariaDB sem system versioning (4124)', () => {
+  let token: string;
+
+  beforeAll(async () => {
+    probe.rows = fixtureRows();
+    token = await getToken();
+  });
+
+  afterEach(() => {
+    probe.error = null;
+  });
+
+  /** Reproduz o `PrismaClientKnownRequestError` que o driver emite de verdade. */
+  function notSystemVersioned(table: string) {
+    const dbMessage = `Table \`${table}\` is not system-versioned`;
+
+    return Object.assign(
+      new Error(`Raw query failed. Code: \`4124\`. Message: \`${dbMessage}\``),
+      {
+        code: 'P2010',
+        name: 'PrismaClientKnownRequestError',
+        meta: { code: '4124', message: dbMessage },
+      }
+    );
+  }
+
+  it('GET: tabela sem system versioning → 503 com o nome da tabela e o comando', async () => {
+    probe.error = notSystemVersioned('Active');
+
+    const state = await GET(token);
+
+    expect(state.statusCode).toBe(503);
+
+    const { error } = state.jsonBody as { error: string };
+    expect(error).toContain('Active');
+    expect(error).toContain('scripts/garantir-system-versioning.ts');
+  });
+
+  it('POST: mesma falha de infraestrutura também vira 503', async () => {
+    probe.error = notSystemVersioned('FatherSpace');
+
+    const state = await POST(token, {
+      table: 'Active',
+      id: 'A1',
+      timestamp: new Date(Date.now() - 2000).toISOString(),
+      mode: 'QUICK',
+    });
+
+    expect(state.statusCode).toBe(503);
+
+    const { error } = state.jsonBody as { error: string };
+    expect(error).toContain('FatherSpace');
+    expect(error).toContain('scripts/garantir-system-versioning.ts');
+  });
+
+  it('o 503 nomeia a tabela mas não vaza código Prisma, stack ou mensagem crua do driver', async () => {
+    probe.error = notSystemVersioned('Category');
+
+    const state = await POST(token, {
+      table: 'Active',
+      id: 'A1',
+      timestamp: new Date(Date.now() - 2000).toISOString(),
+      mode: 'QUICK',
+    });
+
+    expect(state.statusCode).toBe(503);
+
+    const body = state.jsonBody as { error: string; details?: string };
+    expect(body.error).toContain('Category');
+    expect(body.error).not.toContain('P2010');
+    expect(body.error).not.toContain('4124');
+    expect(body.error).not.toContain('at ');
+    expect(body.error).not.toContain('.ts:');
+    expect(body.details).toBeUndefined();
+    expect(Object.keys(body)).toEqual(['error']);
+  });
+
+  it('4124 sem nome de tabela → 503 que fala em "uma ou mais tabelas"', async () => {
+    probe.error = new Error('Raw query failed. Code: `4124`. Message: `erro genérico`');
+
+    const state = await GET(token);
+
+    expect(state.statusCode).toBe(503);
+
+    const { error } = state.jsonBody as { error: string };
+    expect(error).toContain('Uma ou mais tabelas');
+    expect(error).toContain('scripts/garantir-system-versioning.ts');
+  });
+
+  it('o 503 não passa a engolir os 401/403/409: os sentinels seguem traduzidos', async () => {
+    probe.rows = fixtureRows();
+    probe.error = null;
+
+    // 409 — lista defasada continua 409 (o sentinel não pode virar 503).
+    const stale = new Date(new Date(T0).getTime() - 1).toISOString();
+    const conflict = await POST(token, {
+      items: [{ table: 'Active', id: 'A1', timestamp: stale }],
+      mode: 'HISTORY',
+    });
+    expect(conflict.statusCode).toBe(409);
+
+    // 403 — VIEWER continua barrado antes de tocar o banco.
+    const viewer = await getViewerToken();
+    const forbidden = await GET(viewer);
+    expect(forbidden.statusCode).toBe(403);
+
+    // 401 — sem cookie continua 401.
+    const { res, state } = mockRes();
+    await revertHandler(
+      { method: 'GET', cookies: {}, headers: {}, query: {}, socket: {} } as unknown as NextApiRequest,
+      res
+    );
+    expect(state.statusCode).toBe(401);
   });
 });

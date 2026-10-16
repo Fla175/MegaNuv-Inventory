@@ -496,3 +496,58 @@ yarn test            # testes + coverage acima do threshold
 - Versão é a **fonte da verdade** em `package.json:3`, exposta via `lib/version.ts`.
 - Release cria branch `inventory-vX.Y.Z` e faz merge para `main`. Branch de versão é **proibida para a IA**.
 - A IA **nunca** executa `push`, `tag` ou merge em `main`.
+
+### 5.5 System Versioning (MariaDB)
+
+**O Revert depende de `WITH SYSTEM VERSIONING`.** Toda consulta de histórico usa
+`FOR SYSTEM_TIME AS OF` / `FOR SYSTEM_TIME ALL`. Sem a opção na tabela, o MariaDB recusa com
+**erro 4124** (`Table `X` is not system-versioned`), e `/api/database/revert` não funciona.
+
+**Tabelas exigidas — fonte única, `REVERTABLE_TABLES` em `lib/revert/history.ts`.**
+`Active`, `FatherSpace`, `Category`. **Nunca hardcodear a lista** em script, endpoint ou
+documentação: quem precisa da lista importa o mapa.
+
+**O Prisma não modela isso.** `prisma/schema.prisma` e as migrations não têm como declarar a
+opção de tabela, e o Prisma geraria DDL sem ela. Logo:
+
+- O `ALTER TABLE ... ADD SYSTEM VERSIONING` é aplicado **fora** do sistema de migrations do
+  Prisma e **não deve ser registrado como migration**. Ele não sobrevive a `prisma migrate diff`
+  nem a `migrate reset`; o estado do system versioning é responsabilidade **operacional**.
+- As migrations existentes são **imutáveis** (`AGENTS.md` §3.3). Não "corrigir" nenhuma delas.
+
+**Verificar e aplicar** — `scripts/garantir-system-versioning.ts` (idempotente, sem I/O além do
+banco, roda direto no Node 22 por type-stripping):
+
+```bash
+node scripts/garantir-system-versioning.ts            # somente leitura — imprime TABELA | SYSTEM VERSIONING | SITUAÇÃO
+node scripts/garantir-system-versioning.ts --aplicar  # ALTER TABLE ADD SYSTEM VERSIONING só no que está 'NO'
+node scripts/garantir-system-versioning.ts --tabela Active
+```
+
+> **Como o estado é lido (verificado no MariaDB 10.11.14):** por
+> `information_schema.tables.TABLE_TYPE`, que vale `'SYSTEM VERSIONED'` para uma tabela com
+> `WITH SYSTEM VERSIONING`. A coluna `SYSTEM_VERSIONING` de `information_schema.tables`
+> **não existe no MariaDB 10.11** — ela é do MySQL 8 — e consultá-la devolve
+> `ERROR 1054 (42S22): Unknown column 'SYSTEM_VERSIONING' in 'SELECT'`. Equivalência
+> cross-checkada com `SHOW CREATE TABLE`.
+
+O modo padrão é **sempre** leitura; nada é aplicado sem `--aplicar`. Rodar `--aplicar` duas vezes
+não executa DDL na segunda, porque só entra no `ALTER` o que a releitura marcou como pendente. O
+script termina com `process.exitCode = 1` se alguma tabela esperada continuar sem versionamento —
+serve como **check de CI**. Tabela **inexistente** é reportada como `AUSENTE` e não entra no
+`ALTER`: `ALTER TABLE` em tabela que não existe só produziria um erro mascarando o problema real.
+
+**O app NÃO tem DDL e nunca vai ganhar.** O handler **não** aplica o `ALTER`: conceder a uma
+aplicação web o privilégio de alterar o próprio schema em produção inverte a separação de
+responsabilidades e multiplica a superfície de um erro de infraestrutura. A correção é sempre um
+passo operacional, executado por quem tem acesso ao banco.
+
+**Contrato do endpoint:** quando o erro 4124 chega ao `catch` de `pages/api/database/revert.ts`,
+`parseSystemVersioningError` (`lib/revert/errors.ts`, módulo puro) o reconhece e o handler
+responde **503** com `{ error }` em português, nomeando a tabela — ou falando em "uma ou mais
+tabelas" quando o nome não veio — e **incluindo o comando exato de correção**
+(`node scripts/garantir-system-versioning.ts --aplicar`). O corpo **não** carrega stack,
+`details` nem a mensagem crua do Prisma/MariaDB. 503 e não 500 porque a condição é persistente:
+retry não resolve, é configuração. Os sentinels `"UNAUTHORIZED"`, `"USER_NOT_FOUND"` e
+`"STALE_REVERT_LIST"` passam **antes** dessa checagem e continuam produzindo 401/401/409 — o
+reconhecimento nunca pode capturar nenhum deles.

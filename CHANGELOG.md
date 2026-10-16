@@ -18,6 +18,68 @@
 
 ### 🤖 OpenCode Operations
 
+#### Added
+* **`lib/revert/errors.ts` — reconhecimento puro do erro MariaDB 4124** (``Table `X` is not
+  system-versioned``). Módulo sem I/O, sem Prisma, sem Next: `parseSystemVersioningError(error)`
+  devolve `{ table }`, `{ table: '' }` quando o 4124 vem sem nome, ou `null`. O código é procurado
+  em duas fontes independentes — o rótulo ``Code: `4124``` da mensagem e o `meta.code` do
+  `PrismaClientKnownRequestError` (aceito como string **e** como número) — e basta uma confirmar.
+  O nome da tabela é extraído de `` Table `X` is not system-versioned ``, com fallback para
+  `meta.message`, onde o Prisma também repete o texto do driver.
+* **`scripts/garantir-system-versioning.ts` — verificação/aplicação idempotente.** Roda direto
+  pelo Node 22 por type-stripping (`node scripts/...`, sem build e sem runner novo), usa o
+  singleton de `lib/prisma.ts` e deriva a lista de `REVERTABLE_TABLES` — **sem hardcode**.
+  Consulta `information_schema.tables` filtrando `TABLE_SCHEMA = DATABASE()`, então é
+  multi-banco. O **modo leitura é o padrão** e imprime `TABELA | SYSTEM VERSIONING | SITUAÇÃO`;
+  `--aplicar` emite `ALTER TABLE ... ADD SYSTEM VERSIONING` só nas tabelas que voltaram `'NO'`,
+  relê o estado e não repete DDL na segunda execução. Opções: `--aplicar` e `--tabela <nome>`
+  (validada contra `REVERTABLE_TABLES`). Fecha a conexão em `finally` e define
+  `process.exitCode = 1` quando alguma tabela esperada fica sem versionamento — o que o torna
+  utilizável como **check de CI**.
+  - **Estado lido por `information_schema.tables.TABLE_TYPE` = `'SYSTEM VERSIONED'`, e não pela
+    coluna `SYSTEM_VERSIONING`** — a premissa de partida (que a coluna existiria) está **errada
+    para o MariaDB**: ela é do MySQL 8 e no MariaDB 10.11.14 a consulta devolve
+    `ERROR 1054 (42S22): Unknown column 'SYSTEM_VERSIONING' in 'SELECT'`. Verificado
+    empiricamente, e a equivalência com `SHOW CREATE TABLE` foi cross-checkada. A premissa está
+    registrada em `SPECS.md` §5.5 para ninguém reintroduzir a coluna.
+  - Tabela **inexistente** sai como `AUSENTE` e **não** entra no `ALTER`; erros de uso (opção
+    desconhecida, tabela fora de `REVERTABLE_TABLES`) imprimem a mensagem, enquanto erro do driver
+    é redacted para o tipo — a mensagem do Prisma pode carregar fragmento do DSN.
+* **503 acionável em `GET`/`POST /api/database/revert`.** O `catch` reconhece o 4124 e responde
+  503 com `{ error }` em português, nomeando a tabela (ou dizendo "uma ou mais tabelas"), citando
+  `system versioning` e **incluindo o comando exato** de correção
+  (`node scripts/garantir-system-versioning.ts --aplicar`). **Sem** stack, `details` ou mensagem
+  crua do Prisma/MariaDB no corpo. 503 — e não 500 — porque a condição é persistente: retry não
+  resolve, é configuração.
+
+#### Fixed
+* **`GET /api/database/revert` deixava vazar 500 com stack em produção.** O 4124 do MariaDB
+  (tabela sem `WITH SYSTEM VERSIONING`) caía no `catch` sem mapeamento. Agora é reconhecido e
+  traduzido na origem.
+* **Regressão evitada no mesmo `catch`:** `"UNAUTHORIZED"`, `"USER_NOT_FOUND"` e
+  `"STALE_REVERT_LIST"` são verificados **antes** do reconhecimento do 4124 e seguem produzindo
+  401/401/409. `parseSystemVersioningError` devolve `null` para os três — coberto por teste
+  dedicado, junto com a garantia de que a regex é ancorada no rótulo `Code:` e não dispara por
+  qualquer "4124" que apareça numa mensagem qualquer.
+* **`tsconfig.json` — `allowImportingTsExtensions: true`.** Necessário para o script: o
+  type-stripping nativo do Node resolve especificadores ESM e exige a extensão `.ts` explícita
+  nos imports relativos. A opção é válida porque `noEmit` já é `true`; nada do build do Next foi
+  alterado.
+
+#### Docs
+* **`README.md`** — aviso visível na seção de setup, após o bloco do `.env`: system versioning é
+  obrigatório para o Revert, o comando de verificação e o de aplicação, e o aviso de que isso fica
+  **fora** do sistema de migrations do Prisma.
+* **`SPECS.md` §5.5 — System Versioning (MariaDB)**, nova seção: o Revert exige; quais tabelas,
+  via `REVERTABLE_TABLES` e sem hardcode; como verificar/aplicar; que o DDL fica fora do Prisma e
+  **não deve ser migration**; que o app **não tem DDL e nunca vai aplicá-lo**; e o contrato do
+  endpoint (503 acionável, sem vazar stack, sem capturar os sentinels de 401/409).
+* **`CONTEXT.md` §3.5** — `Active` registrada como corrigida manualmente (e **não** via migration,
+  que é o comportamento correto aqui); `FatherSpace` e `Category` registradas como **ainda não
+  verificadas**, com o script apontado como a verificação que falta; e o novo comportamento 503.
+
+### 🤖 OpenCode Operations
+
 #### Security
 * **Remoção definitiva das feature flags `CREATOR_ACCESS_ENABLED` e `CREATOR_ACCESS_REQUIRE_PASSWORD`** —
   decisão do dono do projeto: o Acesso do Criador é **sempre habilitado** e **sempre exige a senha do
