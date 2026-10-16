@@ -1,5 +1,6 @@
 // lib/minio.ts
 import * as Minio from 'minio';
+import { getMinioKeyFromUrl } from './mediaUrl';
 
 /**
  * Valida que uma variável de ambiente obrigatória está definida.
@@ -36,17 +37,41 @@ export const minioPublicClient = new Minio.Client({
 
 export const BUCKET_NAME = 'inventory';
 
-export const deleteFileFromMinio = async (url: string | null) => {
+/**
+ * Remove o objeto do MinIO referenciado por uma URL guardada no banco.
+ *
+ * A extração da chave tem que ser a canônica (`getMinioKeyFromUrl`), e não um
+ * `split('/').pop()` local, por dois motivos concretos:
+ *
+ * 1. O banco guarda a **URL completa** e o bucket guarda a **chave**. Com
+ *    subpasta (`/inventory/subpasta/foto.jpg`) o `pop()` devolve só
+ *    `foto.jpg` e apaga o objeto errado — ou nada, sem sinalizar.
+ * 2. O app aceita **link externo** ("Cole um link", ex.: Google Drive). O
+ *    `pop()` dele (`.../view` → `view`) viraria uma chave de deleção dentro do
+ *    bucket `inventory`: uma remoção que o usuário nunca pediu.
+ *
+ * `getMinioKeyFromUrl` devolve `null` para o que não é do bucket — e aí não há
+ * nada nosso para apagar, o que **não** é erro.
+ *
+ * Não lança: `removeObject` é idempotente e rejeita objeto já inexistente,
+ * e os chamadores (`father-spaces/delete`, `actives/delete`,
+ * `storage/delete-url`) dependem disso para não reverter a exclusão de um
+ * registro só porque o arquivo já sumiu.
+ */
+export const deleteFileFromMinio = async (url: string | null | undefined) => {
   if (!url) return;
 
-  try {
-    const urlParts = url.split('/');
-    const objectName = urlParts.pop();
+  const objectName = getMinioKeyFromUrl(url);
 
-    if (objectName) {
-      await minioClient.removeObject(BUCKET_NAME, objectName);
-    }
-  } catch {
-    // Silencia erros de exclusão
+  // Link externo ou URL fora do bucket `inventory`: nada nosso para apagar.
+  if (!objectName) return;
+
+  try {
+    await minioClient.removeObject(BUCKET_NAME, objectName);
+  } catch (error) {
+    // Registra o motivo (antes era engolido em silêncio) sem stack e sem
+    // qualquer credencial: o log vai para o console do servidor.
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`[minio] falha ao remover o objeto de "${url}": ${reason}`);
   }
 };

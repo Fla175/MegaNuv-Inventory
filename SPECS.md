@@ -413,6 +413,25 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   - ⚠️ **A policy só tem efeito depois de aplicada no servidor** — ação humana, ver
     `CONTEXT.md` §3.3.
 
+**Remoção de anexo**
+- `deleteFileFromMinio()` (`lib/minio.ts`) **extrai a chave com `getMinioKeyFromUrl()`** de
+  `lib/mediaUrl.ts` — regex `/^https?:\/\/[^/]+\/inventory\/(.+)$/`, que captura o caminho
+  **completo**, subpastas incluídas.
+  - **`split('/').pop()` local é proibido.** O banco guarda a **URL completa** e o bucket guarda a
+    **chave nua**: com subpasta ele devolveria só o nome do arquivo e apagaria o objeto errado — ou
+    nada, sem sinalizar, porque o `catch` era mudo.
+  - **Link externo é ignorado, não é erro.** O app aceita "Cole um link" (ex.: Google Drive) e
+    `getMinioKeyFromUrl` devolve `null` para o que não é do bucket `inventory`; nesse caso a função
+    **não chama** `removeObject`. Sem isso, o `pop()` de `.../file/d/x/view` viraria a chave `view` e
+    o app removeria um objeto do bucket que o usuário nunca pediu.
+- A função **não lança**. `removeObject` é idempotente e rejeita objeto já inexistente, e os
+  chamadores (`pages/api/father-spaces/delete.ts`, `pages/api/actives/delete.ts`,
+  `pages/api/storage/delete-url.ts`) dependem disso para não reverter a exclusão de um registro só
+  porque o arquivo já sumiu. A falha é registrada em `console.warn` com a **URL** e o **motivo** —
+  sem stack e **sem qualquer credencial**.
+- Assinatura `url: string | null | undefined`: chamadores passam colunas do Prisma que podem ser
+  `undefined` (`Active.imageUrl`), não só `null`.
+
 **Validação de entrada**
 - Sem biblioteca de validação (Zod etc.) no projeto. Handlers validam manualmente.
 - ✅ `String()` sem argumento corrigido: `upload-url.ts` lê `activeId` do formulário e vincula o arquivo ao

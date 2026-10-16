@@ -11,15 +11,72 @@
 
 ## [Unreleased]
 
-> **Próxima release: `2.25.0`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
-> hardcode). O bump foi feito com `npm version 2.25.0 --no-git-tag-version`: o `--no-git-tag-version` é
+> **Próxima release: `2.25.1`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
+> hardcode). O bump foi feito com `npm version 2.25.1 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
-> `yarn.lock` não foi tocado. A branch `inventory-v2.25.0` e a tag `v2.25.0` são criação humana.
+> `yarn.lock` não foi tocado. A branch `inventory-v2.25.1` e a tag `v2.25.1` são criação humana.
 >
-> **Por que minor e não patch:** a série desde `2.22.7` soma correção de segurança P0, correção de
-> build, refactor de auth em ~20 endpoints, correção de RBAC, o script de system versioning e agora o
-> **auditor de órfãos do MinIO** — que adiciona um caminho de código novo e uma credencial nova no
+> **Por que patch:** a única mudança desde `2.25.0` é a correção de `deleteFileFromMinio`
+> (`split('/').pop()` → `getMinioKeyFromUrl()`, §5.1) — correção pontual de comportamento com bug, sem
+> caminho de código novo e sem credencial nova no servidor. O minor anterior (`2.25.0`) é que somava
+> caminho novo e credencial a criar.
+>
+> **Sessão anterior (bumpara `2.25.0`, minor):** a série desde `2.22.7` soma correção de segurança P0,
+> correção de build, refactor de auth em ~20 endpoints, correção de RBAC, o script de system versioning e
+> o **auditor de órfãos do MinIO** — que adiciona um caminho de código novo e uma credencial nova no
 > servidor. Isso é mudança de comportamento observável, não correção pontual.
+
+### 🤖 OpenCode Operations
+
+#### Changed
+* **Bump de versão para `2.25.1`** (patch), com `npm version 2.25.1 --no-git-tag-version`: nenhuma tag,
+  nenhum commit automático, `yarn.lock` intacto. O `--no-git-tag-version` é obrigatório porque a IA
+  **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4).
+* `AGENTS.md` §1 ("Versão atual") e `CONTEXT.md` §4 ("Versão atual" + justificativa patch vs minor)
+  atualizados para `2.25.1`. `lib/version.ts` continua lendo `package.json` — sem hardcode.
+
+### 🤖 OpenCode Operations
+
+#### Fixed
+* **`deleteFileFromMinio` (`lib/minio.ts`) apagava o objeto errado e podia apagar o objeto
+  errado por link externo.** A função derivava a chave com `url.split('/').pop()`, o que quebrava
+  em dois casos verificados empiricamente:
+  - **Subpasta:** o banco guarda a **URL completa** e o bucket guarda a **chave nua**. Para
+    `http://host/inventory/subpasta/1792-foto.jpg` o `pop()` devolvia `1792-foto.jpg`, e a remoção
+    atingia o objeto errado — ou nada, sem sinalizar, porque o `catch` era mudo.
+  - **Link externo:** o app aceita "Cole um link" (ex.: Google Drive). Para
+    `https://drive.google.com/file/d/abc123/view` o `pop()` devolvia `view` e o app chamava
+    `removeObject('inventory', 'view')` — uma remoção no bucket que o usuário **nunca pediu**.
+* **Correção:** a extração da chave passa a ser a canônica, `getMinioKeyFromUrl()` de
+  `lib/mediaUrl.ts` (regex `/^https?:\/\/[^/]+\/inventory\/(.+)$/`), que captura o caminho completo,
+  subpastas incluídas. Quando ela devolve `null` — URL externa ou de outro bucket — a função
+  **não chama** `removeObject`: não há nada nosso para apagar, e isso **não é erro**.
+* **Assinatura** de `url: string | null` para `string | null | undefined`: os chamadores passam
+  colunas do Prisma que podem ser `undefined` (`Active.imageUrl`).
+* **`catch` mudo → `console.warn`** com a URL e o motivo do erro (sem stack, sem credencial).
+  A função **continua sem lançar**: `removeObject` é idempotente e rejeita objeto já inexistente, e
+  `pages/api/father-spaces/delete.ts`, `pages/api/actives/delete.ts` e
+  `pages/api/storage/delete-url.ts` dependem disso para não reverter a exclusão de um registro só
+  porque o arquivo já sumiu.
+
+#### Added
+* **`__tests__/lib/minio-delete.test.ts`** — 11 testes de regressão de `deleteFileFromMinio`, com o
+  pacote `minio` mockado (`vi.mock('minio', ...)`) para que `removeObject` seja um spy e nenhuma
+  chamada de rede aconteça: URL sem subpasta, URL **com** subpasta (o caso que mais importa),
+  subpasta profunda, https com porta explícita, **link externo e bucket errado** (não removem nada),
+  `null` / `undefined` / string vazia, e `removeObject` rejeitando (a função não propaga o erro e
+  registra o motivo).
+  > O teste foi validado por mutação: contra a implementação antiga (`split('/').pop()` + `catch`
+  > mudo) **6 dos 11 falham**, incluindo os dois de subpasta e o de link externo.
+
+#### Changed
+* Regras registradas em `SPECS.md` §5.1 (bloco **Remoção de anexo**): a extração da chave tem que ser
+  a canônica, `split('/').pop()` local é **proibido**, link externo é **ignorado** (não erro), a
+  função **não lança**, e a assinatura aceita `undefined`.
+
+#### Docs
+* `CONTEXT.md` §2.1 e §3.3 #18: a dívida aberta sobre `deleteFileFromMinio` derivar a chave com
+  `split('/').pop()` está registrada como **corrigida** nesta branch.
 
 ### 🤖 OpenCode Operations
 
