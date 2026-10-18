@@ -11,6 +11,61 @@
 
 ## [Unreleased]
 
+### 🤖 OpenCode Operations
+
+#### Security
+
+- **Etapa 0 da `ADR/ADR-001.md` — escrita sem autorização em dois endpoints de mutação de ativos.**
+  Achado da auditoria do front-end. `clone-batch.ts` e `update.ts` são os **dois** endpoints de
+  mutação de ativos que **não verificavam papel algum** — `delete.ts:17` e `move.ts:41` já
+  bloqueiam `VIEWER`, e `create.ts:53` também.
+  - **`POST /api/actives/clone-batch` (`:1-30`)** — o handler **não importava `authMiddleware`** e
+    não resolvia sessão: exportava-se cru. A autorização dependia só do `middleware.ts`, que valida
+    **token, não papel** (`middleware.ts:58-86`), de modo que qualquer `VIEWER` autenticado criava
+    até **50 cópias** de qualquer ativo (`qty` limitado a 50 em `:18`), em qualquer destino,
+    **copiando `fixedValue` e `notes`** (`:79-80`). Agora resolve a sessão com `getSessionUser`,
+    barra `VIEWER` com `403`, e é envolvido por `authMiddleware`.
+  - **`PUT /api/actives/update` (`:128`)** — usava `authMiddleware(handler)` **sem
+    `requiredRoles`**. O terceiro parâmetro de `authMiddleware` existia desde sempre
+    (`lib/middlewares/authMiddleware.ts:24,51-55`) **sem nenhum chamador no projeto**. Um `VIEWER`
+    autenticado editava qualquer ativo por ID, e `applyToSimilar` (`:79-106`) propagava a alteração
+    para todos os ativos de mesmo `name`/`manufacturer`/`model`/`sku` — escrita em N registros com
+    um único `PUT`. Agora passa `["DIRECTOR", "ADMIN", "MANAGER"]`, o complemento de `VIEWER` na
+    matriz RBAC, mesma semântica de `delete.ts`/`move.ts`.
+  - **Autoria nos clones (`:95-99`).** Os clones não registravam `createdById` — o schema o torna
+    opcional (`prisma/schema.prisma:95`), então **não havia como saber quem clonou o quê**. Um
+    endpoint de escrita sem autoria é também um endpoint sem auditoria. Mesmo formato de
+    `create.ts:131`.
+  - **`update.ts` agora usa o singleton (`:4`).** Era o **único** arquivo de `pages/` e `lib/` a
+    instanciar `new PrismaClient()` fora de `lib/prisma.ts:5`, burlando o guard de hot-reload.
+    Descoberto porque isso tornava o endpoint **impossível de testar com o mock do projeto** — foi
+    o que revelou o 403 ausente, já que o teste de regressão falhava com 404 em vez de bloquear.
+  - **Regra de produto aplicada:** ADMIN, MANAGER e DIRECTOR veem e editam `fixedValue`; somente
+    VIEWER não pode nada. O card de patrimônio total permanece restrito (`dashboard/stats.ts:13`).
+
+#### Added
+
+- **`__tests__/api/actives-write-authz.test.ts`** — 12 testes de regressão exigidos pela Etapa 0:
+  `VIEWER` recebe `403` e o banco não muda em `clone-batch` e em `update`; `403` também sem token;
+  `applyToSimilar` não propaga; `VIEWER` não zera `fixedValue`; os clones registram
+  `createdById`; e `ADMIN`/`MANAGER`/`DIRECTOR` **não** são barrados por papel. **Validados por
+  mutação:** remover a guarda de `VIEWER` do `clone-batch` faz **1** teste falhar, remover o
+  `requiredRoles` do `update` faz **3**, remover o `createdById` faz **1** — os testes prendem a
+  regressão, não apenas a descrevem.
+
+#### Refactored
+
+- **`ADR/ADR-001.md`** — registro da decisão que originou esta correção, em quatro etapas
+  (0: escrita sem autorização · 1: dado sensível e perda de dado · 2: duplicação · 3: qualidade).
+  Criada nesta sessão a partir de uma revisão de auditoria do front-end; a numeração de ADR foi
+  reiniciada neste diretório.
+
+#### Docs
+
+- **`CONTEXT.md` §3.1** —entradas novas para os dois endpoints sem guarda de `VIEWER`.
+
+---
+
 > **Próxima release: `2.25.2`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
 > hardcode). O bump foi feito com `npm version 2.25.2 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
