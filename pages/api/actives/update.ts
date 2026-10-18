@@ -1,9 +1,8 @@
 // pages/api/actives/update.ts
 import { NextApiResponse } from "next";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { authMiddleware, AuthenticatedNextApiRequest } from "@/lib/middlewares/authMiddleware";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   if (req.method !== "PUT") {
@@ -125,4 +124,13 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
   }
 };
 
-export default authMiddleware(handler);
+// Etapa 0 da ADR-001: `requiredRoles` é o terceiro parâmetro de
+// `authMiddleware` e existia sem nenhum chamador no projeto. Sem ele, o wrapper
+// validava apenas a sessão e um VIEWER autenticado editava qualquer ativo por
+// ID — inclusive zerando `fixedValue` e propagando a mudança para todos os
+// ativos similares via `applyToSimilar`.
+//
+// A lista é o complemento de VIEWER na matriz RBAC (SPECS.md §4.2), e é a
+// mesma semântica já usada por delete.ts:17 e move.ts:41. O card de patrimônio
+// total permanece restrito em dashboard/stats.ts:13.
+export default authMiddleware(handler, ["DIRECTOR", "ADMIN", "MANAGER"]);

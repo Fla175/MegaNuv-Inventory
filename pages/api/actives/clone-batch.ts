@@ -1,14 +1,28 @@
 // pages/api/actives/clone-batch.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { prisma, generateUniqueHexId } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { getSessionUser } from '@/lib/apiAuth';
+import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido.' });
   }
 
   try {
+    // Etapa 0 da ADR-001: este handler não importava `authMiddleware` e não
+    // resolvia a sessão por conta própria — exportava-se cru. A autorização
+    // dependia inteiramente do `middleware.ts`, que valida token mas não papel,
+    // de modo que qualquer VIEWER autenticado criava até 50 cópias de qualquer
+    // ativo, em qualquer destino, copiando `fixedValue` e `notes` do original.
+    const session = await getSessionUser(req);
+    if (!session) return res.status(401).json({ error: 'Sessão expirada.' });
+
+    if (session.role === 'VIEWER') {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
     const { activeIds, quantity = 1, destinationSpaceId } = req.body;
 
     if (!activeIds || !Array.isArray(activeIds) || activeIds.length === 0) {
@@ -81,6 +95,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           imageUrl: active.imageUrl ?? null,
           fileUrl: active.fileUrl ?? null,
           isPhysicalSpace: active.isPhysicalSpace ?? false,
+          // Etapa 0 da ADR-001: os clones não registravam autoria — o schema
+          // torna `createdById` opcional, então não havia como saber quem
+          // clonou o quê. Um endpoint de escrita sem autoria é também um
+          // endpoint sem auditoria. Mesmo formato de create.ts:131.
+          createdById: session.userId ? String(session.userId) : null,
         });
       }
     }
@@ -101,4 +120,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: errMessage,
     });
   }
-}
+};
+
+// A segunda camada: `getSessionUser` acima resolve a sessão para poder ler o
+// `userId` da autoria, e este wrapper garante que a requisição está autenticada
+// mesmo que a guarda interna seja removida ou reordenada por engano.
+export default authMiddleware(handler);
