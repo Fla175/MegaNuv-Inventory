@@ -315,6 +315,15 @@ falha fechado). Requisito novo ou alteração nestes contratos nem reintroduzir 
 > dizem "não" — a correção documental, incluindo a regra de escrita (`clone-batch`/`update`), é o
 > escopo da `ADR-002` (pendente).
 
+**Exclusão de espaço e tamanho da subárvore (ADR-001, Etapa 2):** `SPECS.md:239` exige que o
+endpoint avise o tamanho da subárvore. `GET /api/father-spaces/delete?id=<id>` (mesmo gate do
+`DELETE`: sessão + `ADMIN`) devolve `{ spaceId, spaceName, spaces, actives }`, onde `spaces` conta
+o espaço e **todos** os descendentes (`parentId`) e `actives` conta os ativos de **todos** esses
+espaços. O `DELETE` usa a mesma subárvore (`lib/spaceTree.ts`): apaga os ativos de todos os espaços
+da árvore — `Active.fatherSpace` é Restrict, então não se pode confiar no cascade para os filhos —
+e então remove o espaço pai (os `FatherSpace` filhos caem pelo cascade de `parentId`). O aviso da
+UI é a prévia, não uma estimativa: o que o diálogo conta é o que o `DELETE` apaga.
+
 **Paginação:** não existe. `list` devolve o conjunto inteiro; `/api/logs/list` limita a 200.
 Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versionar.
 

@@ -24,6 +24,7 @@ import {
   Factory,
   Ban,
 } from "lucide-react";
+import { parseFileUrls } from "@/lib/mediaReferences";
 
 interface AssetActive {
   id: string;
@@ -110,19 +111,6 @@ export default function SpacePublicView() {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString("pt-BR");
-  };
-
-  const parseFileUrls = (fileUrlString?: string | null): string[] => {
-    if (!fileUrlString) return [];
-    try {
-      const parsed = JSON.parse(fileUrlString);
-      if (Array.isArray(parsed))
-        return parsed.map((u: string) => u.trim()).filter(Boolean);
-    } catch {}
-    return fileUrlString
-      .split(",")
-      .map((url: string) => url.trim())
-      .filter(Boolean);
   };
 
   const getFileDetails = (url: string) => {

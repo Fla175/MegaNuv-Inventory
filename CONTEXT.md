@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 15/10/2026 · **Branch:** `integration/security-build-auth`
+**Última atualização:** 20/10/2026 · **Branch:** `fix/frontend-duplication-silent-errors`
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -27,8 +27,19 @@ em segurança, testes e manutenção. Ver §3.
 
 ### 2.1 Foco atual
 
-> **Release de documentação `2.25.2` — só documentação, nenhum caminho de código.**
-> Foco da sessão: (a) **correção do drift de contagem de testes** no `SPECS.md` §5.2, que fixava um número
+> **Execução da `ADR/ADR-001.md` — Etapas 0, 1 e 2 concluídas, em branches empilhadas.**
+> Etapa 0 (`fix/actives-write-authz`, `49a2b58`): autorização de escrita em `clone-batch` e `update`.
+> Etapa 1 (`fix/actives-value-visibility`, `d76992a`): redação de `fixedValue` por papel, preservação
+> do campo ausente no update e soma do patrimônio no servidor. Etapa 2
+> (`fix/frontend-duplication-silent-errors`): `SearchableSelect` único em `components/ui/` com a
+> semântica de `"default"` reconciliada em módulo puro, `parseFileUrls` como cópia única nas duas
+> telas, `fetchData` de `settings` notificando falha, e prévia/cascata da subárvore de espaço
+> (`GET /api/father-spaces/delete`) avisando o que será excluído. Falta a **Etapa 3** e a
+> **ADR-002** (matriz RBAC de `SPECS.md:262-270`, hoje defasada nas linhas "Vê `fixedValue`").
+> Gates da Etapa 2: lint/tsc/prisma limpos, **260 testes** passando, build standalone 90M.
+
+> **Contexto herdado — release de documentação `2.25.2` — implementada e verificada antes:**
+> (a) **correção do drift de contagem de testes** no `SPECS.md` §5.2, que fixava um número
 > envelhecido em vez de apontar para a saída de `yarn test`, e em duas células do `CONTEXT.md` (§2.1 e
 > §3.3 #1); (b) **consolidação da dívida #17** em linha de tabela legível + nova subseção §3.3.1 com o
 > **passo a passo de criação da credencial do auditor** (`mc admin user add` / `policy create` /

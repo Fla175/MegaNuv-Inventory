@@ -63,6 +63,10 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
   const toast = UseToast();
+  // Callback estável do provider — o objeto `toast` troca de identidade a cada
+  // toast exibido (o value do contexto não é memoizado por campo), então
+  // depender do objeto refaria o fetch da aba a cada notificação.
+  const { showError } = toast;
   const [saving, setSaving] = useState(false);
 
   const [revertItems, setRevertItems] = useState<RevertItem[]>([]);
@@ -146,9 +150,26 @@ export default function SettingsPage() {
   const fetchData = useCallback(async <T,>(endpoint: string, setter: (data: T) => void) => {
     try {
       const res = await fetch(endpoint);
-      if (res.ok) setter(await res.json());
-    } catch { /* erro silencioso */ }
-  }, []);
+      if (!res.ok) {
+        // Etapa 2 da ADR-001 (2.4): a falha era indistinguível de "sem
+        // registros" — o setter nunca rodava e a tela exibia lista vazia com o
+        // servidor fora do ar. Os outros handlers deste arquivo já notificam;
+        // este era o único que engolia o erro (inclusive o HTTP != 2xx).
+        let message = 'Erro ao carregar dados.';
+        try {
+          const data = await res.json();
+          if (typeof data?.error === 'string' && data.error) message = data.error;
+        } catch {
+          // Corpo não-JSON (ex.: 502 do proxy): mantém a mensagem genérica.
+        }
+        showError(message);
+        return;
+      }
+      setter(await res.json());
+    } catch {
+      showError('Erro de conexão ao carregar dados.');
+    }
+  }, [showError]);
 
   const refreshActiveTabData = useCallback(() => {
     if (activeTab === 'users') fetchData('/api/users', setUsersList);
@@ -414,6 +435,47 @@ export default function SettingsPage() {
       }
     }
 
+    // Etapa 2 da ADR-001 (2.5): avisar o tamanho da subárvore ANTES da cascata
+    // (`SPECS.md` §4.1 exige). O texto anterior era genérico ("todos os ativos
+    // associados"), e o endpoint excluía sem dizer quantos. A prévia vem da
+    // mesma rota e da mesma subárvore que o DELETE percorre — não é estimativa.
+    let spaceMessage: string | null = null;
+    if (type === 'space' && id) {
+      try {
+        const previewRes = await fetch(`/api/father-spaces/delete?id=${id}`);
+        if (!previewRes.ok) {
+          let message = 'Não foi possível verificar o que será excluído.';
+          try {
+            const data = await previewRes.json();
+            if (typeof data?.error === 'string' && data.error) message = data.error;
+          } catch {
+            // Corpo não-JSON: mantém a mensagem genérica.
+          }
+          toast.showError(message);
+          return;
+        }
+
+        const data = await previewRes.json();
+        const actives = typeof data.actives === 'number' ? data.actives : 0;
+        const spaces = typeof data.spaces === 'number' ? data.spaces : 1;
+
+        const assetsLabel =
+          actives === 0
+            ? 'Nenhum ativo será excluído.'
+            : actives === 1
+              ? '1 ativo será excluído permanentemente.'
+              : `${actives} ativos serão excluídos permanentemente.`;
+
+        spaceMessage =
+          spaces > 1
+            ? `Tem certeza que deseja excluir este espaço pai e mais ${spaces - 1} espaço(s) filho(s)? ${assetsLabel}`
+            : `Tem certeza que deseja excluir este espaço pai? ${assetsLabel}`;
+      } catch {
+        toast.showError('Erro de conexão ao verificar o tamanho da exclusão.');
+        return;
+      }
+    }
+
     const dialogConfig: Record<string, { title: string; message: string; variant: 'danger' }> = {
       user: { 
         title: 'Confirmar Exclusão de Usuário', 
@@ -422,7 +484,7 @@ export default function SettingsPage() {
       },
       space: { 
         title: 'Confirmar Exclusão de Espaço', 
-        message: 'Tem certeza que deseja excluir este espaço pai? Todos os ativos associados serão excluídos permanentemente.',
+        message: spaceMessage ?? 'Tem certeza que deseja excluir este espaço pai? Todos os ativos associados serão excluídos permanentemente.',
         variant: 'danger' 
       },
       category: { 
