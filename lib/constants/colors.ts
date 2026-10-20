@@ -31,14 +31,6 @@ export const TYPE_COLORS = {
   },
 };
 
-export function getActiveColors(hasContent: boolean = true) {
-  return hasContent ? TYPE_COLORS.ACTIVE : TYPE_COLORS.EMPTY;
-}
-
-export function getPhysicalSpaceColors(hasContent: boolean = true) {
-  return hasContent ? TYPE_COLORS.PHYSICAL_SPACE : TYPE_COLORS.EMPTY;
-}
-
 export function getParentSpaceColors(hasContent: boolean = true) {
   return hasContent ? TYPE_COLORS.PARENT_SPACE : TYPE_COLORS.EMPTY;
 }

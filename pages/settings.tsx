@@ -63,9 +63,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const { user, refreshUser, loading } = useUser();
   const toast = UseToast();
-  // Callback estável do provider — o objeto `toast` troca de identidade a cada
-  // toast exibido (o value do contexto não é memoizado por campo), então
-  // depender do objeto refaria o fetch da aba a cada notificação.
+  // Stable provider callback — the `toast` object changes identity on every
+  // displayed toast (the context value is not memoized per field), so depending
+  // on the object would refetch the tab on every notification.
   const { showError } = toast;
   const [saving, setSaving] = useState(false);
 
@@ -74,7 +74,7 @@ export default function SettingsPage() {
   const [selectedReverts, setSelectedReverts] = useState<Set<string>>(new Set());
   const [isReverting, setIsReverting] = useState(false);
 
-  // Estados de Listagem
+  // Listing state
   const [usersList, setUsersList] = useState<User[]>([]);
   const [spacesList, setSpacesList] = useState<FatherSpace[]>([]);
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
@@ -88,7 +88,7 @@ export default function SettingsPage() {
   const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
   const [role, setRole] = useState(selectedUser?.role || '');
 
-  // Estados do Acesso do Criador
+  // Creator access state
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
   const [transferConfirmInput, setTransferConfirmInput] = useState('');
@@ -99,7 +99,7 @@ export default function SettingsPage() {
   const [isEnterModalOpen, setIsEnterModalOpen] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
 
-  // Estado do Dialog de Confirmação
+  // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -108,7 +108,7 @@ export default function SettingsPage() {
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
 
-  // Permissões
+  // Permissions
   const isDirector = user?.role === 'DIRECTOR';
   const isAdmin = user?.role === 'ADMIN';
   const isManager = user?.role === 'MANAGER';
@@ -145,22 +145,32 @@ export default function SettingsPage() {
   useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
   useEscapeKey(() => setIsSpaceModalOpen(false), isSpaceModalOpen);
   useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
+  useEscapeKey(() => {
+    setIsEnterModalOpen(false);
+    setEnterTargetUser(null);
+    setEnterPassword('');
+  }, isEnterModalOpen);
+  useEscapeKey(() => {
+    setIsTransferModalOpen(false);
+    setTransferTargetUser(null);
+    setTransferConfirmInput('');
+  }, isTransferModalOpen);
 
-  // --- CARREGAMENTO DE DADOS ---
+  // --- DATA LOADING ---
   const fetchData = useCallback(async <T,>(endpoint: string, setter: (data: T) => void) => {
     try {
       const res = await fetch(endpoint);
       if (!res.ok) {
-        // Etapa 2 da ADR-001 (2.4): a falha era indistinguível de "sem
-        // registros" — o setter nunca rodava e a tela exibia lista vazia com o
-        // servidor fora do ar. Os outros handlers deste arquivo já notificam;
-        // este era o único que engolia o erro (inclusive o HTTP != 2xx).
+        // ADR-001 stage 2 (2.4): a failure used to be indistinguishable from
+        // "no records" — the setter never ran and the screen showed an empty
+        // list with the server down. Every other handler here already notifies;
+        // this was the only one swallowing the error (including HTTP != 2xx).
         let message = 'Erro ao carregar dados.';
         try {
           const data = await res.json();
           if (typeof data?.error === 'string' && data.error) message = data.error;
         } catch {
-          // Corpo não-JSON (ex.: 502 do proxy): mantém a mensagem genérica.
+          // Non-JSON body (e.g. a proxy 502): keep the generic message.
         }
         showError(message);
         return;
@@ -215,7 +225,7 @@ export default function SettingsPage() {
     });
   };
 
-  // --- HANDLERS DE REVERSÃO ---
+  // --- REVERT HANDLERS ---
   const handleRevertSelected = async (targetItems?: RevertItem[]) => {
     const selectedList = targetItems || revertItems.filter((item) => {
       const itemKey = item.groupId || item.id;
@@ -226,7 +236,7 @@ export default function SettingsPage() {
   
     setIsReverting(true);
   
-    // Extrai todos os sub-itens dos lotes ou itens individuais selecionados
+    // Flatten every sub-item from the selected batches or single items
     const payloadItems: RevertSubItem[] = selectedList.flatMap((item) => {
       if (item.items && item.items.length > 0) {
         return item.items;
@@ -255,7 +265,7 @@ export default function SettingsPage() {
       setSelectedReverts(new Set());
       setIsRevertMenuOpen(false);
   
-      // Atualiza a tela instantaneamente
+      // Refresh the screen immediately
       await fetchRevertHistory();
       refreshActiveTabData();
       await refreshUser();
@@ -268,11 +278,11 @@ export default function SettingsPage() {
 
   const handleQuickUndo = async () => {
     if (revertItems.length === 0 || isReverting) return;
-    // Desfaz a alteração mais recente diretamente
+    // Revert the most recent change directly
     await handleRevertSelected([revertItems[0]]);
   };
 
-  // --- HANDLERS ACESSO DO CRIADOR ---
+  // --- CREATOR ACCESS HANDLERS ---
   const handleEnterAccount = async (targetUser: User) => {
     if (isEntering) return;
     if (!enterPassword) {
@@ -338,7 +348,7 @@ export default function SettingsPage() {
     }
   };
 
-  // --- HANDLERS CRUD ---
+  // --- CRUD HANDLERS ---
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
@@ -435,10 +445,11 @@ export default function SettingsPage() {
       }
     }
 
-    // Etapa 2 da ADR-001 (2.5): avisar o tamanho da subárvore ANTES da cascata
-    // (`SPECS.md` §4.1 exige). O texto anterior era genérico ("todos os ativos
-    // associados"), e o endpoint excluía sem dizer quantos. A prévia vem da
-    // mesma rota e da mesma subárvore que o DELETE percorre — não é estimativa.
+    // ADR-001 stage 2 (2.5): warn about the subtree size BEFORE the cascade
+    // (`SPECS.md` §4.1 requires it). The previous text was generic ("all linked
+    // assets") and the endpoint deleted without saying how many. The preview
+    // comes from the same route and the same subtree the DELETE walks — it is
+    // not an estimate.
     let spaceMessage: string | null = null;
     if (type === 'space' && id) {
       try {
@@ -449,7 +460,7 @@ export default function SettingsPage() {
             const data = await previewRes.json();
             if (typeof data?.error === 'string' && data.error) message = data.error;
           } catch {
-            // Corpo não-JSON: mantém a mensagem genérica.
+            // Non-JSON body: keep the generic message.
           }
           toast.showError(message);
           return;
@@ -959,30 +970,36 @@ export default function SettingsPage() {
 
       {/* MODAIS */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-modal-title"
+          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+        >
           <form onSubmit={handleUserSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedUser?.id === user.id ? 'Meu Perfil' : selectedUser ? 'Editar Membro' : 'Novo Membro'}</h3>
+              <h3 id="user-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedUser?.id === user.id ? 'Meu Perfil' : selectedUser ? 'Editar Membro' : 'Novo Membro'}</h3>
               <button type="button" onClick={() => setIsUserModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><UserCircle size={10}/> Nome Completo</label>
-                <input name="name" defaultValue={selectedUser?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
+                <label htmlFor="user-name" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><UserCircle size={10}/> Nome Completo</label>
+                <input id="user-name" name="name" defaultValue={selectedUser?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><Mail size={10}/> Email</label>
-                <input name="email" type="email" defaultValue={selectedUser?.email || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
+                <label htmlFor="user-email" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><Mail size={10}/> Email</label>
+                <input id="user-email" name="email" type="email" defaultValue={selectedUser?.email || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><KeyRound size={10}/> {selectedUser ? "Mudar Senha (Opcional)" : "Senha"}</label>
-                <input name="password" type="password" className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required={!selectedUser} />
+                <label htmlFor="user-password" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><KeyRound size={10}/> {selectedUser ? "Mudar Senha (Opcional)" : "Senha"}</label>
+                <input id="user-password" name="password" type="password" className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required={!selectedUser} />
               </div>
               {selectedUser?.id !== user.id && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">Nível de Permissão</label>
+                  <label htmlFor="user-role" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">Nível de Permissão</label>
                   <input type="hidden" name="role" value={role} />
                   <CustomSelect
+                    id="user-role"
                     options={roleOptions}
                     value={role}
                     onChange={(val) => setRole(val as "DIRECTOR" | "ADMIN" | "MANAGER" | "VIEWER")}
@@ -998,10 +1015,15 @@ export default function SettingsPage() {
       )}
 
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="category-modal-title"
+          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+        >
           <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+              <h3 id="category-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
               <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-4 mb-8">
@@ -1015,10 +1037,15 @@ export default function SettingsPage() {
       )}
 
       {isSpaceModalOpen && (
-        <div className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="space-modal-title"
+          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+        >
           <form onSubmit={handleSpaceSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedSpace ? 'Editar Espaço' : 'Novo Espaço Pai'}</h3>
+              <h3 id="space-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedSpace ? 'Editar Espaço' : 'Novo Espaço Pai'}</h3>
               <button type="button" onClick={() => setIsSpaceModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
             </div>
             <div className="space-y-6 mb-10">
@@ -1054,14 +1081,19 @@ export default function SettingsPage() {
 
       {/* Modal de Solicitação de Senha para Entrar na Conta */}
       {isEnterModalOpen && enterTargetUser && (
-        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="enter-modal-title"
+          className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-zinc-900 border border-amber-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-amber-500 mb-4">
               <div className="p-3 bg-amber-100 dark:bg-amber-950/60 rounded-2xl">
                 <LogIn size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                <h3 id="enter-modal-title" className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
                   Entrar na Conta
                 </h3>
                 <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
@@ -1116,14 +1148,19 @@ export default function SettingsPage() {
 
       {/* Modal de Transferência do Título de Criador */}
       {isTransferModalOpen && transferTargetUser && (
-        <div className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="transfer-modal-title"
+          className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-red-500 mb-4">
               <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">
                 <KeyRound size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
+                <h3 id="transfer-modal-title" className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
                   Ceder Título de Criador
                 </h3>
                 <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">

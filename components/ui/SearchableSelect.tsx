@@ -9,6 +9,7 @@ import {
   getRootOptions,
   type OptionKind,
   type SearchableSelectOption,
+  type SelectOptionType,
 } from "@/lib/searchableSelect";
 
 export type { SearchableSelectOption };
@@ -17,8 +18,10 @@ export interface SearchableSelectProps {
   options: SearchableSelectOption[];
   value?: string;
   /** Recebe o `type` da opção escolhida — o sentinela se identifica como `default`. */
-  onChange: (id: string, type?: string) => void;
+  onChange: (id: string, type?: SelectOptionType) => void;
   placeholder?: string;
+  /** Permite que um `<label htmlFor>` associe o rótulo ao controle. */
+  id?: string;
   /**
    * Aparência herdada de cada superfície que usava uma cópia própria.
    *
@@ -144,6 +147,7 @@ export function SearchableSelect({
   onChange,
   placeholder = "Selecione...",
   variant = "list",
+  id,
 }: SearchableSelectProps) {
   const skin = VARIANTS[variant];
   const [isOpen, setIsOpen] = useState(false);
@@ -251,6 +255,7 @@ export function SearchableSelect({
   return (
     <div className="relative">
       <button
+        id={id}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={skin.button}

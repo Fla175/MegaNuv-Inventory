@@ -1,5 +1,4 @@
 // pages/index.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import HeaderSection from "@/components/HeaderSection";
@@ -7,13 +6,14 @@ import SearchSection from "@/components/SearchSection";
 import ListSection from "@/components/ListSection";
 import ActiveForm from "@/components/actives/activeForm";
 import { useUser } from "@/lib/context/UserContext";
+import type { FatherSpace, InventoryItem } from "@/types/inventory";
 
 export default function GestaoAtivosPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit" | "clone">("create");
-  const [selectedActive, setSelectedActive] = useState<null>(null);
-  const [fatherSpaces, setFatherSpaces] = useState([]);
-  const [actives, setActives] = useState([]);
+  const [selectedActive, setSelectedActive] = useState<Partial<InventoryItem> | null>(null);
+  const [fatherSpaces, setFatherSpaces] = useState<FatherSpace[]>([]);
+  const [actives, setActives] = useState<InventoryItem[]>([]);
   const { refreshUser } = useUser();
 
   const loadData = async () => {
@@ -33,7 +33,7 @@ export default function GestaoAtivosPage() {
         setActives(data);
       }
     } catch {
-      // Erro silencioso - dados serão recarregados no próximo refresh
+      // Silent failure - data is reloaded on the next refresh
     }
   };
 
@@ -62,7 +62,10 @@ export default function GestaoAtivosPage() {
     tag: "",
   });
 
-  const handleOpenForm = (mode: "create" | "edit" | "clone", data: any = null) => {
+  const handleOpenForm = (
+    mode: "create" | "edit" | "clone",
+    data: Partial<InventoryItem> | null = null
+  ) => {
     setFormMode(mode);
     setSelectedActive(data);
     setIsFormOpen(true);
@@ -89,7 +92,7 @@ export default function GestaoAtivosPage() {
           mode={formMode}
           initialData={selectedActive}
           fatherSpace={fatherSpaces} 
-          activeContainers={actives.filter((a: any) => a.isPhysicalSpace === true)}
+          activeContainers={actives.filter((a) => a.isPhysicalSpace === true)}
           onClose={() => {
             setIsFormOpen(false);
             loadData();

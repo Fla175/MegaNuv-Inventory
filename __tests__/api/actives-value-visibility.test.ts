@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
+import type { AuthTokenPayload } from '@/lib/auth';
 
 /**
  * Visibilidade e preservação de `fixedValue` — Etapa 1 da ADR-001.
@@ -58,42 +60,26 @@ vi.mock('@/lib/minio', () => ({
   BUCKET_NAME: 'inventory-test',
 }));
 
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'GET',
-    cookies: { auth_token: 'token-valido' },
-    headers: {},
-    body: {},
-    query: {},
-    ...overrides,
-  } as any;
-}
-
-function makeRes() {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  const end = vi.fn();
-  return { status, json, end };
-}
+const authedReq = (overrides: Record<string, unknown> = {}) =>
+  makeReq({ cookies: { auth_token: 'token-valido' }, ...overrides });
 
 describe('canViewValue (regra pura — lib/apiAuth)', () => {
-  it.each(['ADMIN', 'MANAGER', 'DIRECTOR'])('%s pode ver o valor', async (role) => {
+  it.each(['ADMIN', 'MANAGER', 'DIRECTOR'] as const)('%s pode ver o valor', async (role) => {
     setRole(role);
     const { canViewValue } = await import('@/lib/apiAuth');
-    expect(canViewValue({ role } as any)).toBe(true);
+    expect(canViewValue({ role })).toBe(true);
   });
 
   it('VIEWER não pode ver o valor', async () => {
     const { canViewValue } = await import('@/lib/apiAuth');
-    expect(canViewValue({ role: 'VIEWER' } as any)).toBe(false);
+    expect(canViewValue({ role: 'VIEWER' })).toBe(false);
   });
 
   it('sessão ausente ou sem papel não vê (falha fechado)', async () => {
     const { canViewValue } = await import('@/lib/apiAuth');
     expect(canViewValue(null)).toBe(false);
     expect(canViewValue(undefined)).toBe(false);
-    expect(canViewValue({} as any)).toBe(false);
+    expect(canViewValue({} as Pick<AuthTokenPayload, 'role'>)).toBe(false);
   });
 });
 
@@ -110,7 +96,7 @@ describe('GET /api/actives/list — 1.1', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/actives/list');
 
-    await handler(makeReq(), res as any);
+    await handler(authedReq(), res);
 
     const payload = res.json.mock.calls[0][0];
     expect(res.status).toHaveBeenCalledWith(200);
@@ -126,7 +112,7 @@ describe('GET /api/actives/list — 1.1', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/actives/list');
 
-    await handler(makeReq(), res as any);
+    await handler(authedReq(), res);
 
     const payload = res.json.mock.calls[0][0];
     expect(payload[0]).toHaveProperty('fixedValue', 800);
@@ -164,9 +150,11 @@ describe('PUT /api/actives/update — 1.2', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/actives/update');
 
-    await handler(makeReq({ method: 'PUT', body: { id: 'a1', name: 'Renomeada' } }), res as any);
+    await handler(authedReq({ method: 'PUT', body: { id: 'a1', name: 'Renomeada' } }), res);
 
-    const [args] = dbMock.active.update.mock.calls[0] as any;
+    const args = dbMock.active.update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
     expect(args.data.fixedValue).toBe(1250);
   });
 
@@ -175,9 +163,11 @@ describe('PUT /api/actives/update — 1.2', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/actives/update');
 
-    await handler(makeReq({ method: 'PUT', body: { id: 'a1', name: 'Zerada', fixedValue: 0 } }), res as any);
+    await handler(authedReq({ method: 'PUT', body: { id: 'a1', name: 'Zerada', fixedValue: 0 } }), res);
 
-    const [args] = dbMock.active.update.mock.calls[0] as any;
+    const args = dbMock.active.update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
     expect(args.data.fixedValue).toBe(0);
   });
 
@@ -186,9 +176,11 @@ describe('PUT /api/actives/update — 1.2', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/actives/update');
 
-    await handler(makeReq({ method: 'PUT', body: { id: 'a1', name: 'Reprecificada', fixedValue: 990 } }), res as any);
+    await handler(authedReq({ method: 'PUT', body: { id: 'a1', name: 'Reprecificada', fixedValue: 990 } }), res);
 
-    const [args] = dbMock.active.update.mock.calls[0] as any;
+    const args = dbMock.active.update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
     expect(args.data.fixedValue).toBe(990);
   });
 
@@ -198,11 +190,13 @@ describe('PUT /api/actives/update — 1.2', () => {
     const { default: handler } = await import('@/pages/api/actives/update');
 
     await handler(
-      makeReq({ method: 'PUT', body: { id: 'a1', name: 'Renomeada', applyToSimilar: true } }),
-      res as any
+      authedReq({ method: 'PUT', body: { id: 'a1', name: 'Renomeada', applyToSimilar: true } }),
+      res
     );
 
-    const [args] = dbMock.active.updateMany.mock.calls[0] as any;
+    const args = dbMock.active.updateMany.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
     expect(args.data).not.toHaveProperty('fixedValue');
     expect(args.data).toHaveProperty('name', 'Renomeada');
   });
@@ -214,14 +208,26 @@ describe('GET /api/qrcode/public-get — 1.3 e 1.4', () => {
   //   ├── B "Prateleira 1" (espaço, 50)
   //   │   └── D "Serra" (ativo, 25)
   //   └── C "Caixa A" (ativo, 200)
-  const nodes: Record<string, any> = {
+  interface QrNode {
+    id: string;
+    name: string;
+    isPhysicalSpace: boolean;
+    fixedValue: number;
+    imageUrl: null;
+    fileUrl: null;
+    notes: null;
+    createdBy: { name: string };
+    category: { name: string };
+  }
+
+  const nodes: Record<string, QrNode> = {
     A: { id: 'A', name: 'Depósito', isPhysicalSpace: true, fixedValue: 100, imageUrl: null, fileUrl: null, notes: null, createdBy: { name: 'R' }, category: { name: 'C' } },
     B: { id: 'B', name: 'Prateleira 1', isPhysicalSpace: true, fixedValue: 50, imageUrl: null, fileUrl: null, notes: null, createdBy: { name: 'R' }, category: { name: 'C' } },
     C: { id: 'C', name: 'Caixa A', isPhysicalSpace: false, fixedValue: 200, imageUrl: null, fileUrl: null, notes: null, createdBy: { name: 'R' }, category: { name: 'C' } },
     D: { id: 'D', name: 'Serra', isPhysicalSpace: false, fixedValue: 25, imageUrl: null, fileUrl: null, notes: null, createdBy: { name: 'R' }, category: { name: 'C' } },
   };
 
-  const treeChildren: Record<string, any[]> = {
+  const treeChildren: Record<string, QrNode[]> = {
     A: [nodes.B, nodes.C],
     B: [nodes.D],
     C: [],
@@ -230,11 +236,13 @@ describe('GET /api/qrcode/public-get — 1.3 e 1.4', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    dbMock.active.findUnique.mockImplementation(async ({ where }: any) => {
+    dbMock.active.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => {
       const node = nodes[where.id];
       if (!node) return null;
-      return { ...node, children: treeChildren[where.id] ?? [] };
-    });
+        return { ...node, children: treeChildren[where.id] ?? [] };
+      }
+    );
   });
 
   it('responde 401 sem sessão (o handler continua sendo a barreira)', async () => {
@@ -242,7 +250,7 @@ describe('GET /api/qrcode/public-get — 1.3 e 1.4', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/qrcode/public-get');
 
-    await handler(makeReq({ cookies: {} }), res as any);
+    await handler(makeReq({ cookies: {} }), res);
 
     expect(res.status).toHaveBeenCalledWith(401);
   });
@@ -252,7 +260,7 @@ describe('GET /api/qrcode/public-get — 1.3 e 1.4', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/qrcode/public-get');
 
-    await handler(makeReq({ query: { id: 'A' } }), res as any);
+    await handler(authedReq({ query: { id: 'A' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = res.json.mock.calls[0][0];
@@ -271,15 +279,20 @@ describe('GET /api/qrcode/public-get — 1.3 e 1.4', () => {
     const res = makeRes();
     const { default: handler } = await import('@/pages/api/qrcode/public-get');
 
-    await handler(makeReq({ query: { id: 'A' } }), res as any);
+    await handler(authedReq({ query: { id: 'A' } }), res);
 
-    const payload = res.json.mock.calls[0][0];
+    type QrPayload = {
+      root: { fixedValue?: number };
+      sections: Array<{ actives: Array<{ id: string; fixedValue?: number }> }>;
+      totalValue: number;
+    };
+    const payload = res.json.mock.calls[0][0] as QrPayload;
     // 100 (raiz) + 50 (B) + 200 (C) + 25 (D, dentro do espaço aninhado) = 375.
     expect(payload.root.fixedValue).toBe(100);
-    const flat = payload.sections.flatMap((s: any) => s.actives);
-    expect(flat.find((a: any) => a.id === 'B').fixedValue).toBe(50);
-    expect(flat.find((a: any) => a.id === 'C').fixedValue).toBe(200);
-    expect(flat.find((a: any) => a.id === 'D').fixedValue).toBe(25);
+    const flat = payload.sections.flatMap((s) => s.actives);
+    expect(flat.find((a) => a.id === 'B')?.fixedValue).toBe(50);
+    expect(flat.find((a) => a.id === 'C')?.fixedValue).toBe(200);
+    expect(flat.find((a) => a.id === 'D')?.fixedValue).toBe(25);
     expect(payload.totalValue).toBe(375);
   });
 });

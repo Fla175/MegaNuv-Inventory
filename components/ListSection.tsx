@@ -1,5 +1,4 @@
-// comṕonents/ListSection.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/ListSection.tsx
 import React, { useState, useMemo, useEffect, useRef, memo } from "react";
 import QRCode from "react-qr-code";
 import {
@@ -38,6 +37,7 @@ import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { SearchableSelect, type SearchableSelectOption } from "./ui/SearchableSelect";
 import { parseFileUrls } from "@/lib/mediaReferences";
 import { ListSectionProps } from "../lib/types";
+import type { Category, InventoryItem } from "@/types/inventory";
 import { useUser } from "@/lib/context/UserContext";
 import Image from "next/image";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
@@ -86,31 +86,31 @@ function ListSection({
   const { user } = useUser();
   const isViewer = user?.role === "VIEWER";
 
-  // --- ESTADOS DE SELEÇÃO MÚLTIPLA ---
+  // --- MULTI-SELECTION STATE ---
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
   const [longPressItem, setLongPressItem] = useState<string | null>(null);
 
-  // --- ESTADOS DE CONTROLE ---
+  // --- CONTROL STATE ---
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    item: any;
+    item: InventoryItem;
     isPhysicalSpace: boolean;
     selectedCount?: number;
   } | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>(
     {}
   );
-  const [selectedPrintItem, setSelectedPrintItem] = useState<any | null>(null);
-  const [selectedViewItem, setSelectedViewItem] = useState<any | null>(null);
-  const [movingItem, setMovingItem] = useState<any | null>(null);
+  const [selectedPrintItem, setSelectedPrintItem] = useState<InventoryItem | null>(null);
+  const [selectedViewItem, setSelectedViewItem] = useState<InventoryItem | null>(null);
+  const [movingItem, setMovingItem] = useState<InventoryItem | null>(null);
   const [moveExpanded, setMoveExpanded] = useState<Record<string, boolean>>({});
   const [isMovingLoading, setIsMovingLoading] = useState(false);
 
-  // --- ESTADOS DE SELEÇÃO E CLONAGEM ---
+  // --- SELECTION AND CLONE STATE ---
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isCloneBatchOpen, setIsCloneBatchOpen] = useState(false);
   const [cloneQuantity, setCloneQuantity] = useState<number>(1);
@@ -118,7 +118,7 @@ function ListSection({
     useState<string>("");
   const [isCloning, setIsCloning] = useState(false);
 
-  // --- DESFAZER ALTERAÇÃO ---
+  // --- UNDO STATE ---
   const [undoData, setUndoData] = useState<{
     table: string;
     ids: string[];
@@ -129,7 +129,7 @@ function ListSection({
   const [undoSeconds, setUndoSeconds] = useState(0);
   const [isUndoing, setIsUndoing] = useState(false);
 
-  // Estado do Dialog de Confirmação
+  // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -181,7 +181,7 @@ function ListSection({
     setSelectedViewItem(null);
   };
 
-  const executeIframePrint = (item: any) => {
+  const executeIframePrint = (item: InventoryItem) => {
     const iframe = document.createElement("iframe");
     iframe.style.position = "absolute";
     iframe.style.width = "0";
@@ -271,12 +271,15 @@ function ListSection({
     doc.close();
   };
 
-  const getCategory = (categoryId: string, categoriesList: any[]) => {
+  const getCategory = (
+    categoryId: string | null | undefined,
+    categoriesList: Category[]
+  ) => {
     const foundCategory = categoriesList.find((cat) => cat.id === categoryId);
     return foundCategory ? foundCategory.name : "Categoria n      o encontrada";
   };
 
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEscapeKey(() => setSelectedViewItem(null), !!selectedViewItem);
@@ -381,7 +384,7 @@ function ListSection({
 
   const handleContextMenu = (
     e: React.MouseEvent,
-    item: any,
+    item: InventoryItem,
     isPhysicalSpace: boolean
   ) => {
     e.preventDefault();
@@ -411,7 +414,7 @@ function ListSection({
     const hasFilters =
       query !== "" || category !== "" || manufacturer !== "" || model !== "";
 
-    const matchesDirectly = (a: any) => {
+    const matchesDirectly = (a: InventoryItem) => {
       const nameMatch =
         query === "" ||
         a.name?.toLowerCase().includes(query) ||
@@ -421,8 +424,7 @@ function ListSection({
       const categoryMatch =
         category === "" ||
         a.categoryId === category ||
-        a.category?.name === category ||
-        a.category === category;
+        a.category?.name === category;
       const manufacturerMatch =
         manufacturer === "" ||
         a.manufacturer?.toLowerCase().includes(manufacturer);
@@ -505,7 +507,7 @@ function ListSection({
     }
   }, [filters, filteredData.hasFilters, filteredData.actives]);
 
-  // --- AÇÕES ---
+  // --- ACTIONS ---
   const handleMoveAction = async (
     targetSpaceId: string,
     targetParentId?: string
@@ -514,7 +516,7 @@ function ListSection({
 
     const isBatch = movingItem.isBatch;
 
-    // Guardamos a seleção ANTES de chamar exitSelectionMode().
+    // Snapshot the selection BEFORE calling exitSelectionMode().
     const selectedIds = Array.from(selectedItems);
 
     if (isBatch && selectedIds.length === 0) {
@@ -553,7 +555,7 @@ function ListSection({
       }
 
       // =====================================================
-      // TIMESTAMP DO SERVIDOR
+      // SERVER TIMESTAMP
       // =====================================================
 
       if (!data.timestamp) {
@@ -564,7 +566,7 @@ function ListSection({
         );
       } else {
         // ===================================================
-        // POPUP DE DESFAZER
+        // UNDO POPUP
         // ===================================================
 
         const undoId = isBatch ? selectedIds.join(",") : movingItem.id;
@@ -612,9 +614,9 @@ function ListSection({
     }
   };
 
-  // Único gatilho do popup de desfazer: a movimentação — move.ts é a única
-  // API que devolve `timestamp`. Delete e clone não devolvem; desfazer essas
-  // ações acontece pelo Histórico em Settings.
+  // The only trigger for the undo popup is a move: move.ts is the only API
+  // that returns a `timestamp`. Delete and clone do not; undoing those actions
+  // happens through History in Settings.
   const showUndo = (
     id: string,
     name: string,
@@ -691,7 +693,7 @@ function ListSection({
     }
   };
 
-  const handleCloneClick = (item: any) => {
+  const handleCloneClick = (item: InventoryItem) => {
     onClone({
       ...item,
       id: undefined,
@@ -703,7 +705,7 @@ function ListSection({
     if (selectedViewItem) setSelectedViewItem(null);
   };
 
-  const handleDelete = async (item: any) => {
+  const handleDelete = async (item: InventoryItem) => {
     setConfirmDialog({
       isOpen: true,
       title: "Confirmar Exclusão",
@@ -1052,7 +1054,7 @@ function ListSection({
             >
               <div
                 onContextMenu={(e) =>
-                  handleContextMenu(e, active, active.isPhysicalSpace)
+                  handleContextMenu(e, active, active.isPhysicalSpace ?? false)
                 }
                 onClick={() => {
                   const childCount = actives.filter(
@@ -1131,9 +1133,9 @@ function ListSection({
                         ? "cursor-pointer hover:scale-105 active:scale-95 border-2 border-blue-500/30"
                         : "border dark:border-white/10"
                     } ${
-                      getItemColors(active.isPhysicalSpace, hasSubItems).bg
+                      getItemColors(active.isPhysicalSpace ?? false, hasSubItems).bg
                     } ${
-                      getItemColors(active.isPhysicalSpace, hasSubItems).text
+                      getItemColors(active.isPhysicalSpace ?? false, hasSubItems).text
                     }`}
                   >
                     {active.isPhysicalSpace ? (
@@ -1158,7 +1160,7 @@ function ListSection({
                         </p>
                       )}
 
-                      {categoryObj && (
+                      {categoryObj?.color && (
                         <p
                           className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border mr-0.5"
                           style={{
@@ -1312,13 +1314,13 @@ function ListSection({
                 <div
                   className={`p-3 rounded-2xl ${
                     getItemColors(
-                      selectedViewItem.isPhysicalSpace,
-                      selectedViewItem.hasSubItems
+                      selectedViewItem.isPhysicalSpace ?? false,
+                      selectedViewItem.hasSubItems ?? false
                     ).bg
                   } ${
                     getItemColors(
-                      selectedViewItem.isPhysicalSpace,
-                      selectedViewItem.hasSubItems
+                      selectedViewItem.isPhysicalSpace ?? false,
+                      selectedViewItem.hasSubItems ?? false
                     ).text
                   }`}
                 >
@@ -1385,13 +1387,13 @@ function ListSection({
                     label="Localização"
                     Class="truncate"
                     value={
-                      selectedViewItem.parentId
+                      (selectedViewItem.parentId
                         ? actives.find(
                             (a) => a.id === selectedViewItem.parentId
                           )?.name || selectedViewItem.fatherSpace?.name
                         : fatherSpaces.find(
                             (s) => s.id === selectedViewItem.fatherSpaceId
-                          )?.name
+                          )?.name) || "N/A"
                     }
                   />
                   <InfoItem
@@ -1445,10 +1447,10 @@ function ListSection({
                   </h4>
 
                   {(() => {
-                    // Etapa 2 da ADR-001 (2.3): `parseFileUrls` é a cópia única
-                    // (`lib/mediaReferences.ts`, exigida por `SPECS.md` §4.1).
-                    // O split de CSV local tratava JSON array legado como uma
-                    // URL só e renderizava o link literal `["http://a.pdf"]`.
+                    // ADR-001 stage 2 (2.3): `parseFileUrls` is the single
+                    // copy (`lib/mediaReferences.ts`, required by `SPECS.md`
+                    // §4.1). The local CSV split treated a legacy JSON array as
+                    // a single URL and rendered the literal `["http://a.pdf"]`.
                     const filesArray = parseFileUrls(selectedViewItem.fileUrl);
 
                     return filesArray.length > 0 ? (
@@ -1550,7 +1552,7 @@ function ListSection({
             <div className="p-4 border-t dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center gap-2 overflow-x-auto custom-scrollbar">
               <button
                 onClick={() => {
-                  setSelectedViewItem(false);
+                  setSelectedViewItem(null);
                   onEdit(selectedViewItem, "edit");
                 }}
                 className="flex-1 sm:flex-none px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
@@ -1562,7 +1564,7 @@ function ListSection({
               <button
                 onClick={() => {
                   setMovingItem(selectedViewItem);
-                  setSelectedViewItem(false);
+                  setSelectedViewItem(null);
                 }}
                 className="flex-1 sm:flex-none px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
               >
@@ -1573,7 +1575,7 @@ function ListSection({
               <button
                 onClick={() => {
                   handleCloneClick(selectedViewItem);
-                  setSelectedViewItem(false);
+                  setSelectedViewItem(null);
                 }}
                 className="flex-1 sm:flex-none px-4 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
               >
@@ -1586,7 +1588,7 @@ function ListSection({
               <button
                 onClick={() => {
                   handleDelete(selectedViewItem);
-                  setSelectedViewItem(false);
+                  setSelectedViewItem(null);
                 }}
                 className="flex-1 sm:flex-none px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
               >
@@ -1783,10 +1785,14 @@ function ListSection({
 
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5">
+                <label
+                  htmlFor="clone-quantity"
+                  className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5"
+                >
                   Quantidade de cópias por ativo
                 </label>
                 <input
+                  id="clone-quantity"
                   type="number"
                   min={1}
                   max={50}
@@ -1805,10 +1811,14 @@ function ListSection({
                 </span>
               </div>
               <div>
-                <label className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5">
+                <label
+                  htmlFor="clone-destination"
+                  className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5"
+                >
                   Localização
                 </label>
                 <SearchableSelect
+                  id="clone-destination"
                   options={cloneLocationOptions}
                   value={cloneDestinationSpaceId}
                   onChange={(id: string) => setCloneDestinationSpaceId(id)}
@@ -2075,14 +2085,14 @@ function ListSection({
   );
 }
 
-// --- COMPONENTES AUXILIARES ---
+// --- HELPER COMPONENTS ---
 function InfoItem({
   icon,
   label,
   Class,
   value,
 }: {
-  icon: any;
+  icon: React.ReactNode;
   label: string;
   Class: string;
   value: string;
@@ -2113,7 +2123,7 @@ function ContextBtn({
   danger,
   onClose,
 }: {
-  icon: any;
+  icon: React.ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;

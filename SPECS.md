@@ -104,7 +104,7 @@ MinIO externo ao compose · `output: "standalone"` no Next.
 | `SYSTEM_TIME_MAX`                       | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB)                                        | `lib/revert/history.ts` (`TIMESTAMP_MAX`)          |
 | Tabelas reversíveis                     | `Active`, `FatherSpace`, `Category` (whitelist)                                                      | `lib/revert/history.ts` (`REVERTABLE_TABLES`)      |
 | Escala do inventário                    | `Active.id` = 4 chars hex (65.536 combinações) — colisão provável em inventário grande               | `lib/prisma.ts:8-24`                               |
-| Tamanho máximo de arquivo de componente | **1.927 linhas** em `components/ListSection.tsx`                                                     | —                                                  |
+| Tamanho máximo de arquivo de componente | **2.150 linhas** em `components/ListSection.tsx`                                                     | —                                                  |
 | Threads de conexão Prisma               | 1 (singleton com hot-reload guard)                                                                   | `lib/prisma.ts:46-54`                              |
 
 ---
@@ -152,20 +152,20 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │   ├── _app.tsx  _document.tsx
 │   ├── index.tsx            # Gestão de Ativos
 │   ├── dashboard.tsx        # 374 L
-│   ├── settings.tsx         # 911 L — abas users|spaces|categories|logs|theme
-│   ├── login.tsx  initial-setup/register.tsx  qrcode/view.tsx (504 L)
+│   ├── settings.tsx         # 1.235 L — abas users|spaces|categories|logs|theme
+│   ├── login.tsx  initial-setup/register.tsx  qrcode/view.tsx (614 L)
 │   └── api/                 # 36 endpoints .ts
 │       ├── actives/  auth/  categories/  dashboard/
 │       ├── database/revert.ts (544 L)  father-spaces/
 │       ├── internal/  logs/  public/  qrcode/
 │       ├── storage/  users/
 │       ├── hello.ts  protected.ts
-├── components/              # 12 .tsx
-│   ├── ListSection.tsx      # 1.927 L ← gargalo
+├── components/              # 13 .tsx
+│   ├── ListSection.tsx      # 2.150 L ← gargalo
 │   ├── Layout.tsx  HeaderSection.tsx  SearchSection.tsx
-│   ├── FileUpload.tsx (298 L)  imageUpload.tsx  customSelect.tsx
+│   ├── FileUpload.tsx (307 L)  imageUpload.tsx  customSelect.tsx
 │   ├── AddLocationModal.tsx
-│   ├── actives/activeForm.tsx (659 L)
+│   ├── actives/activeForm.tsx (775 L)
 │   └── ui/  ConfirmDialog.tsx  Toast.tsx  ToastContainer.tsx
 ├── lib/                     # nunca importa de pages/ ou components/
 │   ├── prisma.ts  auth.ts  apiAuth.ts  minio.ts  logger.ts
@@ -536,7 +536,7 @@ exige `REVERT_PROBE_DATABASE_URL`. Cobertura medida: **83% de linhas / 80% de br
 **Gates locais — todos obrigatórios, todos precisam passar:**
 
 ```bash
-yarn lint            # 0 erros, 0 avisos
+yarn lint            # eslint . — 0 erros, 0 avisos (inclui __tests__)
 npx tsc --noEmit     # 0 erros
 npx prisma validate  # schema válido
 yarn build:opt       # build standalone bem-sucedido

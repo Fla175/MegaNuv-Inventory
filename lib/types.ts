@@ -1,4 +1,5 @@
-import { FatherSpace, Active } from "@prisma/client";
+// lib/types.ts
+import type { FatherSpace, InventoryItem } from "@/types/inventory";
 
 export interface ListSectionFilters {
   query?: string;
@@ -9,10 +10,10 @@ export interface ListSectionFilters {
 
 export interface ListSectionProps {
   filters: ListSectionFilters;
-  onEdit: (item: Active, mode: 'view' | 'edit') => void; 
-  onClone: (item: Active) => void;
+  onEdit: (item: InventoryItem, mode: 'view' | 'edit') => void;
+  onClone: (item: Partial<InventoryItem>) => void;
   onRefresh: () => void;
-  onMove?: (item: Active) => void;
-  actives: Active[];
+  onMove?: (item: InventoryItem) => void;
+  actives: InventoryItem[];
   fatherSpaces: FatherSpace[];
 }

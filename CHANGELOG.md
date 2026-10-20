@@ -772,6 +772,66 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 
 - Nenhuma alteração manual do desenvolvedor registrada nesta sessão.
 
+### 🤖 OpenCode Operations (4)
+
+#### Fixed
+
+- **Etapa 3 da `ADR/ADR-001.md` — conformidade e acessibilidade.** Fecha a ADR; a `ADR-002`
+  (matriz RBAC) permanece pendente.
+  - **3.1 — `Esc` e semântica de diálogo (funcional, não só a11y).** Os 5 modais de
+    `pages/settings.tsx` ganharam `role="dialog"`, `aria-modal` e `aria-labelledby`; Entrar e
+    Transferência, que não registravam `useEscapeKey`, agora fecham com `Esc` como os outros 3.
+  - **3.2 — labels associados.** `htmlFor`/`id` nos labels-irmãos de `ListSection` (2),
+    `activeForm` (11), `settings` (4), `FileUpload`, `imageUpload` e `AddLocationModal`; os labels de
+    grupo Categoria e Seriais usam `role="group"` + `aria-labelledby`, porque rotulam N controles.
+    `CustomSelect` e `SearchableSelect` aceitam `id` e o aplicam ao `button` (elemento rotulável).
+    Nos uploads o `id` vem de `useId`, e o label só associa quando o input está renderizado.
+  - **3.3 — bypass de upload fechado no cliente.** `FileUpload` mantinha uma cópia da allowlist e
+    validava por **ou** (`extensão === tipo || MIME === tipo`): um `.pdf` com
+    `application/octet-stream` passava no cliente e era recusado no servidor. Agora delega a
+    `validateUpload` (`lib/uploadPolicy.ts`), a mesma regra **e** do servidor
+    (`SPECS.md` §5.3); o caso de bypass já era coberto por
+    `__tests__/lib/uploadPolicy.test.ts`.
+  - **3.8** — cabeçalho `comṕonents/ListSection.tsx` corrigido.
+
+#### Changed
+
+- **3.5 — `yarn lint` passou de `next lint` para `eslint .`.** O flat config ganhou `ignores`
+  apenas de artefatos (`.next/`, `node_modules/`, `coverage/`, `next-env.d.ts`); `__tests__` está
+  coberto de verdade. A migração revelou **149 erros** — não os 102 da ADR, porque a suíte cresceu:
+  140 `no-explicit-any`, 5 `no-unused-vars`, 4 `no-non-null-asserted-optional-chain`. Os 10 arquivos
+  foram tipados; o `as any` que restava nos helpers virou `as unknown as`/`asMock`, centralizado, e
+  não há `ignores` para testes.
+- **3.4 — `types/inventory.ts` deixou de ser código morto.** Nova interface estrutural
+  `InventoryItem` (a árvore mistura `Active` e `FatherSpace` e a API acrescenta campos derivados)
+  adotada por `lib/types.ts`, `ListSection`, `activeForm` e `pages/index`; os três
+  `eslint-disable @typescript-eslint/no-explicit-any` saíram. `activeForm` passou a mapear
+  explicitamente os campos de `initialData` em vez de espalhar o objeto no estado, e a leitura de
+  `fileUrl` usa `parseFileUrls` (a cópia única do 2.3).
+- **3.7 — código morto e idioma.** `getActiveColors`/`getPhysicalSpaceColors`
+  (`lib/constants/colors.ts`) tinham 0 referências e foram removidos. Comentários PT-BR dos arquivos
+  da etapa (`ListSection`, `settings`, `FileUpload`, `imageUpload`, `AddLocationModal`, `index`,
+  `activeForm`, `types/inventory`) traduzidos sem perder conteúdo — inclusive a regra de que
+  `move.ts` é o único endpoint que devolve `timestamp` para o popup de desfazer.
+- **3.6 — contagens.** `SPECS.md` §3.1/§3.2 e `CONTEXT.md` §3.3 #4 atualizados para os valores
+  correntes: `ListSection` 2.150 L, `settings` 1.235, `activeForm` 775, `qrcode/view` 614,
+  `FileUpload` 307, `components/` 13 `.tsx`. Os números da ADR (1.927/911/659/504) tinham sido
+  superados pela própria Etapa 2.
+
+#### Added
+
+- **`__tests__/helpers/http.ts`** — `makeReq`, `makeRes` e `asMock`: os doubles de request/response
+  dos testes de API em um lugar, tipados. Elimina a repetição de `makeReq(overrides: any)` +
+  `as any` em 10 arquivos.
+
+#### Docs
+
+- **`SPECS.md`** — gate de lint documentado como `eslint .` cobrindo `__tests__`.
+- **`CONTEXT.md`** — §2.1 com a Etapa 3 concluída; P1 #9 (`next lint` depreciado) marcado como
+  corrigido; P2 #4 com a contagem atual.
+- **`ADR/ADR-001.md`** — Etapa 3 marcada como concluída e decisão do 3.5 registrada (corrigir os
+  testes, sem `ignores`).
+
 ---
 
 ## - Initial Setup

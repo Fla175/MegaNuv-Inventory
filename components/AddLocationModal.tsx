@@ -5,7 +5,7 @@ import { X, Warehouse, Loader2 } from "lucide-react";
 interface AddLocationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Ajustado para aceitar a função simplificada que o index.tsx usa
+  // Adjusted to accept the simplified callback used by index.tsx
   onLocationAdded: (name: string) => Promise<void> | void; 
   isLoading: boolean;
   error: string | null;
@@ -25,7 +25,7 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
     
-    // Chama a função e limpa o campo
+    // Call the handler and clear the field
     await onLocationAdded(name);
     setName("");
   };
@@ -56,10 +56,14 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
+            <label
+              htmlFor="space-name"
+              className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2"
+            >
               Nome do Espaço
             </label>
             <input
+              id="space-name"
               autoFocus
               className="w-full bg-gray-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl p-4 font-bold text-blue-950 outline-none transition-all"
               placeholder="Ex: Almoxarifado Central"

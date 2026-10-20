@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
 
 /**
  * RBAC de `POST /api/auth/signup`.
@@ -28,41 +29,26 @@ const dbMock = {
     delete: vi.fn(),
   },
   log: { create: vi.fn() },
-  $transaction: vi.fn(async (txs: any[]) => Promise.all(txs)),
+  $transaction: vi.fn(async (txs: Array<Promise<unknown>>) => Promise.all(txs)),
 };
 
 vi.mock('@/lib/prisma', () => ({ default: dbMock }));
 
-type ResMock = { status: any; json: any; setHeader: any; end: any };
+type Res = ReturnType<typeof makeRes>;
 
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'POST',
-    cookies: {},
-    headers: {},
-    body: {},
-    query: {},
-    // o handler registra a origem do cadastro em Log e lê req.socket.remoteAddress
-    socket: { remoteAddress: '127.0.0.1' },
-    ...overrides,
-  } as any;
-}
-
-function makeRes(): ResMock {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  return { status, json, setHeader: vi.fn(), end: vi.fn() };
-}
-
-async function callSignup(res: ResMock, role: string, cookies: any = { auth_token: 'token-valido' }) {
+async function callSignup(
+  res: Res,
+  role: string,
+  cookies: Record<string, string> = { auth_token: 'token-valido' }
+) {
   currentRole = role;
   const { default: handler } = await import('@/pages/api/auth/signup');
   const req = makeReq({
+    method: 'POST',
     cookies,
     body: { email: `novo-${role}@x.com`, password: 'senha123456', name: 'Novo', role: 'VIEWER' },
   });
-  await handler(req, res as any);
+  await handler(req, res);
 }
 
 describe('POST /api/auth/signup — gate de papel (RBAC SPECS.md §4.2)', () => {
@@ -136,10 +122,11 @@ describe('POST /api/auth/signup — bootstrap do primeiro ADMIN', () => {
     currentRole = 'VIEWER';
     const { default: handler } = await import('@/pages/api/auth/signup');
     const req = makeReq({
+      method: 'POST',
       cookies: {},
       body: { email: 'primeiro@x.com', password: 'senha123456', name: 'Criador', role: 'DIRECTOR' },
     });
-    await handler(req, res as any);
+    await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(dbMock.user.create).toHaveBeenCalledWith(

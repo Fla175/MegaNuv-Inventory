@@ -1,7 +1,8 @@
 // components/FileUpload.tsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useId } from 'react';
 import { UploadCloud, X, Loader2, FileText, Link as LinkIcon, Plus, Image as ImageIcon, File as FileIcon } from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
+import { validateUpload } from '@/lib/uploadPolicy';
 
 interface FileUploadProps {
   value: string[];
@@ -10,7 +11,7 @@ interface FileUploadProps {
   maxFiles?: number;
 }
 
-// Função auxiliar para extrair dados da URL e definir o visual
+// Helper: derive the display data and visual style from the URL
 const getFileDetails = (url: string) => {
   const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
   const displayName = decodeURIComponent(rawFilename);
@@ -76,7 +77,7 @@ export default function FileUpload({
     try {
       setLoading(true);
 
-      // Faz a chamada para a sua API existente usando o método DELETE
+      // Call the existing API using the DELETE method
       const res = await fetch('/api/storage/delete-url', {
         method: 'DELETE',
         headers: {
@@ -91,7 +92,7 @@ export default function FileUpload({
         throw new Error(data.error || 'Erro ao remover o arquivo do servidor.');
       }
 
-      // Se a exclusão no MinIO deu certo, atualiza o estado local
+      // If MinIO deletion succeeded, update local state
       const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
       onChange(newFiles);
       toast.showSuccess('Arquivo removido com sucesso.');
@@ -105,34 +106,37 @@ export default function FileUpload({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 1. Captura múltiplos arquivos
+    // 1. Capture multiple files
     let selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
 
-    // 2. Valida o limite de arquivos
+    // 2. Enforce the file count limit
     const availableSlots = maxFiles - currentFiles.length;
     if (selectedFiles.length > availableSlots) {
       toast.showWarning(`Você só pode enviar mais ${availableSlots} arquivo(s). Os extras foram ignorados.`);
-      selectedFiles = selectedFiles.slice(0, availableSlots); // Corta a array para não passar do limite
+      selectedFiles = selectedFiles.slice(0, availableSlots); // Trim the list so it does not exceed the limit
     }
 
-    const allowedTypes = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', '.webp', 'image/webp', 'image/png', 'image/jpeg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validFiles: File[] = [];
 
-    // 3. Validações individuais (Tipo e Tamanho)
+    // 3. Per-file validation — the same rule as the server
+    // (`lib/uploadPolicy.ts`): both type **and** extension must be allowed
+    // (`SPECS.md` §5.3). The previous local copy used **or** and accepted
+    // `application/octet-stream` with an allowed extension — exactly the
+    // bypass the SPEC forbids.
     for (const file of selectedFiles) {
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-      const isAllowed = allowedTypes.some(type => 
-        fileExtension === type.toLowerCase() || file.type === type
-      );
+      const rejection = validateUpload({
+        mimetype: file.type,
+        originalFilename: file.name,
+        size: file.size,
+      });
 
-      if (!isAllowed) {
-        toast.showWarning(`Arquivo "${file.name}" recusado: tipo não permitido.`);
-        continue;
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        toast.showWarning(`Arquivo "${file.name}" recusado: tamanho acima de 10MB.`);
+      if (rejection) {
+        const reason =
+          rejection.field === 'size'
+            ? 'tamanho acima de 10MB.'
+            : 'tipo não permitido.';
+        toast.showWarning(`Arquivo "${file.name}" recusado: ${reason}`);
         continue;
       }
 
@@ -144,12 +148,12 @@ export default function FileUpload({
       return;
     }
 
-    // 4. Envio em lote (Batch Upload)
+    // 4. Batch upload
     try {
       setLoading(true);
       const newUploadedUrls: string[] = [];
 
-      // Mapeia os arquivos para Promises de upload simultâneas
+      // Map files to concurrent upload promises
       const uploadPromises = validFiles.map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -165,8 +169,8 @@ export default function FileUpload({
         return data.publicUrl as string;
       });
 
-      // Executa os uploads simultaneamente e coleta os resultados usando Promise.allSettled 
-      // (Isso evita que todos falhem caso apenas um arquivo dê erro)
+      // Run uploads concurrently and collect results with Promise.allSettled
+      // (so a single failing file does not fail the whole batch)
       const results = await Promise.allSettled(uploadPromises);
 
       results.forEach((result, index) => {
@@ -177,7 +181,7 @@ export default function FileUpload({
         }
       });
 
-      // Atualiza o estado com as URLs que tiveram sucesso
+      // Store the URLs that succeeded
       if (newUploadedUrls.length > 0) {
         onChange([...currentFiles, ...newUploadedUrls]);
         if (newUploadedUrls.length === validFiles.length) {
@@ -190,16 +194,20 @@ export default function FileUpload({
       toast.showError(errorMessage);
     } finally {
       setLoading(false);
-      // Limpa o input file para permitir selecionar o mesmo arquivo novamente, se necessário
+      // Reset the input so the same file can be selected again
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const canAddMore = currentFiles.length < maxFiles;
+  const fileInputId = useId();
 
   return (
     <div className="mb-4">
-      <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block">
+      <label
+        htmlFor={canAddMore ? fileInputId : undefined}
+        className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block"
+      >
         {label} ({currentFiles.length}/{maxFiles})
       </label>
       
@@ -278,6 +286,7 @@ export default function FileUpload({
             className="relative w-full h-16 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900 hover:border-indigo-400 transition-all cursor-pointer overflow-hidden flex items-center justify-center gap-2"
           >
             <input 
+              id={fileInputId}
               type="file" 
               ref={fileInputRef} 
               onChange={handleFileSelect} 
