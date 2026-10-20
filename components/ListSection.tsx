@@ -27,8 +27,6 @@ import {
   Factory,
   Cpu,
   Loader2,
-  Search,
-  ChevronDown,
   Undo2,
   CheckCircle2,
 } from "lucide-react";
@@ -37,6 +35,8 @@ import { useIsMobile } from "../lib/hooks/useMediaQuery";
 import { UseToast } from "../lib/context/ToastContext";
 import { getItemColors, getParentSpaceColors } from "../lib/constants/colors";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { SearchableSelect, type SearchableSelectOption } from "./ui/SearchableSelect";
+import { parseFileUrls } from "@/lib/mediaReferences";
 import { ListSectionProps } from "../lib/types";
 import { useUser } from "@/lib/context/UserContext";
 import Image from "next/image";
@@ -73,340 +73,6 @@ const getFileDetails = (url: string) => {
 
   return { displayName, extension, Icon, colorClass, bgClass };
 };
-
-function SearchableSelect({ options, value, onChange, placeholder }: any) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedSpaces, setExpandedSpaces] = useState<Record<string, boolean>>(
-    {}
-  );
-
-  const selectedOption = options.find((opt: any) => opt.id === value);
-
-  const rootElements = useMemo(() => {
-    return options.filter((opt: any) => !opt.parentId);
-  }, [options]);
-
-  const filteredAll = useMemo(() => {
-    if (!searchTerm) return [];
-    const term = searchTerm.toLowerCase();
-    return options.filter((opt: any) => opt.name.toLowerCase().includes(term));
-  }, [searchTerm, options]);
-
-  const getDirectChildren = (parentId: string) => {
-    return options.filter((opt: any) => opt.parentId === parentId);
-  };
-
-  const getAllDescendants = (parentId: string): string[] => {
-    const directChildren = getDirectChildren(parentId);
-    let descendants: string[] = [];
-    for (const child of directChildren) {
-      descendants.push(child.id);
-      descendants = descendants.concat(getAllDescendants(child.id));
-    }
-    return descendants;
-  };
-
-  const getDescendantsCount = (parentId: string) => {
-    return getAllDescendants(parentId).length;
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedSpaces((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const renderChildren = (parentId: string, depth: number) => {
-    const children = getDirectChildren(parentId);
-    if (children.length === 0) return null;
-
-    const indentClass =
-      depth > 0 ? "ml-8 border-l-2 dark:border-white/5 pl-4" : "";
-
-    return (
-      <div className={`${indentClass} flex flex-col`}>
-        {children.map((child: any) => {
-          const grandChildren = getDirectChildren(child.id);
-          const hasGrandChildren = grandChildren.length > 0;
-          const isExpanded = expandedSpaces[child.id];
-          const isSpace = child.type === "space" || child.type === "default";
-
-          return (
-            <div key={child.id} className="w-full flex flex-col">
-              <div
-                className={`w-full flex items-center justify-between border-b dark:border-white/5 transition-colors ${
-                  isSpace
-                    ? "hover:bg-blue-50/50 dark:hover:bg-blue-600/5"
-                    : "hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange(child.id, child.type);
-                    setIsOpen(false);
-                    setSearchTerm("");
-                  }}
-                  className="flex-1 text-left py-3 px-3 min-w-0"
-                >
-                  <div className="flex items-center gap-2 w-full min-w-0">
-                    <div
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        isSpace ? "bg-blue-500" : "bg-emerald-500"
-                      }`}
-                    />
-
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="text-xs font-bold dark:text-zinc-200 truncate">
-                        {child.name}
-                      </span>
-                      {child.type !== "default" && (
-                        <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
-                          {isSpace ? "Espaço Pai" : "Espaço Físico"}
-                        </span>
-                      )}
-                    </div>
-
-                    {hasGrandChildren && (
-                      <span
-                        className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                          isSpace
-                            ? "text-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                            : "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
-                        }`}
-                      >
-                        {grandChildren.length}
-                      </span>
-                    )}
-                  </div>
-                </button>
-
-                {hasGrandChildren && (
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(child.id)}
-                    className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
-                      isSpace
-                        ? "hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                        : "hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                    }`}
-                  >
-                    <ChevronDown
-                      size={14}
-                      className={`transition-transform duration-200 ${
-                        isSpace ? "text-blue-500" : "text-emerald-500"
-                      } ${isExpanded ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                )}
-              </div>
-
-              {hasGrandChildren &&
-                isExpanded &&
-                renderChildren(child.id, depth + 1)}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold text-xs h-[52px] text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-amber-500 flex items-center justify-between transition-all"
-      >
-        <div className="flex items-center gap-2 overflow-hidden">
-          {selectedOption ? (
-            <>
-              {selectedOption.type !== "default" && (
-                <span
-                  className={`shrink-0 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase ${
-                    selectedOption.type === "space"
-                      ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40"
-                      : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40"
-                  }`}
-                >
-                  {selectedOption.type === "space" ? "PAI" : "FÍSICO"}
-                </span>
-              )}
-              <span className="truncate">{selectedOption.name}</span>
-            </>
-          ) : (
-            <span className="text-zinc-400">{placeholder}</span>
-          )}
-        </div>
-        <ChevronDown
-          className={`shrink-0 transition-transform duration-300 ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          size={16}
-        />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-[1000] w-full mt-2 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
-          <div className="p-2 border-b dark:border-zinc-800 flex items-center gap-2">
-            <Search size={14} className="text-zinc-400 ml-2" />
-            <input
-              autoFocus
-              className="w-full bg-transparent p-2 text-xs font-bold outline-none dark:text-white"
-              placeholder="Filtrar local..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            {searchTerm ? (
-              filteredAll.length > 0 ? (
-                <div>
-                  {filteredAll.map((opt: any) => (
-                    <div key={opt.id} className="border-b dark:border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onChange(opt.id, opt.type);
-                          setIsOpen(false);
-                          setSearchTerm("");
-                        }}
-                        className="w-full text-left px-3 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              opt.type === "space" || opt.type === "default"
-                                ? "bg-blue-500"
-                                : "bg-emerald-500"
-                            } shrink-0`}
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold dark:text-zinc-200">
-                              {opt.name}
-                            </span>
-                            {opt.type !== "default" && (
-                              <span className="text-[8px] uppercase font-black text-gray-400">
-                                {opt.type === "space"
-                                  ? "ESP. PAI"
-                                  : "ESP. FÍSICO"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 text-center text-[10px] font-black text-zinc-400 uppercase">
-                  Nenhum local encontrado
-                </div>
-              )
-            ) : (
-              <div>
-                {rootElements.length > 0 &&
-                  rootElements.map((item: any) => {
-                    const descendantsCount = getDescendantsCount(item.id);
-                    const isExpanded = expandedSpaces[item.id];
-                    const isSpace =
-                      item.type === "space" || item.type === "default";
-
-                    return (
-                      <div key={item.id} className="w-full flex flex-col">
-                        <div
-                          className={`w-full flex items-center justify-between border-b dark:border-zinc-800 transition-colors ${
-                            isSpace
-                              ? "hover:bg-blue-50/50 dark:hover:bg-blue-600/5"
-                              : "hover:bg-emerald-50/50 dark:hover:bg-emerald-600/5"
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onChange(item.id, item.type);
-                              setIsOpen(false);
-                              setSearchTerm("");
-                            }}
-                            className="flex-1 text-left py-3 px-3 min-w-0"
-                          >
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <div
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                  isSpace ? "bg-blue-500" : "bg-emerald-500"
-                                }`}
-                              />
-
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <span className="text-sm font-bold dark:text-zinc-200 truncate">
-                                  {item.name}
-                                </span>
-                                {item.type !== "default" && (
-                                  <span className="text-[8px] uppercase font-black text-gray-400 tracking-wider truncate">
-                                    {isSpace ? "Espaço Pai" : "Espaço Físico"}
-                                  </span>
-                                )}
-                              </div>
-
-                              {descendantsCount > 0 && (
-                                <span
-                                  className={`ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                                    isSpace
-                                      ? "text-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                                      : "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
-                                  }`}
-                                >
-                                  {descendantsCount}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-
-                          {descendantsCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(item.id)}
-                              className={`shrink-0 p-2 mr-2 transition-colors rounded-lg ${
-                                isSpace
-                                  ? "hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                                  : "hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                              }`}
-                            >
-                              <ChevronDown
-                                size={14}
-                                className={`transition-transform duration-200 ${
-                                  isSpace ? "text-blue-500" : "text-emerald-500"
-                                } ${isExpanded ? "rotate-180" : ""}`}
-                              />
-                            </button>
-                          )}
-                        </div>
-
-                        {descendantsCount > 0 &&
-                          isExpanded &&
-                          renderChildren(item.id, 1)}
-                      </div>
-                    );
-                  })}
-
-                {rootElements.length === 0 && (
-                  <div className="p-4 text-center text-[10px] font-black text-zinc-400 uppercase">
-                    Nenhum local encontrado
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-[990]"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
 
 function ListSection({
   filters,
@@ -478,18 +144,18 @@ function ListSection({
     onConfirm: () => {},
   });
 
-  const cloneLocationOptions = useMemo(() => {
+  const cloneLocationOptions = useMemo<SearchableSelectOption[]>(() => {
     return [
       {
         id: "",
         name: "Manter no espaço original de cada um",
-        type: "default",
+        type: "default" as const,
         parentId: null,
       },
       ...fatherSpaces.map((s) => ({
         id: s.id,
         name: s.name,
-        type: "space",
+        type: "space" as const,
         parentId: null,
       })),
       ...actives
@@ -497,7 +163,7 @@ function ListSection({
         .map((a) => ({
           id: a.id,
           name: a.name,
-          type: "active",
+          type: "active" as const,
           parentId: a.parentId || a.fatherSpaceId || null,
         })),
     ];
@@ -1779,15 +1445,11 @@ function ListSection({
                   </h4>
 
                   {(() => {
-                    const filesArray =
-                      typeof selectedViewItem.fileUrl === "string"
-                        ? selectedViewItem.fileUrl
-                            .split(",")
-                            .map((url: string) => url.trim())
-                            .filter(Boolean)
-                        : Array.isArray(selectedViewItem.fileUrl)
-                        ? selectedViewItem.fileUrl.filter(Boolean)
-                        : [];
+                    // Etapa 2 da ADR-001 (2.3): `parseFileUrls` é a cópia única
+                    // (`lib/mediaReferences.ts`, exigida por `SPECS.md` §4.1).
+                    // O split de CSV local tratava JSON array legado como uma
+                    // URL só e renderizava o link literal `["http://a.pdf"]`.
+                    const filesArray = parseFileUrls(selectedViewItem.fileUrl);
 
                     return filesArray.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2151,6 +1813,7 @@ function ListSection({
                   value={cloneDestinationSpaceId}
                   onChange={(id: string) => setCloneDestinationSpaceId(id)}
                   placeholder="Selecione o espaço de destino..."
+                  variant="list"
                 />
               </div>
             </div>

@@ -139,6 +139,68 @@
 
 ---
 
+### 🤖 OpenCode Operations (3)
+
+#### Changed
+
+- **Etapa 2 da `ADR/ADR-001.md` — a mesma regra implementada mais de uma vez.** Quatro dos cinco
+  itens compartilham a mesma raiz: uma cópia por tela, cada uma evoluindo sozinha.
+  - **2.2 + 2.1 — `SearchableSelect` único, com a semântica de `"default"` reconciliada ANTES da
+    extração** (ordem exigida pela ADR). A árvore de locais existia em duas cópias
+    (`components/ListSection.tsx:77-409` e `components/actives/activeForm.tsx:144-474`) que
+    divergiram: o `ListSection` tratava `type === "default"` como espaço na cor e no hover, mas
+    escondia o selo de tipo; o formulário **nem conhecia o valor** (`grep '"default"'` → 0).
+    `"default"` é o **sentinela** "Manter no espaço original de cada um" do diálogo de clonagem —
+    não é local. A regra agora vive em `lib/searchableSelect.ts` (módulo puro):
+    `getOptionKind` devolve `space | active | sentinel`; o sentinela é **neutro** (não veste azul
+    de espaço) e nunca exibe "Espaço Pai"/"Espaço Físico". O componente único está em
+    `components/ui/SearchableSelect.tsx` e recebe `variant="list" | "form"` — **a variante muda
+    apenas classes**, preservando a linguagem visual de cada tela; a lógica é uma só. O botão de
+    expandir, o tamanho do nome por nível e a borda da raiz foram conferidos contra as duas cópias
+    originais para não regredir. Extração eliminou **664 linhas duplicadas**.
+  - **2.3 — `parseFileUrls` como cópia única.** `qrcode/view.tsx` reimplementava o parser (sem
+    dedup) e `ListSection.tsx` fazia só `split(',')`: um `fileUrl` em JSON array legado virava
+    **um único link literal** `["http://a.pdf"]` na tela de visualização. Ambos agora importam
+    `lib/mediaReferences.ts` (exigência de `SPECS.md` §4.1), que já tem testes próprios.
+  - **2.4 — `fetchData` de `settings` deixou de engolir falha.** O `catch` mudo e a ausência de
+    checagem de `res.ok` faziam falha de rede/servidor parecer **lista vazia** ("nenhum registro").
+    Agora notifica com o `error` do envelope ou mensagem de conexão. A dependência usada é
+    `showError` (callback estável do `ToastProvider`), não o objeto `toast` — o objeto troca de
+    identidade a cada toast e refaria o fetch da aba a cada notificação.
+  - **2.5 — aviso do tamanho da subárvore antes da cascata.** `SPECS.md` §4.1 exige. O diálogo
+    dizia "todos os ativos associados" sem número, e o `DELETE` apagava apenas os ativos com
+    `fatherSpaceId = id`: os ativos dos espaços-filho ficavam fora da conta e, como
+    `Active.fatherSpace` é **Restrict**, a exclusão de um filho com ativo abortava em **500
+    genérico**. Agora `GET /api/father-spaces/delete` (mesma rota, mesmo gate ADMIN) devolve
+    `{ spaces, actives }` da subárvore inteira e o diálogo informa quantos ativos e espaços-filho
+    serão excluídos; o `DELETE` usa **a mesma** subárvore (`lib/spaceTree.ts`) para apagar os
+    ativos de todos os espaços e registrar a contagem real no log. As duas `deleteMany` do código
+    antigo (a segunda era subconjunto da primeira) viraram uma.
+
+#### Added
+
+- **`lib/searchableSelect.ts`** — semântica pura do seletor (categoria da opção, raiz, filhos,
+  descendentes com guarda de ciclo, contagem, filtro case-insensitive com `trim`).
+- **`lib/spaceTree.ts`** — `collectSpaceSubtreeIds(spaces, rootId)`, em largura, raiz primeiro,
+  sem repetição e sem laço em hierarquia cíclica (dado legado não pode travar a rota de exclusão).
+- **`components/ui/SearchableSelect.tsx`** — componente único, props tipadas (fim do `any` na
+  assinatura).
+- **Testes — 24 novos, validados por 4 mutações.** `__tests__/lib/searchableSelect.test.ts` (11):
+  a reconciliação do `"default"` (sentinela, não espaço), árvore, netos, ciclo, filtro.
+  `__tests__/lib/spaceTree.test.ts` (4): subárvore, irmãos excluídos, ciclo, raiz primeiro.
+  `__tests__/api/father-spaces-delete.test.ts` (8): prévia com contagem da subárvore, gate
+  ADMIN/401/404/405, `DELETE` cobrindo filhos, imagens e log com a contagem real. Mutações:
+  `getOptionKind` voltando a tratar `default` como espaço → 1 falha; subárvore só com a raiz → 5;
+  prévia contando só o espaço clicado → 1; `DELETE` só no espaço clicado → 1.
+
+#### Docs
+
+- **`SPECS.md` §4.2** — contrato da prévia (`GET /api/father-spaces/delete`) e da exclusão em
+  cascata sobre a subárvore inteira.
+- **`CONTEXT.md` §2.1** — foco atual: ADR-001 Etapas 0–2 concluídas, Etapa 3 e ADR-002 pendentes.
+
+---
+
 > **Próxima release: `2.25.2`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
 > hardcode). O bump foi feito com `npm version 2.25.2 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
