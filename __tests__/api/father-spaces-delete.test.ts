@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
 
 /**
  * Prévia e cascata de exclusão de espaço — Etapa 2 da ADR-001 (2.5).
@@ -45,32 +46,21 @@ vi.mock('@/lib/prisma', () => ({
   prisma: dbMock,
 }));
 
-const createLog = vi.fn(
-  async (_req: any, _userId: any, _action: any, _details: string) => {}
-);
+const createLog = vi.fn<
+  (req: unknown, userId: unknown, action: unknown, details: string) => Promise<void>
+>(async () => {});
 vi.mock('@/lib/logger', () => ({ createLog }));
 
 const deleteFileFromMinio = vi.fn(async () => {});
 vi.mock('@/lib/minio', () => ({ deleteFileFromMinio }));
 
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'GET',
-    cookies: { auth_token: 'token-valido' },
-    headers: {},
-    query: { id: 'root' },
-    ...overrides,
-  } as any;
-}
+type Req = ReturnType<typeof makeReq>;
+type Res = ReturnType<typeof makeRes>;
 
-function makeRes() {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  return { status, json };
-}
+const authedReq = (overrides: Record<string, unknown> = {}) =>
+  makeReq({ cookies: { auth_token: 'token-valido' }, query: { id: 'root' }, ...overrides });
 
-async function callHandler(req: any, res: any) {
+async function callHandler(req: Req, res: Res) {
   const { default: handler } = await import('@/pages/api/father-spaces/delete');
   await handler(req, res);
 }
@@ -94,7 +84,7 @@ describe('GET /api/father-spaces/delete — prévia da cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq(), res);
+    await callHandler(authedReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -116,7 +106,7 @@ describe('GET /api/father-spaces/delete — prévia da cascata', () => {
     setRole('MANAGER');
     const res = makeRes();
 
-    await callHandler(makeReq(), res);
+    await callHandler(authedReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(dbMock.active.count).not.toHaveBeenCalled();
@@ -126,7 +116,7 @@ describe('GET /api/father-spaces/delete — prévia da cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq({ cookies: {} }), res);
+    await callHandler(authedReq({ cookies: {} }), res);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(dbMock.fatherSpace.findUnique).not.toHaveBeenCalled();
@@ -137,7 +127,7 @@ describe('GET /api/father-spaces/delete — prévia da cascata', () => {
     dbMock.fatherSpace.findUnique.mockResolvedValue(null);
     const res = makeRes();
 
-    await callHandler(makeReq(), res);
+    await callHandler(authedReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });
@@ -165,7 +155,7 @@ describe('DELETE /api/father-spaces/delete — cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq({ method: 'DELETE' }), res);
+    await callHandler(authedReq({ method: 'DELETE' }), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(dbMock.active.deleteMany).toHaveBeenCalledWith({
@@ -178,7 +168,7 @@ describe('DELETE /api/father-spaces/delete — cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq({ method: 'DELETE' }), res);
+    await callHandler(authedReq({ method: 'DELETE' }), res);
 
     expect(deleteFileFromMinio).toHaveBeenCalledWith('http://minio/a.png');
     expect(deleteFileFromMinio).toHaveBeenCalledWith('http://minio/space.png');
@@ -188,9 +178,9 @@ describe('DELETE /api/father-spaces/delete — cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq({ method: 'DELETE' }), res);
+    await callHandler(authedReq({ method: 'DELETE' }), res);
 
-    const details = createLog.mock.calls[0][3] as string;
+    const details = createLog.mock.calls[0][3];
     expect(details).toContain('4 ativo(s)');
     expect(details).toContain('3 espaço(s)');
   });
@@ -199,7 +189,7 @@ describe('DELETE /api/father-spaces/delete — cascata', () => {
     setRole('ADMIN');
     const res = makeRes();
 
-    await callHandler(makeReq({ method: 'POST' }), res);
+    await callHandler(authedReq({ method: 'POST' }), res);
 
     expect(res.status).toHaveBeenCalledWith(405);
     expect(dbMock.active.deleteMany).not.toHaveBeenCalled();

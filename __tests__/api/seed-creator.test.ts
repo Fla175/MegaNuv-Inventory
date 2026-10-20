@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
 
 /**
  * Bootstrap de `POST /api/auth/seed`.
@@ -18,36 +19,16 @@ const dbMock = {
     create: vi.fn(),
   },
   log: { create: vi.fn() },
-  $transaction: vi.fn(async (txs: any[]) => Promise.all(txs)),
+  $transaction: vi.fn(async (txs: Array<Promise<unknown>>) => Promise.all(txs)),
 };
 
 vi.mock('@/lib/prisma', () => ({ default: dbMock }));
 
-type ResMock = { status: any; json: any; setHeader: any; end: any };
+type Res = ReturnType<typeof makeRes>;
 
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'POST',
-    cookies: {},
-    headers: {},
-    body: {},
-    query: {},
-    // o handler registra a inicialização em Log e lê req.socket.remoteAddress
-    socket: { remoteAddress: '127.0.0.1' },
-    ...overrides,
-  } as any;
-}
-
-function makeRes(): ResMock {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  return { status, json, setHeader: vi.fn(), end: vi.fn() };
-}
-
-async function callSeed(res: ResMock, body: any, method = 'POST') {
+async function callSeed(res: Res, body: Record<string, unknown>, method = 'POST') {
   const { default: handler } = await import('@/pages/api/auth/seed');
-  await handler(makeReq({ method, body }), res as any);
+  await handler(makeReq({ method, body }), res);
 }
 
 describe('POST /api/auth/seed — admin master nasce criador', () => {
@@ -83,7 +64,9 @@ describe('POST /api/auth/seed — admin master nasce criador', () => {
     await callSeed(res, { email: 'admin@x.com', password: 'senha123456', isCreator: false });
 
     expect(res.status).toHaveBeenCalledWith(201);
-    const call = dbMock.user.create.mock.calls[0][0] as any;
+    const call = dbMock.user.create.mock.calls[0][0] as {
+      data: { isCreator?: unknown };
+    };
     expect(call.data.isCreator).toBe(true);
   });
 

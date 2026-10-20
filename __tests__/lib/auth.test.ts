@@ -23,7 +23,7 @@ describe('lib/auth - generateAuthToken & verifyAuthToken', () => {
     expect(decoded?.userId).toBe(payload.userId);
     expect(decoded?.email).toBe(payload.email);
     expect(decoded?.role).toBe(payload.role);
-    expect(decoded?.exp! - decoded?.iat!).toBe(8 * 3600);
+    expect((decoded?.exp ?? 0) - (decoded?.iat ?? 0)).toBe(8 * 3600);
   });
 
   it('generates a token with custom expiresIn options (e.g. 2h)', async () => {
@@ -39,7 +39,7 @@ describe('lib/auth - generateAuthToken & verifyAuthToken', () => {
 
     expect(decoded).not.toBeNull();
     expect(decoded?.userId).toBe(payload.userId);
-    expect(decoded?.exp! - decoded?.iat!).toBe(2 * 3600);
+    expect((decoded?.exp ?? 0) - (decoded?.iat ?? 0)).toBe(2 * 3600);
   });
 
   it('returns null for an invalid token', async () => {

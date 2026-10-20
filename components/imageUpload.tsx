@@ -1,5 +1,5 @@
 // components/imageUpload.tsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useId } from 'react';
 import { UploadCloud, X, Loader2 } from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
 import Image from 'next/image';
@@ -13,6 +13,7 @@ interface ImageUploadProps {
 
 export default function ImageUpload({ value, onChange, label = "Imagem" }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
+  const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = UseToast();
 
@@ -53,7 +54,7 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
     e.stopPropagation();
     if (value) {
       try {
-        // Envia uma requisição DELETE com a URL que está guardada no estado 'value'
+        // Send a DELETE request with the URL stored in the 'value' state
         const res = await fetch('/api/storage/delete-url', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -74,13 +75,25 @@ export default function ImageUpload({ value, onChange, label = "Imagem" }: Image
 
   return (
     <div className="mb-6">
-      <label className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block">{label}</label>
+      <label
+        htmlFor={fileInputId}
+        className="text-[10px] font-black text-gray-500 uppercase ml-2 mb-2 block"
+      >
+        {label}
+      </label>
       <div 
         onClick={() => !loading && fileInputRef.current?.click()}
         className={`relative w-full h-44 rounded-[2rem] border border-dashed border-gray-500 transition-all cursor-pointer overflow-hidden
           ${value ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-400'}`}
       >
-        <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
+        <input
+          id={fileInputId}
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          accept="image/*"
+          className="hidden"
+        />
         
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-blue-600 bg-white/80 dark:bg-zinc-800 backdrop-blur-sm z-10">

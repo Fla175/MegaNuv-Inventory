@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
 
 /**
  * Autorização de escrita em `POST /api/actives/clone-batch` e
@@ -57,37 +58,21 @@ vi.mock('@/lib/prisma', () => ({
   generateUniqueHexId: vi.fn(async () => 'a1b2'),
 }));
 
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'POST',
-    cookies: { auth_token: 'token-valido' },
-    headers: {},
-    body: {},
-    query: {},
-    ...overrides,
-  } as any;
-}
+type Res = ReturnType<typeof makeRes>;
 
-type ResMock = { status: any; json: any; end: any };
+const authedReq = (overrides: Record<string, unknown> = {}) =>
+  makeReq({ cookies: { auth_token: 'token-valido' }, ...overrides });
 
-function makeRes(): ResMock {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  const end = vi.fn();
-  return { status, json, end };
-}
-
-async function callCloneBatch(res: ResMock, role: string, body: any = {}) {
+async function callCloneBatch(res: Res, role: string, body: Record<string, unknown> = {}) {
   setRole(role);
   const { default: handler } = await import('@/pages/api/actives/clone-batch');
-  await handler(makeReq({ method: 'POST', body }), res as any);
+  await handler(authedReq({ method: 'POST', body }), res);
 }
 
-async function callUpdate(res: ResMock, role: string, body: any = {}) {
+async function callUpdate(res: Res, role: string, body: Record<string, unknown> = {}) {
   setRole(role);
   const { default: handler } = await import('@/pages/api/actives/update');
-  await handler(makeReq({ method: 'PUT', body }), res as any);
+  await handler(authedReq({ method: 'PUT', body }), res);
 }
 
 describe('Etapa 0 (ADR-001) — VIEWER não pode escrever em ativos', () => {
@@ -125,7 +110,7 @@ describe('Etapa 0 (ADR-001) — VIEWER não pode escrever em ativos', () => {
       setRole('VIEWER');
       const { default: handler } = await import('@/pages/api/actives/clone-batch');
 
-      await handler(makeReq({ method: 'POST', cookies: {}, body: { activeIds: ['a1b2'] } }), res as any);
+      await handler(makeReq({ method: 'POST', cookies: {}, body: { activeIds: ['a1b2'] } }), res);
 
       // Sem token, a resposta deve ser 401 (não identificada), nunca 200.
       expect(res.status).toHaveBeenCalledWith(401);
@@ -154,7 +139,9 @@ describe('Etapa 0 (ADR-001) — VIEWER não pode escrever em ativos', () => {
 
       await callCloneBatch(res, 'ADMIN', { activeIds: ['a1b2'], quantity: 1, destinationSpaceId: '0000' });
 
-      const [args] = dbMock.active.createMany.mock.calls[0] as any;
+      const args = dbMock.active.createMany.mock.calls[0][0] as {
+        data: Array<{ createdById?: string }>;
+      };
       expect(args.data[0]).toHaveProperty('createdById', 'u1');
     });
   });

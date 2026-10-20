@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq, makeRes } from '../helpers/http';
 
 // Mock do auth: verifyAuthToken devolve um payload válido quando receber qualquer token
 // não vazio, para simular sessões autenticadas sem depender de JWT real.
@@ -37,30 +38,10 @@ const dbMock = {
   },
   category: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   log: { create: vi.fn() },
-  $transaction: vi.fn(async (txs: any[]) => Promise.all(txs)),
+  $transaction: vi.fn(async (txs: Array<Promise<unknown>>) => Promise.all(txs)),
 };
 
 vi.mock('@/lib/prisma', () => ({ default: dbMock }));
-
-function makeReq(overrides: any = {}) {
-  return {
-    method: 'GET',
-    cookies: {},
-    headers: {},
-    body: {},
-    query: {},
-    ...overrides,
-  } as any;
-}
-
-type ResMock = { status: any; json: any; setHeader: any; end: any };
-
-function makeRes(): ResMock {
-  const json = vi.fn();
-  const status = vi.fn();
-  status.mockReturnValue({ json });
-  return { status, json, setHeader: vi.fn(), end: vi.fn() };
-}
 
 describe('GET /api/users (auth)', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -69,7 +50,7 @@ describe('GET /api/users (auth)', () => {
     const { default: handler } = await import('@/pages/api/users/index');
     const req = makeReq({ method: 'GET' });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
@@ -78,7 +59,7 @@ describe('GET /api/users (auth)', () => {
     const { default: handler } = await import('@/pages/api/users/index');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'valid-token' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(dbMock.user.findMany).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
@@ -89,7 +70,7 @@ describe('GET /api/users/check-director (auth)', () => {
     const { default: handler } = await import('@/pages/api/users/check-director');
     const req = makeReq({ method: 'GET' });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
@@ -98,7 +79,7 @@ describe('GET /api/users/check-director (auth)', () => {
     const { default: handler } = await import('@/pages/api/users/check-director');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'valid-token' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ exists: true });
   });
@@ -114,7 +95,7 @@ describe('POST /api/users (RBAC)', () => {
       body: { name: 'X', email: 'x@x.com', password: '123456', role: 'VIEWER' },
     });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(dbMock.user.create).not.toHaveBeenCalled();
   });
@@ -128,7 +109,7 @@ describe('POST /api/users (RBAC)', () => {
       body: { name: 'X', email: 'x@x.com', password: '123456', role: 'ADMIN' },
     });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(dbMock.user.create).not.toHaveBeenCalled();
   });
@@ -143,7 +124,7 @@ describe('POST /api/users (RBAC)', () => {
       body: { name: 'X', email: 'x@x.com', password: '123456', role: 'ADMIN' },
     });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(dbMock.user.create).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
   });
@@ -152,11 +133,11 @@ describe('POST /api/users (RBAC)', () => {
 describe('authMiddleware aceita cookie e Bearer', () => {
   it('rejeita token inválido com 401', async () => {
     const { verifyAuthToken } = await import('@/lib/auth');
-    (verifyAuthToken as any).mockResolvedValueOnce(null);
+    vi.mocked(verifyAuthToken).mockResolvedValueOnce(null);
     const { default: handler } = await import('@/pages/api/users/check-director');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-invalido' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
@@ -168,7 +149,7 @@ describe('authMiddleware aceita cookie e Bearer', () => {
       headers: { authorization: 'Bearer token-valido' },
     });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ exists: false });
   });
@@ -179,7 +160,7 @@ describe('PUT /api/actives/update (auth)', () => {
     const { default: handler } = await import('@/pages/api/actives/update');
     const req = makeReq({ method: 'PUT', body: { id: 'abc' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
@@ -189,7 +170,7 @@ describe('DELETE /api/storage/delete-url (auth)', () => {
     const { default: handler } = await import('@/pages/api/storage/delete-url');
     const req = makeReq({ method: 'DELETE', body: { url: 'http://x/y' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
@@ -199,7 +180,7 @@ describe('GET /api/qrcode/public-get (auth)', () => {
     const { default: handler } = await import('@/pages/api/qrcode/public-get');
     const req = makeReq({ method: 'GET', query: { id: 'abc' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
@@ -209,7 +190,7 @@ describe('envelope de erro do authMiddleware (SPECS.md §4.2)', () => {
     const { default: handler } = await import('@/pages/api/users/check-director');
     const req = makeReq({ method: 'GET' });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
     // O frontend lê `data.error` em todos os toasts (components/*.tsx, pages/settings.tsx).
@@ -220,12 +201,12 @@ describe('envelope de erro do authMiddleware (SPECS.md §4.2)', () => {
 
   it('401 com token inválido também usa a chave `error`', async () => {
     const { verifyAuthToken } = await import('@/lib/auth');
-    (verifyAuthToken as any).mockResolvedValueOnce(null);
+    vi.mocked(verifyAuthToken).mockResolvedValueOnce(null);
 
     const { default: handler } = await import('@/pages/api/users/check-director');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-invalido' } });
     const res = makeRes();
-    await handler(req, res as any);
+    await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
@@ -241,7 +222,7 @@ describe('authMiddleware com requiredRoles', () => {
     setRole('VIEWER');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-valido' } });
     const res = makeRes();
-    await wrapped(req, res as any);
+    await wrapped(req, res);
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }));
@@ -256,7 +237,7 @@ describe('authMiddleware com requiredRoles', () => {
     setRole('ADMIN');
     const req = makeReq({ method: 'GET', cookies: { auth_token: 'token-valido' } });
     const res = makeRes();
-    await wrapped(req, res as any);
+    await wrapped(req, res);
 
     expect(handler).toHaveBeenCalled();
   });

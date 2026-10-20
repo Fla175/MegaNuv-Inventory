@@ -1,5 +1,4 @@
 // components/actives/activeForm.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo } from "react";
 import {
   X,
@@ -18,6 +17,18 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { UseToast } from "@/lib/context/ToastContext";
 import CustomSelect from "../customSelect";
+import type { Category, FatherSpace, InventoryItem } from "@/types/inventory";
+import { parseFileUrls } from "@/lib/mediaReferences";
+import type { SelectOptionType } from "@/lib/searchableSelect";
+
+interface ActiveFormProps {
+  mode: "create" | "edit" | "clone";
+  /** `Partial` because cloning clears the `id` before opening the form. */
+  initialData?: Partial<InventoryItem> | null;
+  onClose: () => void;
+  fatherSpace?: FatherSpace[];
+  activeContainers?: InventoryItem[];
+}
 
 export default function ActiveForm({
   mode,
@@ -25,8 +36,8 @@ export default function ActiveForm({
   onClose,
   fatherSpace,
   activeContainers,
-}: any) {
-  const [categories, setCategories] = useState<any[]>([]);
+}: ActiveFormProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -91,42 +102,43 @@ export default function ActiveForm({
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      const locId =
-        initialData.parentId || initialData.parent?.id
-          ? initialData.parentId || initialData.parent.id
-          : initialData.fatherSpaceId || initialData.fatherSpace?.id || "";
-
-      const locType =
-        initialData.parentId || initialData.parent?.id ? "active" : "space";
+      // The parent can arrive as `parentId` (payload) or `parent.id` (hydrated
+      // relation); the selected location is the parent, otherwise the space.
+      const parentLocationId =
+        initialData.parentId ?? initialData.parent?.id ?? null;
+      const fatherSpaceLocationId =
+        initialData.fatherSpaceId ?? initialData.fatherSpace?.id ?? "";
+      const locId = parentLocationId ?? fatherSpaceLocationId;
+      const locType = parentLocationId ? "active" : "space";
 
       const serialArray =
         mode === "clone"
-          ? Array(initialData.quantity || 1).fill("")
+          ? Array<string>(initialData.quantity || 1).fill("")
           : initialData.serialNumber
-          ? typeof initialData.serialNumber === "string"
-            ? initialData.serialNumber.split(",").map((s: string) => s.trim())
-            : [initialData.serialNumber]
-          : Array(initialData.quantity || 1).fill("");
+            ? initialData.serialNumber.split(",").map((s) => s.trim())
+            : Array<string>(initialData.quantity || 1).fill("");
 
-      const fileUrlArray = initialData.fileUrl
-        ? typeof initialData.fileUrl === "string"
-          ? initialData.fileUrl
-              .split(",")
-              .map((u: string) => u.trim())
-              .filter(Boolean)
-          : Array.isArray(initialData.fileUrl)
-          ? initialData.fileUrl
-          : [initialData.fileUrl]
-        : [];
+      // Same `fileUrl` parsing as the rest of the system (ADR-001, 2.3).
+      const fileUrlArray = parseFileUrls(initialData.fileUrl);
 
+      // Explicit mapping: the form must not inherit fields that do not belong
+      // to it (`createdAt`, `children`, hydrated relations).
       setFormData((prev) => ({
         ...prev,
-        ...initialData,
-        categoryId: initialData.categoryId || prev.categoryId,
+        id: mode === "clone" ? undefined : initialData.id,
         isPhysicalSpace: initialData.isPhysicalSpace ?? false,
+        name: initialData.name ?? "",
+        categoryId: initialData.categoryId || prev.categoryId,
+        sku: initialData.sku ?? "",
+        manufacturer: initialData.manufacturer ?? "",
+        model: initialData.model ?? "",
+        fixedValue: initialData.fixedValue ?? 0,
+        tag: initialData.tag ?? "IN-STOCK",
+        notes: initialData.notes ?? "",
+        imageUrl: initialData.imageUrl ?? null,
+        quantity: initialData.quantity ?? prev.quantity,
         locationId: locId,
         locationType: locType,
-        id: mode === "clone" ? undefined : initialData.id,
         serialNumbers: serialArray,
         fileUrl: fileUrlArray,
       }));
@@ -168,8 +180,8 @@ export default function ActiveForm({
     let finalParentId: string | null;
 
     if (mode === "edit" && initialData) {
-      finalFatherSpaceId = initialData.fatherSpaceId;
-      finalParentId = initialData.parentId || null;
+      finalFatherSpaceId = initialData.fatherSpaceId ?? "";
+      finalParentId = initialData.parentId ?? null;
     } else {
       finalFatherSpaceId = formData.locationId;
       finalParentId = null;
@@ -179,7 +191,7 @@ export default function ActiveForm({
         finalParentId = null;
       } else if (formData.locationType === "active") {
         const selectedLocation = activeContainers?.find(
-          (c: any) => c.id === formData.locationId
+          (c) => c.id === formData.locationId
         );
         finalFatherSpaceId =
           selectedLocation?.fatherSpaceId || formData.locationId;
@@ -333,7 +345,10 @@ export default function ActiveForm({
           {/* AREA DE FOCO */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest">
+              <label
+                id="active-category-label"
+                className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 block tracking-widest"
+              >
                 Categoria
               </label>
               {categories.length < 18 && (
@@ -366,7 +381,11 @@ export default function ActiveForm({
                 </p>
               </div>
             ) : (
-              <div className={`grid gap-2 ${gridConfig}`}>
+              <div
+                role="group"
+                aria-labelledby="active-category-label"
+                className={`grid gap-2 ${gridConfig}`}
+              >
                 {categories.map((category) => {
                   const isSelected = formData.categoryId === category.id;
                   const color = category.color;
@@ -382,7 +401,7 @@ export default function ActiveForm({
                         }))
                       }
                       style={
-                        isSelected
+                        isSelected && color
                           ? {
                               borderColor: color,
                               backgroundColor: `${color}15`,
@@ -406,10 +425,14 @@ export default function ActiveForm({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+              <label
+                htmlFor="active-name"
+                className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+              >
                 Nome do Registro
               </label>
               <input
+                id="active-name"
                 required
                 className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold border-2 border-transparent focus:border-blue-600/30 text-sm dark:text-white"
                 value={formData.name}
@@ -420,10 +443,14 @@ export default function ActiveForm({
             </div>
 
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+              <label
+                htmlFor="active-status"
+                className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+              >
                 Status Atual
               </label>
               <CustomSelect
+                id="active-status"
                 options={statusOptions}
                 value={formData.tag}
                 onChange={(newValue) =>
@@ -435,30 +462,39 @@ export default function ActiveForm({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+              <label
+                htmlFor="active-location"
+                className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+              >
                 Localização
               </label>
               <SearchableSelect
+                id="active-location"
                 options={[
-                  ...(fatherSpace || []).map((s: any) => ({
+                  ...(fatherSpace || []).map((s) => ({
                     id: s.id,
                     name: s.name,
-                    type: "space",
+                    type: "space" as const,
                     parentId: null,
                   })),
-                  ...(activeContainers || []).map((c: any) => ({
+                  ...(activeContainers || []).map((c) => ({
                     id: c.id,
                     name: c.name,
-                    type: "active",
+                    type: "active" as const,
                     parentId: c.parentId || c.fatherSpaceId || null,
                   })),
                 ]}
                 value={formData.locationId}
-                onChange={(id: string, type: any) =>
+                onChange={(id: string, type?: SelectOptionType) =>
                   setFormData((prev) => ({
                     ...prev,
                     locationId: id,
-                    locationType: type,
+                    locationType:
+                      type === "active"
+                        ? "active"
+                        : type === "space"
+                          ? "space"
+                          : "",
                   }))
                 }
                 placeholder="Selecione local..."
@@ -471,10 +507,14 @@ export default function ActiveForm({
               } gap-2`}
             >
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                <label
+                  htmlFor="active-fixed-value"
+                  className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+                >
                   Vlr. Unitário
                 </label>
                 <input
+                  id="active-fixed-value"
                   type="number"
                   className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
                   value={formData.fixedValue}
@@ -488,10 +528,14 @@ export default function ActiveForm({
               </div>
               {mode !== "edit" && (
                 <div>
-                  <label className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block">
+                  <label
+                    htmlFor="active-quantity"
+                    className="text-[10px] font-black uppercase text-blue-600 ml-1 mb-1 block"
+                  >
                     Quantidade
                   </label>
                   <input
+                    id="active-quantity"
                     type="number"
                     className="w-full bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl font-black text-blue-600 dark:text-blue-400 border-2 border-blue-600/20 text-sm outline-none focus:border-blue-600"
                     value={formData.quantity}
@@ -507,10 +551,14 @@ export default function ActiveForm({
           <div className="space-y-4 pt-4 border-t dark:border-white/5">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                <label
+                  htmlFor="active-manufacturer"
+                  className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+                >
                   Fabricante
                 </label>
                 <input
+                  id="active-manufacturer"
                   className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
                   value={formData.manufacturer}
                   onChange={(e) =>
@@ -522,10 +570,14 @@ export default function ActiveForm({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                <label
+                  htmlFor="active-model"
+                  className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+                >
                   Modelo
                 </label>
                 <input
+                  id="active-model"
                   className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30"
                   value={formData.model}
                   onChange={(e) =>
@@ -537,10 +589,14 @@ export default function ActiveForm({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+                <label
+                  htmlFor="active-sku"
+                  className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+                >
                   SKU/EAN
                 </label>
                 <input
+                  id="active-sku"
                   className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl font-bold text-sm dark:text-white outline-none border-2 border-transparent focus:border-blue-600/30 font-mono uppercase"
                   value={formData.sku}
                   onChange={(e) =>
@@ -552,13 +608,20 @@ export default function ActiveForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2">
+              <label
+                id="active-serials-label"
+                className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 flex items-center gap-2"
+              >
                 <Hash size={12} />{" "}
                 {mode === "edit"
                   ? "Número de Série"
                   : `Números de Série (${formData.quantity})`}
               </label>
-              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2">
+              <div
+                role="group"
+                aria-labelledby="active-serials-label"
+                className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-zinc-950/50 rounded-2xl border dark:border-white/5 p-2"
+              >
                 {formData.serialNumbers.map((sn, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     {mode !== "edit" && (
@@ -596,10 +659,14 @@ export default function ActiveForm({
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block">
+            <label
+              htmlFor="active-notes"
+              className="text-[10px] font-black uppercase text-gray-400 dark:text-zinc-500 ml-1 mb-1 block"
+            >
               Notas
             </label>
             <textarea
+              id="active-notes"
               className="w-full bg-gray-50 dark:bg-zinc-950 p-4 rounded-xl outline-none font-bold h-24 resize-none text-sm dark:text-white border-2 border-transparent focus:border-blue-600/30"
               value={formData.notes}
               onChange={(e) =>
@@ -670,10 +737,14 @@ export default function ActiveForm({
             </div>
             <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
               <div>
-                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2">
+                <label
+                  htmlFor="new-category-name"
+                  className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest block mb-2"
+                >
                   Nome
                 </label>
                 <input
+                  id="new-category-name"
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}

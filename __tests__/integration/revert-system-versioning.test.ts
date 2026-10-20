@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+type RevertItem = {
+  id?: string;
+  action?: string;
+  table?: string;
+  groupId?: string;
+  items?: RevertItem[];
+};
+
 /**
  * Teste de integração **opt-in** contra o banco de sondagem `revert_probe`
  * (MariaDB com `Active` em SYSTEM VERSIONING).
@@ -74,7 +82,7 @@ describe.skipIf(!probeUrl)('revert system-versioning (probe DB)', () => {
     );
 
     expect(state.statusCode).toBe(200);
-    return (state.jsonBody as { items: Array<Record<string, any>> }).items;
+    return (state.jsonBody as { items: RevertItem[] }).items;
   }
 
   it('A1: criado e movido → MOVE (não CREATE)', async () => {
@@ -107,8 +115,10 @@ describe.skipIf(!probeUrl)('revert system-versioning (probe DB)', () => {
     const items = await fetchItems();
     const responseIds = new Set<string>();
     for (const item of items) {
-      if (item.id) responseIds.add(item.id as string);
-      for (const sub of item.items ?? []) responseIds.add(sub.id as string);
+      if (item.id) responseIds.add(item.id);
+      for (const sub of item.items ?? []) {
+        if (sub.id) responseIds.add(sub.id);
+      }
     }
 
     for (const id of dbIds) {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { makeReq } from '../helpers/http';
 
 const verifyAuthToken = vi.fn(async (token: string) =>
   token === 'token-valido' ? { userId: 'u1', email: 'a@x.com', role: 'ADMIN' } : null
@@ -10,10 +11,6 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 const { getSessionToken, getSessionUser, isViewer, isPrivileged } = await import('@/lib/apiAuth');
-
-function makeReq(overrides: any = {}) {
-  return { method: 'GET', cookies: {}, headers: {}, ...overrides } as any;
-}
 
 describe('getSessionToken', () => {
   it('lê o cookie auth_token', () => {
@@ -61,7 +58,7 @@ describe('getSessionToken', () => {
   });
 
   it('não quebra quando req.cookies é indefinido', () => {
-    expect(getSessionToken({ headers: {} } as any)).toBeNull();
+    expect(getSessionToken(makeReq({ cookies: undefined }))).toBeNull();
   });
 });
 
@@ -85,17 +82,17 @@ describe('getSessionUser', () => {
 
 describe('isViewer / isPrivileged', () => {
   it('isViewer identifica apenas VIEWER', () => {
-    expect(isViewer({ role: 'VIEWER' } as any)).toBe(true);
-    expect(isViewer({ role: 'ADMIN' } as any)).toBe(false);
+    expect(isViewer({ role: 'VIEWER' })).toBe(true);
+    expect(isViewer({ role: 'ADMIN' })).toBe(false);
     expect(isViewer(null)).toBe(false);
     expect(isViewer(undefined)).toBe(false);
   });
 
   it('isPrivileged cobre DIRECTOR e ADMIN', () => {
-    expect(isPrivileged({ role: 'DIRECTOR' } as any)).toBe(true);
-    expect(isPrivileged({ role: 'ADMIN' } as any)).toBe(true);
-    expect(isPrivileged({ role: 'MANAGER' } as any)).toBe(false);
-    expect(isPrivileged({ role: 'VIEWER' } as any)).toBe(false);
+    expect(isPrivileged({ role: 'DIRECTOR' })).toBe(true);
+    expect(isPrivileged({ role: 'ADMIN' })).toBe(true);
+    expect(isPrivileged({ role: 'MANAGER' })).toBe(false);
+    expect(isPrivileged({ role: 'VIEWER' })).toBe(false);
   });
 });
 describe('regressão: token presente porém inválido não autentica (SPECS.md §5.1)', () => {
@@ -105,18 +102,18 @@ describe('regressão: token presente porém inválido não autentica (SPECS.md �
   // O handler não pode assumir que o middleware rodou, então a verificação tem
   // de acontecer aqui também.
   it('getSessionUser devolve null para token lixo, mesmo com header preenchido', async () => {
-    const req = { headers: { authorization: 'Bearer qualquercoisa' }, cookies: {} } as any;
+    const req = makeReq({ headers: { authorization: 'Bearer qualquercoisa' } });
     await expect(getSessionUser(req)).resolves.toBeNull();
   });
 
   it('getSessionUser devolve null para cookie lixo', async () => {
-    const req = { headers: {}, cookies: { auth_token: 'lixo' } } as any;
+    const req = makeReq({ cookies: { auth_token: 'lixo' } });
     await expect(getSessionUser(req)).resolves.toBeNull();
   });
 
   it('a verificação realmente acontece (o mock foi chamado com o token)', async () => {
     verifyAuthToken.mockClear();
-    await getSessionUser({ headers: {}, cookies: { auth_token: 'lixo' } } as any);
+    await getSessionUser(makeReq({ cookies: { auth_token: 'lixo' } }));
     expect(verifyAuthToken).toHaveBeenCalledWith('lixo');
   });
 });

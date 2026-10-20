@@ -10,6 +10,11 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // `next lint` only scanned pages|components|lib|src; `eslint .` sees the
+  // build output and dependencies too. These are the only ignores.
+  {
+    ignores: [".next/**", "node_modules/**", "coverage/**", "next-env.d.ts"],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

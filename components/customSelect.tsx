@@ -14,6 +14,8 @@ interface CustomSelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Permite que um `<label htmlFor>` associe o rótulo ao controle. */
+  id?: string;
 }
 
 export default function CustomSelect({
@@ -21,7 +23,8 @@ export default function CustomSelect({
   value,
   onChange,
   placeholder = "Selecione...",
-  disabled = false
+  disabled = false,
+  id
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -30,6 +33,7 @@ export default function CustomSelect({
   return (
     <div className="relative">
       <button
+        id={id}
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}

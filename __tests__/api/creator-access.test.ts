@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
-import { generateAuthToken, verifyAuthToken } from '@/lib/auth';
+import { generateAuthToken } from '@/lib/auth';
+import { asMock } from '../helpers/http';
 import creatorAccessHandler from '@/pages/api/creator-access';
 import logoutHandler from '@/pages/api/auth/logout';
 import meHandler from '@/pages/api/auth/me';
@@ -45,48 +46,59 @@ vi.mock('bcryptjs', () => {
   };
 });
 
+/** Shape the assertions read; the index signature covers the rest. */
+interface JsonBody {
+  [key: string]: unknown;
+  error?: string;
+  impersonated?: boolean;
+  restored?: boolean;
+  success?: boolean;
+  newCreatorId?: string;
+  user?: { id?: string; isCreator?: boolean };
+}
+
 function createMockReqRes(options: {
   method?: string;
   cookies?: Record<string, string>;
   headers?: Record<string, string>;
-  body?: any;
+  body?: unknown;
   query?: Record<string, string>;
 }) {
-  const req: Partial<NextApiRequest> = {
+  const req = {
     method: options.method || 'GET',
     cookies: options.cookies || {},
     headers: options.headers || {},
     body: options.body || {},
     query: options.query || {},
-    socket: { remoteAddress: '127.0.0.1' } as any,
-  };
+    socket: { remoteAddress: '127.0.0.1' },
+  } as unknown as NextApiRequest;
 
   const resState: {
     statusCode: number;
-    headers: Record<string, any>;
-    jsonBody: any;
+    headers: Record<string, unknown>;
+    jsonBody: JsonBody;
   } = {
     statusCode: 200,
     headers: {},
-    jsonBody: null,
+    jsonBody: {},
   };
 
-  const res: Partial<NextApiResponse> = {
+  const res = {
     status: vi.fn((code: number) => {
       resState.statusCode = code;
-      return res as NextApiResponse;
+      return res;
     }),
-    json: vi.fn((body: any) => {
-      resState.jsonBody = body;
-      return res as NextApiResponse;
+    json: vi.fn((body: unknown) => {
+      resState.jsonBody = body as JsonBody;
+      return res;
     }),
-    setHeader: vi.fn((key: string, value: any) => {
+    setHeader: vi.fn((key: string, value: unknown) => {
       resState.headers[key] = value;
-      return res as NextApiResponse;
+      return res;
     }),
-  };
+  } as unknown as NextApiResponse;
 
-  return { req: req as NextApiRequest, res: res as NextApiResponse, resState };
+  return { req, res, resState };
 }
 
 describe('pages/api/creator-access', () => {
@@ -123,7 +135,7 @@ describe('pages/api/creator-access', () => {
       { role: UserRole.DIRECTOR, isCreator: false },
     ])('returns 403 for non-creator user with role %s', async ({ role, isCreator }) => {
       const token = await generateAuthToken({ userId: 'u-1', email: 'test@ex.com', role });
-      (prisma.user.findUnique as any).mockResolvedValue({ id: 'u-1', role, isCreator });
+      asMock(prisma.user.findUnique).mockResolvedValue({ id: 'u-1', role, isCreator });
 
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
@@ -139,7 +151,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 200 for creator user', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1')
           return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
@@ -156,10 +168,10 @@ describe('pages/api/creator-access', () => {
 
       expect(resState.statusCode).toBe(200);
       expect(resState.jsonBody.impersonated).toBe(true);
-      expect(resState.jsonBody.user.id).toBe('target-1');
+      expect(resState.jsonBody.user?.id).toBe('target-1');
 
       // Verify Set-Cookie header issued both auth_token (2h) and auth_token_creator (8h)
-      const setCookie = resState.headers['Set-Cookie'];
+      const setCookie = resState.headers['Set-Cookie'] as string[];
       expect(setCookie).toBeDefined();
       expect(setCookie.some((c: string) => c.startsWith('auth_token='))).toBe(true);
       expect(setCookie.some((c: string) => c.startsWith('auth_token_creator='))).toBe(true);
@@ -169,7 +181,7 @@ describe('pages/api/creator-access', () => {
   describe('Creator Password Requirement', () => {
     it('returns 400 when password is missing from the body', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1')
           return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
@@ -190,7 +202,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 400 when password is an empty string', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1')
           return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
@@ -213,7 +225,7 @@ describe('pages/api/creator-access', () => {
       (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1')
           return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
@@ -236,7 +248,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 200 and issues cookies when password matches', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1')
           return { id: 'c-1', role: UserRole.ADMIN, isCreator: true, password: CREATOR_PASSWORD_HASH };
         if (where.id === 'target-1') return { id: 'target-1', name: 'Target User', email: 'target@ex.com', role: UserRole.VIEWER };
@@ -261,7 +273,7 @@ describe('pages/api/creator-access', () => {
   describe('Input & Stash Guards', () => {
     it('returns 400 when targetUserId is missing', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
+      asMock(prisma.user.findUnique).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
 
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
@@ -277,7 +289,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 400 when targetUserId is self', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
+      asMock(prisma.user.findUnique).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
 
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
@@ -293,7 +305,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 409 when stash cookie auth_token_creator is already present', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
+      asMock(prisma.user.findUnique).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
 
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
@@ -309,7 +321,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 404 when target user does not exist', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1') return { id: 'c-1', role: UserRole.ADMIN, isCreator: true };
         return null;
       });
@@ -361,7 +373,7 @@ describe('pages/api/creator-access', () => {
       expect(resState.statusCode).toBe(200);
       expect(resState.jsonBody).toEqual({ restored: true });
 
-      const setCookie = resState.headers['Set-Cookie'];
+      const setCookie = resState.headers['Set-Cookie'] as string[];
       expect(setCookie).toBeDefined();
       expect(setCookie.some((c: string) => c.includes(`auth_token=${creatorToken}`))).toBe(true);
       expect(setCookie.some((c: string) => c.includes('auth_token_creator=') && c.includes('Max-Age=-1'))).toBe(true);
@@ -371,7 +383,7 @@ describe('pages/api/creator-access', () => {
   describe('PATCH (Transfer Creator Title)', () => {
     it('promotes VIEWER target to ADMIN and transfers title', async () => {
       const creatorToken = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1') return { id: 'c-1', role: UserRole.ADMIN, isCreator: true };
         if (where.id === 'new-c') return { id: 'new-c', role: UserRole.VIEWER, email: 'new@ex.com' };
         return null;
@@ -399,7 +411,7 @@ describe('pages/api/creator-access', () => {
 
     it('preserves DIRECTOR role when transferring title', async () => {
       const creatorToken = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id === 'c-1') return { id: 'c-1', role: UserRole.ADMIN, isCreator: true };
         if (where.id === 'dir-1') return { id: 'dir-1', role: UserRole.DIRECTOR, email: 'dir@ex.com' };
         return null;
@@ -422,7 +434,7 @@ describe('pages/api/creator-access', () => {
 
     it('returns 400 when attempting self-transfer', async () => {
       const creatorToken = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
+      asMock(prisma.user.findUnique).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
 
       const { req, res, resState } = createMockReqRes({
         method: 'PATCH',
@@ -452,25 +464,28 @@ describe('pages/api/creator-access', () => {
         },
       });
 
-      (prisma.user.findUnique as any).mockResolvedValue(null);
-      (prisma.user.create as any).mockImplementation(async ({ data }: any) => data);
+      asMock(prisma.user.findUnique).mockResolvedValue(null);
+      asMock(prisma.user.create).mockImplementation(async ({ data }: { data: Record<string, unknown> }) => data);
 
       await usersHandler(req, res);
 
       expect(prisma.user.create).toHaveBeenCalled();
-      const createdData = (prisma.user.create as any).mock.calls[0][0].data;
+      const [createArgs] = asMock(prisma.user.create).mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      const createdData = createArgs.data;
       expect(createdData.isCreator).toBeUndefined();
     });
 
     it('PATCH /api/users/[id] does NOT accept or update isCreator field', async () => {
       const adminToken = await generateAuthToken({ userId: 'admin-1', email: 'admin@ex.com', role: UserRole.ADMIN });
 
-      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+      asMock(prisma.user.findUnique).mockImplementation(async ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.email === 'admin@ex.com') return { id: 'admin-1', email: 'admin@ex.com', role: UserRole.ADMIN };
         if (where.id === 'target-1') return { id: 'target-1', role: UserRole.VIEWER };
         return null;
       });
-      (prisma.user.update as any).mockImplementation(async ({ data }: any) => data);
+      asMock(prisma.user.update).mockImplementation(async ({ data }: { data: Record<string, unknown> }) => data);
 
       const { req, res } = createMockReqRes({
         method: 'PATCH',
@@ -487,7 +502,10 @@ describe('pages/api/creator-access', () => {
       await userDetailHandler(req, res);
 
       expect(prisma.user.update).toHaveBeenCalled();
-      const updatedData = (prisma.user.update as any).mock.calls[0][0].data;
+      const [updateArgs] = asMock(prisma.user.update).mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      const updatedData = updateArgs.data;
       expect(updatedData.isCreator).toBeUndefined();
     });
   });
@@ -499,7 +517,7 @@ describe('pages/api/creator-access', () => {
       await logoutHandler(req, res);
 
       expect(resState.statusCode).toBe(200);
-      const setCookie = resState.headers['Set-Cookie'];
+      const setCookie = resState.headers['Set-Cookie'] as string[];
       expect(setCookie).toBeDefined();
       expect(setCookie.some((c: string) => c.startsWith('auth_token=') && c.includes('Max-Age=-1'))).toBe(true);
       expect(setCookie.some((c: string) => c.startsWith('auth_token_creator=') && c.includes('Max-Age=-1'))).toBe(true);
@@ -509,7 +527,7 @@ describe('pages/api/creator-access', () => {
   describe('me API signalization', () => {
     it('returns isCreator field and null impersonation when no stash present', async () => {
       const token = await generateAuthToken({ userId: 'u-1', email: 'user@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({
+      asMock(prisma.user.findUnique).mockResolvedValue({
         id: 'u-1',
         name: 'Normal User',
         email: 'user@ex.com',
@@ -528,7 +546,7 @@ describe('pages/api/creator-access', () => {
       await meHandler(req, res);
 
       expect(resState.statusCode).toBe(200);
-      expect(resState.jsonBody.user.isCreator).toBe(true);
+      expect(resState.jsonBody.user?.isCreator).toBe(true);
       expect(resState.jsonBody.impersonation).toBeNull();
     });
 
@@ -536,7 +554,7 @@ describe('pages/api/creator-access', () => {
       const targetToken = await generateAuthToken({ userId: 't-1', email: 'target@ex.com', role: UserRole.VIEWER });
       const stashToken = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN, name: 'Boss Creator' });
 
-      (prisma.user.findUnique as any).mockResolvedValue({
+      asMock(prisma.user.findUnique).mockResolvedValue({
         id: 't-1',
         name: 'Target User',
         email: 'target@ex.com',
@@ -558,7 +576,7 @@ describe('pages/api/creator-access', () => {
       await meHandler(req, res);
 
       expect(resState.statusCode).toBe(200);
-      expect(resState.jsonBody.user.isCreator).toBe(false);
+      expect(resState.jsonBody.user?.isCreator).toBe(false);
       expect(resState.jsonBody.impersonation).toEqual({
         active: true,
         creatorName: 'Boss Creator',
@@ -567,7 +585,7 @@ describe('pages/api/creator-access', () => {
 
     it('does NOT expose creatorAccessEnabled anymore', async () => {
       const token = await generateAuthToken({ userId: 'u-1', email: 'user@ex.com', role: UserRole.ADMIN });
-      (prisma.user.findUnique as any).mockResolvedValue({
+      asMock(prisma.user.findUnique).mockResolvedValue({
         id: 'u-1',
         name: 'Normal User',
         email: 'user@ex.com',
