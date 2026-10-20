@@ -46,7 +46,6 @@ interface AssetActive {
 interface Section {
   id: string;
   name: string;
-  fixedValue?: number;
   actives: AssetActive[];
 }
 
@@ -70,6 +69,9 @@ interface ViewData {
     notes?: string;
   };
   sections: Section[];
+  // Etapa 1 da ADR-001: o servidor calcula o patrimônio da subárvore
+  // (raiz + cada ativo de cada seção). `0` quando o papel não pode ver valor.
+  totalValue?: number;
 }
 
 export default function SpacePublicView() {
@@ -184,9 +186,10 @@ export default function SpacePublicView() {
     (acc, sec) => acc + (sec.actives?.length || 0),
     0
   );
-  const totalValue =
-    (active.fixedValue || 0) +
-    sections.reduce((acc, sec) => acc + (sec.fixedValue || 0), 0);
+  // Etapa 1 da ADR-001: a soma vive no servidor. Client-side, `sec.fixedValue`
+  // era sempre `undefined` — a seção jamais carregou o campo — e o card
+  // reportava apenas o valor da raiz como se fosse o da subárvore inteira.
+  const totalValue = data.totalValue ?? 0;
 
   if (!active.isPhysicalSpace)
     return (

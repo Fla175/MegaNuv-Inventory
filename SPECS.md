@@ -293,6 +293,28 @@ Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é
 > está no handler**, não só no middleware: `authMiddleware` envolve o handler e devolve `401` sem
 > sessão. Nenhum deles depende mais exclusivamente do `middleware.ts` para ser privado.
 
+**Visibilidade de `fixedValue` (ADR-001, Etapa 1 — decisão de produto de 18/10/2026):**
+ADMIN, MANAGER e DIRECTOR veem e editam o valor; **somente VIEWER** não o vê. A regra vive no
+**servidor**, como predicado puro `canViewValue(user)` em `lib/apiAuth.ts:64-77` (allowlist,
+falha fechado). Requisito novo ou alteração nestes contratos nem reintroduzir o valor no payload:
+
+- `GET /api/actives/list` — para `VIEWER`, `fixedValue` está **ausente do objeto** de cada ativo
+  (não vai como `undefined`); os demais escalares não são afetados. Os papéis autorizados recebem
+  o campo.
+- `PUT /api/actives/update` — **ausente ≠ zerado**: sem `fixedValue` no corpo, o valor original é
+  preservado (`'fixedValue' in req.body` decide); `0` explícito zera. Se o campo for omitido,
+  `applyToSimilar` não o propaga (ele não mudou).
+- `GET /api/qrcode/public-get` — a resposta carrega `totalValue` calculado **no servidor** (raiz +
+  cada ativo de cada seção da subárvore, incluídos espaços aninhados). Para `VIEWER`: a raiz e os
+  ativos das seções vêm **sem** `fixedValue` e `totalValue` é `0`. `notes` não é dado sensível e
+  permanece visível a todos os papéis autenticados.
+- O card de patrimônio total do dashboard é a exceção e **permanece restrito**
+  (`dashboard/stats.ts` já devolve `403` para `VIEWER`).
+
+> **Matriz RBAC acima está defasada nas linhas "Vê `fixedValue`" de ADMIN/MANAGER**, que ainda
+> dizem "não" — a correção documental, incluindo a regra de escrita (`clone-batch`/`update`), é o
+> escopo da `ADR-002` (pendente).
+
 **Paginação:** não existe. `list` devolve o conjunto inteiro; `/api/logs/list` limita a 200.
 Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versionar.
 

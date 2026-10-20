@@ -60,3 +60,19 @@ export function isViewer(user: Pick<AuthTokenPayload, 'role'> | null | undefined
 export function isPrivileged(user: Pick<AuthTokenPayload, 'role'> | null | undefined): boolean {
   return user?.role === 'DIRECTOR' || user?.role === 'ADMIN';
 }
+
+/**
+ * Verdadeiro para papéis autorizados a ver o patrimônio de um ativo (`fixedValue`) —
+ * decisão de produto de 18/10/2026: ADMIN, MANAGER e DIRECTOR veem e editam o valor;
+ * **apenas VIEWER** não o vê. O card de patrimônio total do dashboard é a exceção e
+ * permanece restrito em dashboard/stats.ts (ADR-001 §1).
+ *
+ * Predicado puro, ao lado de `isViewer`, para os endpoints de leitura aplicarem
+ * o mesmo critério (`actives/list`, `qrcode/public-get`): quem não pode ver não
+ * recebe o campo no payload — a regra vive no servidor, não na UI (`SPECS.md §5.1`).
+ */
+export function canViewValue(user: Pick<AuthTokenPayload, 'role'> | null | undefined): boolean {
+  return (
+    user?.role === 'DIRECTOR' || user?.role === 'ADMIN' || user?.role === 'MANAGER'
+  );
+}

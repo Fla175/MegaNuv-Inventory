@@ -66,6 +66,79 @@
 
 ---
 
+### 🤖 OpenCode Operations (2)
+
+#### Security
+
+- **Etapa 1 da `ADR/ADR-001.md` — `fixedValue` saía no payload para quem não podia vê-lo e era
+  destruído por edição sem o campo.** Regra de produto (decisão do dono, 18/10/2026): ADMIN,
+  MANAGER e DIRECTOR veem e editam o valor; **somente VIEWER** não o vê. Três correções atômicas —
+  a redação sem a preservação viraria perda de dado no primeiro salvamento.
+  - **`GET /api/actives/list` (1.1, `pages/api/actives/list.ts:31-45`)** — o endpoint devolvia
+    **todos** os escalares para qualquer papel autenticado: o gate de coluna da UI
+    (`ListSection.tsx`) escondia o valor, mas o JSON entregava o patrimônio a qualquer cookie de
+    `VIEWER` (`curl` bastava). Agora o payload é redigido por destructuring condicionado a
+    `canViewValue(session)`. **Desvio de mecanismo, mesmo contrato:** a ADR pede `select` explícito
+    no `findMany`; em vez disso o fetch mantém os escalares e o campo é removido pós-query — o
+    `findMany` sem `select` carrega todos os campos que a UI consome (`notes`, `imageUrl`,
+    `fileUrl`, `createdAt`, ...), e enumerá-los à mão arriscaria derrubar campos da `ListSection`
+    em silêncio. A intenção da ADR — `fixedValue` ausente do JSON para `VIEWER` — é idêntica.
+  - **`PUT /api/actives/update` (1.2, `pages/api/actives/update.ts:52-63`)** — o parse
+    `parseFloat(fixedValue) || 0` gravava `0` sempre que o campo não chegava: "campo ausente" era
+    "zerar", e um cliente que editasse o ativo sem repassar o valor destruía o patrimônio em
+    silêncio (com `applyToSimilar`, em N registros). Agora `'fixedValue' in req.body` distingue
+    **ausente** de **zerado**: ausente → preserva `originalActive.fixedValue`; `0` explícito
+    → zera. É o par da redação do 1.1 — sem isso, listar sem o campo + salvar zerava o valor.
+  - **`GET /api/qrcode/public-get` (1.3, `:110-160`)** — `...rootActive` espalhava **todos** os
+    escalares da raiz, inclusive o valor, sem nenhum gate, e os ativos das seções idem. O
+    `VIEWER` autenticado abre a tela do QR Code, então a redação precisa cobrir raiz e filhos.
+    Agora `canViewValue(req.user)` decide e a chave **sai do objeto** (não vai como `undefined`).
+    **Sobre `notes`:** a evidência da ADR citava o spread de `notes` junto, mas `notes` não é
+    o dado sensível da decisão de produto — permanece visível a todos os papéis autenticados,
+    coerente com `actives/list`.
+  - **`totalValue` no servidor (1.4, `pages/api/qrcode/public-get.ts:158-165`,
+    `pages/qrcode/view.tsx:186-191`)** — o "Valor Total" da tela do QR Code somava
+    `sec.fixedValue`, que a resposta **jamais carregou**: a soma client-side reduzia a
+    `undefined` e o card reportava **apenas o valor da raiz** como se fosse o da subárvore
+    inteira — erro silencioso e ao contrário em fluxo de patrimônio. Agora `SectionActive`
+    declara `fixedValue` e o **servidor** soma raiz + cada ativo de cada seção, incluindo
+    espaços aninhados; a tela consome `data.totalValue ?? 0`. Para `VIEWER`, `totalValue: 0`
+    → o card não é renderizado (`totalValue > 0`).
+
+#### Changed
+
+- **`canViewValue(user)` novo em `lib/apiAuth.ts:64-77`** — a regra vive como predicado puro ao
+  lado de `isViewer`/`isPrivileged` (alternativa D da ADR, exigida por `SPECS.md §5.1` para
+  regra de negócio). **Falha fechado:** allowlist explícito (`DIRECTOR`/`ADMIN`/`MANAGER`),
+  não exclusão de `VIEWER` — sessão ausente, sem papel ou com papel desconhecido retorna
+  `false`. Mutação "reforçada" (`role !== 'VIEWER'`) falhou nesse teste e foi corrigida antes
+  de commitar.
+- **`page /qrcode/view.tsx`** — `Section.fixedValue` removido da interface (a resposta nunca o
+  carregou) e `ViewData.totalValue?: number` adicionado.
+
+#### Added
+
+- **`__tests__/api/actives-value-visibility.test.ts`** — 16 testes de regressão da Etapa 1:
+  5 unitários de `canViewValue` (allowlist, falha fechado), 3 de `actives/list` (VIEWER sem a
+  chave — ausente, não `undefined` — com o restante do payload intacto; ADMIN/MANAGER/DIRECTOR
+  com o valor), 4 de `actives/update` (ausente preserva 1250 — **o teste obrigatório da ADR**;
+  `0` explícito zera; valor novo aplica; `applyToSimilar` sem campo não propaga), 4 de
+  `public-get` (401 sem sessão; VIEWER sem `fixedValue` em raiz/ativos e `totalValue` 0;
+  DIRECTOR com soma correta de subárvore aninhada = 375). **Validados por 6 mutações:** redação
+  incondicional no `list` → 1 falha; parse `|| 0` restaurado no `update` → 2; spread sem gate
+  da raiz no `public-get` → 1; soma sem as seções → 1; allowlist trocado por `!== 'VIEWER'`
+  (falha aberta) → 1; `signedActives` sempre com valor → 1. Suíte completa: 236 passando
+  (era 220, +16).
+
+#### Docs
+
+- **`SPECS.md §4.2`** — cláusula de visibilidade de `fixedValue` nos contratos de
+  `actives/list`, `actives/update` e `qrcode/public-get`; nota de drift na matriz RBAC
+  (linhas "Vê `fixedValue`" de ADMIN/MANAGER) referenciando a `ADR-002` pendente.
+- **`CONTEXT.md §3.1`** — item **15** (exposição de `fixedValue` no payload).
+
+---
+
 > **Próxima release: `2.25.2`.** A versão vive em `package.json:3` e é lida por `lib/version.ts` (sem
 > hardcode). O bump foi feito com `npm version 2.25.2 --no-git-tag-version`: o `--no-git-tag-version` é
 > obrigatório porque a IA **não cria tag nem branch de release** (`AGENTS.md` §3.2, `CONTEXT.md` §4). O
