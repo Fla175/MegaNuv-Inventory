@@ -1,20 +1,17 @@
 ---
-stage: A-shadcn-prep
-status: in_progress
+stage: B-dashboard
+status: done
 updated: 2026-10-20
 ---
 
 ## Now
-Etapa A em andamento: inicializando Shadcn UI (T1–T4).
+Etapa B concluída: `pages/dashboard.tsx` reduzido de 375 L para ~100 L como orquestrador fino. Hooks e componentes extraídos.
 
 ## Next
-T1: `npx shadcn@latest init` (ou `components.json` manual para Tailwind v4 + Pages Router).
-T2: adicionar `select`, `dialog`, `popover` em `components/ui/`.
-T3: rodar gates (`lint`, `tsc`, `prisma validate`, `test`, `build:opt`).
-T4: commit em `refactor/modularize-ui`.
+Etapa C: modularizar `components/ListSection.tsx` (2.151 L) — árvores, filtros, seleção, modais.
 
 ## Blocked
 - (nenhum)
 
 ## Open questions
-- Se o Shadcn não suportar Tailwind v4 automaticamente, configurar `components.json` manualmente (decisão já tomada no grilling Q4).
+- (nenhum)
