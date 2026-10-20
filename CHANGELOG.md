@@ -11,6 +11,16 @@
 
 ## [Unreleased]
 
+### 🤖 Harness² Operations
+
+#### Changed
+
+- **Harness² habilitado para este projeto (ADR-0005).** A instalação fica no workspace global
+  (`~/.config/opencode/harness2`, Python 3.12 via `uv`); neste repositório os runs gravam em
+  `runs/harness2/`, que passou a ser ignorado no git. Primeira execução: `harness2-demo` em modo
+  sequential, **2/2 tarefas concluídas**. Runs de benchmark (`jb`/`lab`/`wb`) exigem
+  `harness2-setup` e credenciais de judge, então ficam opt-in — não entram no fluxo padrão.
+
 ### 🤖 OpenCode Operations
 
 #### Security
@@ -889,6 +899,21 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
   `/api/users`, `/api/users/[id]`, `/api/father-spaces/*` e `/api/logs/clear` na tabela de
   endpoints sensíveis.
 - **`CONTEXT.md`** — §2.1 com a ADR-002 concluída e o bloco de RBAC em §3.1.
+
+### 🤖 OpenCode Operations (6)
+
+#### Planning
+
+- **`ADR-ADR-003.md` criada — modularização de componentes long method e adoção do Shadcn UI.** Documenta a decisão tomada após grilling de arquitetura (7 questões respondidas pelo dono): pastas por feature, hooks `use<Domínio><Coisa>`, sem barrel exports (exceto `components/ui/` se exigido), Shadcn via `npx shadcn@latest init`, reescrita de componentes duplicados (ex: `CustomSelect` → `Select`), Zustand + hooks locais para estado, `@types/inventory.ts` como contrato único, e ordem de execução `dashboard.tsx` → `ListSection.tsx` → `settings.tsx`.
+- **Planejamento das 5 etapas (A–E):** preparação/Shadcn, dashboard, ListSection, settings, validação e documentação. Cada etapa em branch própria com gates completos.
+
+#### Context
+
+- **`CONTEXT.md`** — §2.1 atualizado com o próximo foco (ADR-003); P2 ganha os itens 4b (`settings.tsx` 1.254 L) e 4c (`dashboard.tsx` 375 L) além do item 4 existente (`ListSection.tsx` 2.150 L); header aponta para a próxima branch `refactor/modularize-ui`.
+
+#### Docs
+
+- **`ADR/ADR-003.md`** — contexto, decisão, alternativas, trade-offs, consequências e action items detalhados por etapa.
 
 ---
 

@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 20/10/2026 · **Branch:** `fix/rbac-matrix`
+**Última atualização:** 20/10/2026 · **Branch:** `fix/rbac-matrix` (próxima: `refactor/modularize-ui`)
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -178,6 +178,13 @@ singleton semeado apenas pelo criador; (c) `logs/clear` era ADMIN-only, mas a UI
 ao DIRECTOR — agora DIRECTOR/ADMIN apagam e MANAGER só lê. Testes em `__tests__/lib/rbac.test.ts` e
 `__tests__/api/rbac-*.test.ts` (90 novos), validados por mutação.
 
+> **Próximo foco — `ADR-003` (modularização + Shadcn UI).** Long method detectado em três arquivos:
+> `pages/dashboard.tsx` (375 L), `pages/settings.tsx` (1.254 L) e
+> `components/ListSection.tsx` (2.151 L). Plano: extrair componentes por feature,
+> hooks `use<Domínio><Coisa>`, Zustand para estado global e Shadcn UI para substituir
+> componentes feitos à mão. Ordem: `dashboard.tsx` → `ListSection.tsx` → `settings.tsx`.
+> Cada etapa em branch própria, gates completos por etapa.
+
 **Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026. Antes de
 qualquer novo deploy: **rotacionar a credencial MinIO** (item 12) e **aplicar a nova `inventory-policy.json`**
 no servidor (item 9) — as duas são ações humanas, não de código.
@@ -203,7 +210,9 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 | 1   | **Cobertura de testes ainda parcial** — runner instalado, mas longe do alvo           | projeto inteiro                                                                                                                                    | `vitest` está instalado e roda, mas o gate de cobertura se aplica hoje **só à superfície de segurança** (`lib/middlewares`, `lib/uploadPolicy.ts`, `pages/api/users/{index,check-director}.ts` — 83% linhas / 80% branches). O alvo de `SPECS.md` §5.2 (70–80% por domínio em todo `pages/api/**`) permanece **pendente** e exige cobrir os 36 endpoints.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2   | **Nenhuma CI**                                                                        | sem `.github/`                                                                                                                                     |
 | 3   | ~~**Verificação de JWT replicada**~~ — **consolidada**                                | `lib/apiAuth.ts` (`getSessionUser`)                                                                                                                | A sequência `req.cookies.auth_token \|\| authorization.replace("Bearer ") → jwtVerify` estava replicada em ~20 arquivos de `pages/api/**`, com o prefixo `Bearer` não validado e a leitura do id divergente. Todos passaram a usar `getSessionUser()`, que delega a `verifyAuthToken()` (`lib/auth.ts`, fonte de verdade). `authMiddleware` continua sendo o wrapper para handlers que querem o 401 padronizado.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 4   | **`components/ListSection.tsx` tem 2.150 linhas**                                     | UI + modais + impressão + context menu + upload + revert                                                                                           |
+| 4   | **`components/ListSection.tsx` tem 2.150 linhas**                                     | UI + modais + impressão + context menu + upload + revert — alvo da `ADR-003` (etapa C)                                                                                           |
+| 4b  | **`pages/settings.tsx` tem 1.254 linhas**                                             | 14 `useState`, 5 abas, 7 modais, CRUD de usuários/espacos/categorias, logs, revert, creator access — alvo da `ADR-003` (etapa D)                                                  |
+| 4c  | **`pages/dashboard.tsx` tem 375 linhas**                                              | fetch de stats, derived state, paginação, cards KPI, grid de categorias, 2 painéis, 1 modal — alvo da `ADR-003` (etapa B)                                                         |
 | 5   | **12 dependências declaradas e nunca importadas**                                     | `recharts`, `framer-motion`, `react-rnd`, `@headlessui/react`, `axios`, `jsonwebtoken`, `js-cookie`, `jwt-decode`, `eruda`, `uuid`, `qrcode.react` |
 | 6   | **Espaço de IDs pequeno**: `Active.id`/`FatherSpace.id` = 4 chars hex (65.536)        | `lib/prisma.ts:8-24` — colisão plausível em inventário grande                                                                                      |
 | 7   | `DEBUG_ALLOW_JWT` no `.env` nunca é lido no código                                    | `.env` — variável morta, remover                                                                                                                   |
