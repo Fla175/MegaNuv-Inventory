@@ -49,7 +49,20 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
       ? fileUrl.filter(Boolean).join(",")
       : fileUrl || null;
 
-    const parsedFixedValue = typeof fixedValue === "number" ? fixedValue : parseFloat(fixedValue) || 0;
+    // Etapa 1 da ADR-001 (1.2): "ausente" ≠ "zerado". O parse incondicional
+    // anterior (`parseFloat(fixedValue) || 0`) gravava `0` sempre que o campo
+    // não chegava — destruíndo o patrimônio em silêncio quando um cliente
+    // editava o ativo sem repassar o valor. O `actives/list` redige
+    // `fixedValue` para quem não pode vê-lo; se este endpoint também
+    // trata ausência como zero, a redação viraria perda de dado no primeiro
+    // salvamento. Um `0` explícito no corpo segue zerando.
+    const fixedValueProvided = 'fixedValue' in req.body;
+
+    const parsedFixedValue = fixedValueProvided
+      ? typeof fixedValue === "number"
+        ? fixedValue
+        : parseFloat(fixedValue) || 0
+      : originalActive.fixedValue;
 
     const currentUpdateData = {
       name,
