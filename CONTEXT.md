@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 20/10/2026 · **Branch:** `fix/quality-a11y-lint`
+**Última atualização:** 20/10/2026 · **Branch:** `fix/rbac-matrix`
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -41,9 +41,17 @@ em segurança, testes e manutenção. Ver §3.
 > finalmente usado via `InventoryItem`, sem os `any` de `ListSection`/`activeForm`/`pages/index`
 > (3.4); `eslint .` cobrindo `__tests__`, com os **149 erros** corrigidos e helper compartilhado
 > `__tests__/helpers/http.ts` (3.5); contagens do `SPECS.md`/`CONTEXT.md` (3.6); código morto
-> removido e comentários PT-BR traduzidos (3.7); typo do cabeçalho do `ListSection` (3.8). Falta a
-> **ADR-002** (matriz RBAC de `SPECS.md:262-270`, hoje defasada nas linhas "Vê `fixedValue`").
+> removido e comentários PT-BR traduzidos (3.7); typo do cabeçalho do `ListSection` (3.8).
 > Gates da Etapa 3: `eslint .`/tsc/prisma limpos, **260 testes** passando, build standalone 90M.
+>
+> **`ADR-002` — matriz RBAC canônica — concluída em `fix/rbac-matrix` (20/10/2026).** A matriz de
+> `SPECS.md` §4.2 passou a separar ativos/categorias de espaços e a refletir a decisão de
+> `fixedValue` de 18/10. No código: espaços Pai ficaram com DIRECTOR/ADMIN (a UI já os mostrava; a
+> API só aceitava ADMIN); a gestão de usuários voltou à matriz (DIRECTOR todos; ADMIN exceto
+> DIRECTOR; MANAGER só VIEWER) e fechou a escalada em que um MANAGER criava/editava/excluía
+> DIRECTOR; logs passaram a ser apagáveis por DIRECTOR/ADMIN (MANAGER só lê). A política vive em
+> `lib/rbac.ts`; `POST`/`PATCH /api/users` não devolvem mais o hash de senha. **90 testes novos**
+> (350 no total), validados por mutação 5/7/4/3. Gates: `eslint .`/tsc/prisma limpos, build 90M.
 
 > **Contexto herdado — release de documentação `2.25.2` — implementada e verificada antes:**
 > (a) **correção do drift de contagem de testes** no `SPECS.md` §5.2, que fixava um número
@@ -160,6 +168,15 @@ conjunto de correções de segurança.
 | 13  | **`clone-batch` sem verificação de papel**                     | `pages/api/actives/clone-batch.ts`                               | ✅ **Corrigido** (Etapa 0 da `ADR/ADR-001.md`) — o handler **não importava `authMiddleware`** e não resolvia sessão: exportava-se cru. A proteção vinha só do `middleware.ts`, que valida **token, não papel** (`middleware.ts:58-86`), então qualquer `VIEWER` autenticado criava **até 50 cópias** de qualquer ativo (`qty` máx. 50 em `:18`), copiando `fixedValue` e `notes` (`:79-80`). Agora resolve a sessão com `getSessionUser`, barra `VIEWER` com `403`, registra `createdById` (`:95-99`) e é envolvido por `authMiddleware`. **Não era acesso anônimo** — o matcher do middleware cobre a rota; o defeito era qualquer sessão de menor privilégio escrever. 12 testes em `__tests__/api/actives-write-authz.test.ts`. |
 | 14  | **`actives/update` sem verificação de papel**                   | `pages/api/actives/update.ts`                                    | ✅ **Corrigido** (Etapa 0) — usava `authMiddleware(handler)` **sem `requiredRoles`**, que é o terceiro parâmetro do helper (`lib/middlewares/authMiddleware.ts:24,51-55`) e **não tinha nenhum chamador no projeto**. Um `VIEWER` autenticado editava qualquer ativo por ID, e `applyToSimilar` (`:79-106`) propagava a alteração para todos os ativos de mesmo `name`/`manufacturer`/`model`/`sku` — escrita em N registros com um único `PUT`. Agora passa `["DIRECTOR","ADMIN","MANAGER"]`, o complemento de `VIEWER` na matriz RBAC, mesma semântica de `delete.ts:17` e `move.ts:41`. Corrigido de passagem: era o **único** arquivo a instanciar `new PrismaClient()` fora de `lib/prisma.ts`, o que o tornava **impossível de testar** com o mock do projeto. |
 | 15  | **`fixedValue` no payload para quem não pode vê-lo + apagado pela edição sem o campo** | `actives/list.ts` · `actives/update.ts` · `qrcode/public-get.ts` · `qrcode/view.tsx` | ✅ **Corrigido** (Etapa 1 da `ADR/ADR-001.md`, `fix/actives-value-visibility`) — os três endpoints de leitura devolviam **todos** os escalares a qualquer papel autenticado: o gate de coluna da UI escondia o valor do `VIEWER`, mas o JSON entregava o patrimônio (`curl` bastava). E o `update` parseava `fixedValue` com `\|\| 0` incondicionalmente — **ausência era "zerar"**, destruindo o valor em silêncio no primeiro salvamento sem o campo (com `applyToSimilar`, em N). Agora `canViewValue(user)` (predicado puro em `lib/apiAuth.ts:64-77`, falha fechado) redige o campo **ausente do objeto**, não `undefined`; o `update` distingue ausente (preserva `originalActive.fixedValue`) de `0` explícito (zera); e o **"Valor Total" da tela do QR Code passou a ser somado no servidor** (`totalValue: 0` para `VIEWER`) — a soma client-side reduzia `sec.fixedValue`, que a resposta jamais carregou, e reportava só o valor da raiz. Regra de produto (dono, 18/10/2026): ADMIN/MANAGER/DIRECTOR veem e editam; somente VIEWER não vê. 16 testes em `__tests__/api/actives-value-visibility.test.ts`, validados por 6 mutações. |
+
+**RBAC (ADR-002, 20/10/2026) — drifts fechados.** Três gates não correspondiam à matriz:
+(a) `father-spaces/{create,update,delete}` exigiam ADMIN, embora a UI mostrasse a aba a DIRECTOR —
+agora DIRECTOR/ADMIN via `canManageSpaces`; (b) `POST /api/users` só barrava MANAGER de criar ADMIN
+e `users/[id]` só comparava com ADMIN — um MANAGER **criava/editava/excluía DIRECTOR**, e o DIRECTOR
+não gerenciava ninguém; a matriz passou a ser aplicada (`canActOnUser`/`canAssignRole`), com DIRECTOR
+singleton semeado apenas pelo criador; (c) `logs/clear` era ADMIN-only, mas a UI mostrava o botão
+ao DIRECTOR — agora DIRECTOR/ADMIN apagam e MANAGER só lê. Testes em `__tests__/lib/rbac.test.ts` e
+`__tests__/api/rbac-*.test.ts` (90 novos), validados por mutação.
 
 **Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026. Antes de
 qualquer novo deploy: **rotacionar a credencial MinIO** (item 12) e **aplicar a nova `inventory-policy.json`**

@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import db from "@/lib/prisma"; 
 import { createLog } from "@/lib/logger";
 import { getSessionUser } from "@/lib/apiAuth";
+import { canManageSpaces } from "@/lib/rbac";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT" && req.method !== "PATCH") {
@@ -15,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userId = session.userId;
 
-    if (session.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado. Apenas admins editam espaços." });
+    if (!canManageSpaces(session)) {
+      return res.status(403).json({ error: "Acesso negado. Apenas ADMIN e DIRECTOR editam espaços." });
     }
 
     const { id, name, notes, parentId, imageUrl, address, responsible, phone } = req.body;

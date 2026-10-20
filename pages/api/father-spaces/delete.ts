@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { createLog } from "@/lib/logger";
 import { deleteFileFromMinio } from "@/lib/minio";
 import { getSessionUser } from "@/lib/apiAuth";
+import { canManageSpaces } from "@/lib/rbac";
 import { collectSpaceSubtreeIds } from "@/lib/spaceTree";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -20,8 +21,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userId = session.userId;
 
-    if (session.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado. Apenas admins excluem espaços." });
+    if (!canManageSpaces(session)) {
+      return res.status(403).json({ error: "Acesso negado. Apenas ADMIN e DIRECTOR excluem espaços." });
     }
 
     const { id } = req.query;

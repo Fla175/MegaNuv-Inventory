@@ -2,9 +2,20 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/apiAuth";
+import { canActOnUser, canAssignRole, isUserRole } from "@/lib/rbac";
 import bcrypt from 'bcryptjs';
 
 const saltRounds = 10;
+
+/** Fields safe to return; the hash must never leave the server. */
+const PUBLIC_USER_FIELDS = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  lastLogin: true,
+  createdAt: true,
+} as const;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -13,7 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!session) return res.status(401).json({ message: "Não autorizado" });
 
   try {
-    const requester = await prisma.user.findUnique({ where: { email: session.email } });
+    const requester = await prisma.user.findUnique({
+      where: { email: session.email },
+      select: { id: true, role: true, isCreator: true },
+    });
 
     if (!requester) return res.status(401).json({ message: "Usuário não encontrado" });
 
@@ -21,23 +35,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!targetUser) return res.status(404).json({ message: "Usuário alvo não encontrado" });
 
     const isOwner = requester.id === targetUser.id;
-    const isAdmin = requester.role === "ADMIN";
-    const isManager = requester.role === "MANAGER";
-    const isViewer = requester.role === "VIEWER";
-    const targetIsAdmin = targetUser.role === "ADMIN";
 
     if (req.method === "DELETE") {
-      // ADMIN: pode excluir qualquer um (exceto si mesmo se for o único admin)
-      // MANAGER: pode excluir VIEWER e MANAGER, mas NÃO pode excluir ADMIN
-      // VIEWER: não pode excluir ninguém
-      // Owner: pode excluir a si mesmo
-      if (isViewer) {
-        return res.status(403).json({ message: "Visualizadores não podem excluir usuários." });
-      }
-      if (isManager && targetIsAdmin) {
-        return res.status(403).json({ message: "Gerentes não podem excluir administradores." });
-      }
-      if (!isOwner && !isAdmin && !isManager) {
+      // The matrix is about the target's current role: a MANAGER may delete a
+      // VIEWER, an ADMIN may delete anyone but a DIRECTOR, and the DIRECTOR
+      // may delete anyone. Self-deletion is not exposed by the UI.
+      if (!canActOnUser(requester, targetUser.role)) {
         return res.status(403).json({ message: "Você não tem permissão para excluir este usuário." });
       }
 
@@ -46,46 +49,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "PATCH") {
-      // ADMIN: pode editar qualquer um
-      // MANAGER: pode editar si mesmo e VIEWER, mas NÃO pode editar ADMIN
-      // VIEWER: pode editar apenas si mesmo (nome, senha)
-      if (isViewer && !isOwner) {
-        return res.status(403).json({ message: "Visualizadores não podem editar outros usuários." });
-      }
-      if (isManager && targetIsAdmin) {
-        return res.status(403).json({ message: "Gerentes não podem editar administradores." });
-      }
-      if (!isOwner && !isAdmin && !isManager) {
+      // Everyone may edit their own profile (name/password); editing someone
+      // else follows the same rule as deletion.
+      if (!isOwner && !canActOnUser(requester, targetUser.role)) {
         return res.status(403).json({ message: "Você não tem permissão para editar este usuário." });
       }
 
       const { name, email, role, password } = req.body;
 
-      // ADMIN pode alterar role; MANAGER/VIEWER não podem
       let finalRole = targetUser.role;
-      if (isAdmin && role) {
-        finalRole = role;
-      }
-      
-      // MANAGER não pode promover VIEWER para MANAGER ou ADMIN
-      if (isManager && role && (role === 'ADMIN' || role === 'MANAGER')) {
-        return res.status(403).json({ message: "Gerentes não podem promover usuários." });
+
+      if (role !== undefined && role !== null && role !== "") {
+        if (!isUserRole(role)) {
+          return res.status(400).json({ message: "Papel inválido." });
+        }
+
+        if (role !== targetUser.role) {
+          // Changing your own role can lock the last administrator out; the
+          // UI does not expose it (self is not in the list).
+          if (isOwner) {
+            return res.status(403).json({ message: "Você não pode alterar o seu próprio papel." });
+          }
+
+          const directorExists =
+            role === "DIRECTOR"
+              ? (await prisma.user.findFirst({
+                  where: { role: "DIRECTOR" },
+                  select: { id: true },
+                })) !== null
+              : false;
+
+          if (!canAssignRole(requester, role, { directorExists })) {
+            return res.status(403).json({
+              message: "Você não tem permissão para atribuir este papel.",
+            });
+          }
+
+          finalRole = role;
+        }
       }
 
       const hashedPassword = password ? await bcrypt.hash(password, saltRounds) : undefined;
 
       const updated = await prisma.user.update({
         where: { id: String(id) },
-        data: { 
-          name, 
-          email, 
-          role: finalRole, 
-          ...(hashedPassword ? { password: hashedPassword } : {})
-        }
+        data: {
+          name,
+          email,
+          role: finalRole,
+          ...(hashedPassword ? { password: hashedPassword } : {}),
+        },
+        select: PUBLIC_USER_FIELDS,
       });
       return res.status(200).json(updated);
     }
 
+    res.setHeader("Allow", ["PATCH", "DELETE"]);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Erro interno";
     return res.status(500).json({ message: "Erro interno", error: message });

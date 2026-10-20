@@ -3,6 +3,7 @@ import type { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
+import { canAssignRole, isUserRole, type RbacActor } from '@/lib/rbac';
 
 const saltRounds = 10;
 
@@ -32,15 +33,47 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
   // 2. Lógica para CRIAR usuário (POST)
   if (req.method === 'POST') {
     try {
-      // VIEWER não pode criar ninguém
-      if (req.user?.role === 'VIEWER') {
-        return res.status(403).json({ message: "Visualizadores não podem criar usuários." });
+      const data = req.body ?? {};
+
+      // An unknown role used to reach Prisma and fail as a 500. Reject it
+      // explicitly; an absent/empty field defaults to VIEWER (the form starts
+      // with no role selected).
+      if (data.role !== undefined && data.role !== null && data.role !== '' && !isUserRole(data.role)) {
+        return res.status(400).json({ message: "Papel inválido." });
+      }
+      const targetRole = isUserRole(data.role) ? data.role : 'VIEWER';
+
+      // For a DIRECTOR target the creator flag decides, and it is not in the
+      // token: read the requester. Every other role is decided by the token
+      // role alone, so the common path stays a single query (the INSERT).
+      let actor: RbacActor = { role: req.user!.role };
+      let directorExists = false;
+
+      if (targetRole === 'DIRECTOR') {
+        const requester = await prisma.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { id: true, role: true, isCreator: true },
+        });
+        if (!requester) {
+          return res.status(401).json({ message: "Usuário não encontrado." });
+        }
+        actor = requester;
+
+        directorExists =
+          (await prisma.user.findFirst({
+            where: { role: 'DIRECTOR' },
+            select: { id: true },
+          })) !== null;
+
+        if (directorExists) {
+          return res.status(409).json({ message: "Já existe um usuário DIRECTOR." });
+        }
       }
 
-      // MANAGER só pode criar VIEWER e MANAGER
-      const data = req.body;
-      if (req.user?.role === 'MANAGER' && data.role === 'ADMIN') {
-        return res.status(403).json({ message: "Gerentes não podem criar administradores." });
+      if (!canAssignRole(actor, targetRole, { directorExists })) {
+        return res.status(403).json({
+          message: "Você não tem permissão para criar um usuário com este papel.",
+        });
       }
 
       const hashedPassword = await bcrypt.hash(data.password, saltRounds);
@@ -49,9 +82,18 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
         data: {
           name: data.name,
           email: data.email,
-          role: data.role || 'VIEWER',
+          role: targetRole,
           password: hashedPassword,
-        }
+        },
+        // Never echo the password hash back to the client.
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          lastLogin: true,
+          createdAt: true,
+        },
       });
 
       res.status(201).json(newUser);

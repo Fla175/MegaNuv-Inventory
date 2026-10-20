@@ -117,12 +117,19 @@ export default function SettingsPage() {
   const canSeeLogs = isDirector || isAdmin || isManager;
   const existingDirector = usersList.some(u => u.role === 'DIRECTOR');
 
-  const roleOptions = [
-    {value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500"},
-    {value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500"},
-    {value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500"},
-    ...(user?.isCreator && !existingDirector ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }] : [])
-  ];
+  const roleOptions = !canManageUsers
+    ? []
+    : isManager
+      ? [{ value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500" }]
+      : [
+          { value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500" },
+          { value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500" },
+          { value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500" },
+          // DIRECTOR é singleton: só o criador semeia o primeiro, e só uma vez.
+          ...(user?.isCreator && !existingDirector
+            ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }]
+            : [])
+        ];
 
   useEffect(() => {
     if (selectedUser) {
@@ -363,12 +370,23 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      if (res.ok) {
-        setIsUserModalOpen(false);
-        fetchData('/api/users', setUsersList);
-        if (isEditingSelf) await refreshUser();
-        await fetchRevertHistory();
+      if (!res.ok) {
+        // RBAC failures are client-visible decisions (403) or validation (400,
+        // 409); the modal used to close silently on any non-2xx.
+        let message = 'Erro ao salvar usuário.';
+        try {
+          const body = await res.json();
+          if (typeof body?.message === 'string') message = body.message;
+        } catch {
+          // Non-JSON body (e.g. a proxy 502): keep the generic message.
+        }
+        showError(message);
+        return;
       }
+      setIsUserModalOpen(false);
+      fetchData('/api/users', setUsersList);
+      if (isEditingSelf) await refreshUser();
+      await fetchRevertHistory();
     } finally { setSaving(false); }
   };
 
@@ -753,7 +771,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
                       {usersList.filter(u => u.id !== user?.id).map((u) => {
                         const isTargetHigherRank = 
-                          (isManager && (u.role === 'ADMIN' || u.role === 'DIRECTOR')) ||
+                          (isManager && u.role !== 'VIEWER') ||
                           (isAdmin && u.role === 'DIRECTOR');
 
                         const showActionButtons = canManageUsers && !isTargetHigherRank;

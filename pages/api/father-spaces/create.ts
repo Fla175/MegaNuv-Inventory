@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { createLog } from "@/lib/logger";
 import { getSessionUser } from "@/lib/apiAuth";
+import { canManageSpaces } from "@/lib/rbac";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
@@ -14,8 +15,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userId = session.userId;
 
-    if (session.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso negado. Apenas admins criam espaços pai." });
+    if (!canManageSpaces(session)) {
+      return res.status(403).json({ error: "Acesso negado. Apenas ADMIN e DIRECTOR criam espaços pai." });
     }
 
     const { name, notes, parentId, imageUrl, address, responsible, phone } = req.body;

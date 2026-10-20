@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 import { createLog } from "@/lib/logger";
 import { getSessionUser } from "@/lib/apiAuth";
+import { canClearLogs } from "@/lib/rbac";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "DELETE") {
@@ -13,8 +14,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const session = await getSessionUser(req);
     if (!session) return res.status(401).json({ error: "Não autorizado." });
 
-    if (session.role !== "ADMIN") {
-      return res.status(403).json({ error: "Acesso restrito a administradores." });
+    if (!canClearLogs(session)) {
+      return res.status(403).json({ error: "Acesso restrito a ADMIN e DIRECTOR." });
     }
 
     const { range } = req.query; // 'all' ou 'old' (mais de 30 dias)

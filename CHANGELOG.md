@@ -832,6 +832,64 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 - **`ADR/ADR-001.md`** — Etapa 3 marcada como concluída e decisão do 3.5 registrada (corrigir os
   testes, sem `ignores`).
 
+### 🤖 OpenCode Operations (5)
+
+#### Security
+
+- **`ADR-002` — matriz RBAC canônica e fechamento dos gates.** A matriz de `SPECS.md` §4.2 era o
+  último item adiado pela `ADR-001`. A auditoria contra os handlers encontrou cinco divergências;
+  duas eram falhas de privilégio, não documentação.
+  - **MANAGER→DIRECTOR (escalada).** `POST /api/users` só barrava MANAGER de criar **ADMIN**
+    (`users/index.ts:42`): um MANAGER criava **DIRECTOR**, papel acima do dele. Em
+    `PATCH/DELETE /api/users/[id]`, o código comparava apenas com ADMIN — um MANAGER editava e
+    excluía DIRECTOR, e o próprio DIRECTOR não geria ninguém (caía no `403` genérico). A regra
+    agora é `canActOnUser`: DIRECTOR todos; ADMIN todos exceto DIRECTOR; MANAGER só VIEWER.
+  - **ADMIN comum criava DIRECTOR.** `signup.ts:49-58` aceitava o papel DIRECTOR de qualquer ADMIN
+    (quando não existia outro) e estourava 500 no segundo. `POST /api/users` repetia. Agora DIRECTOR
+    é **singleton**: só o criador (`isCreator`) semeia o primeiro, e só enquanto não existir outro;
+    o segundo devolve **409**, e `signup`/`POST` aplicam a mesma regra (`canAssignRole`).
+  - **Hash de senha na resposta.** `POST /api/users` e `PATCH /api/users/[id]` devolviam o registro
+    cru do Prisma, incluindo `password`. Ambos passaram a usar `select` com campos seguros.
+  - **Espaços Pai.** `create/update/delete` exigiam `role === "ADMIN"`, embora a UI mostrasse a aba
+    a DIRECTOR (`canManageAll`) e a matriz dissesse DIRECTOR/ADMIN/MANAGER. Agora DIRECTOR/ADMIN
+    (`canManageSpaces`); MANAGER segue com ativos/categorias, sem a estrutura física. A prévia de
+    exclusão usa o mesmo gate do delete.
+  - **Logs.** A leitura já era DIRECTOR/ADMIN/MANAGER (`logs/list.ts`), mas `logs/clear.ts` era
+    ADMIN-only — a UI mostrava o botão ao DIRECTOR, que recebia 403. Agora DIRECTOR/ADMIN apagam e
+    MANAGER só lê. A limpeza registra o próprio rastro.
+  - **UI de usuários.** As opções de papel passaram a depender do requisitante (MANAGER só VIEWER;
+    ADMIN sem DIRECTOR; criador vê DIRECTOR enquanto não existir um) e as ações do MANAGER só
+    aparecem em VIEWER. O modal mostra a mensagem do 403/400/409 em vez de fechar em silêncio.
+
+#### Added
+
+- **`lib/rbac.ts`** — política pura e tipada: `canManageSpaces`, `canReadLogs`, `canClearLogs`,
+  `canActOnUser`, `assignableRoles`, `canAssignRole`, `isUserRole`. Os handlers delegam a decisão;
+  a regra não é reescrita em cada arquivo (o anti-padrão que a ADR-001 apontou no JWT).
+- **Testes de RBAC** — `__tests__/lib/rbac.test.ts` (política pura),
+  `__tests__/api/rbac-users.test.ts`, `__tests__/api/rbac-spaces.test.ts`,
+  `__tests__/api/logs-clear.test.ts`, mais casos em `father-spaces-delete` e `signup-rbac`.
+  **90 testes novos** (suíte de 260 para **350**, 5 skipped). Cada guarda foi removida de propósito
+  e os testes falharam: `canManageSpaces` → 5; `canAssignRole` → 7; `canClearLogs` → 4;
+  `canActOnUser` → 3.
+
+#### Changed
+
+- **Contrato de resposta de `POST/PATCH /api/users`** — mesmos campos úteis (`id`, `name`, `email`,
+  `role`, `lastLogin`, `createdAt`), sem `password`. A tela recarrega a lista após salvar.
+- **Métodos não suportados em `/api/users/[id]`** — passam a devolver `405` com `Allow`, em vez de
+  cair no fim do handler sem resposta.
+
+#### Docs
+
+- **`ADR/ADR-002.md`** — contexto, matriz canônica, alternativas, consequências e evidências em
+  `f2c93e7`.
+- **`SPECS.md` §4.2** — matriz com colunas separadas para ativos, categorias e espaços; nota de
+  `fixedValue`, singleton do DIRECTOR, leitura de usuários e dashboard; linhas de `signup`,
+  `/api/users`, `/api/users/[id]`, `/api/father-spaces/*` e `/api/logs/clear` na tabela de
+  endpoints sensíveis.
+- **`CONTEXT.md`** — §2.1 com a ADR-002 concluída e o bloco de RBAC em §3.1.
+
 ---
 
 ## - Initial Setup
