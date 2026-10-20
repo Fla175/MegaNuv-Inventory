@@ -258,16 +258,30 @@ type ApiError = { error: string };
 **Autenticação:** cookie `auth_token` (httpOnly, `sameSite: lax`, 8 h) **ou** header `Authorization: Bearer <token>`.
 Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é a fonte de verdade.
 
-**RBAC (matriz de referência):**
+**RBAC (matriz de referência — `ADR/ADR-002.md`):**
 
-| Papel      | Leitura | CRUD de ativos/espaços/categorias | Gerencia usuários | Vê `fixedValue`             | Logs                         | Revert |
-| ---------- | ------- | --------------------------------- | ----------------- | --------------------------- | ---------------------------- | ------ |
-| `DIRECTOR` | total   | sim                               | todos             | sim                         | sim (inclusive edita/deleta) | sim    |
-| `ADMIN`    | total   | sim                               | exceto DIRECTOR   | **não** (só total agregado) | sim                          | sim    |
-| `MANAGER`  | total   | sim                               | só `VIEWER`       | **não**                     | sim                          | sim    |
-| `VIEWER`   | total   | **não**                           | não               | **não**                     | não                          | não    |
+| Papel      | Leitura de inventário | Ativos | Categorias | Espaços Pai | Gerencia usuários | Vê/edita `fixedValue` | Logs         | Revert |
+| ---------- | --------------------- | ------ | ---------- | ----------- | ----------------- | --------------------- | ------------ | ------ |
+| `DIRECTOR` | total                 | sim    | sim        | sim         | todos             | sim                   | ler + apagar | sim    |
+| `ADMIN`    | total                 | sim    | sim        | sim         | exceto `DIRECTOR` | sim                   | ler + apagar | sim    |
+| `MANAGER`  | total                 | sim    | sim        | **não**     | só `VIEWER`       | sim                   | ler          | sim    |
+| `VIEWER`   | total (ativos)        | **não**| **não**    | **não**     | não               | **não**               | não          | não    |
 
-`DIRECTOR` é o único papel que pode ser criado por `signup` (`pages/api/auth/signup.ts:54-60`).
+Regras que a tabela não expressa sozinha:
+
+- **Categorias e ativos** têm o mesmo gate de escrita: DIRECTOR/ADMIN/MANAGER; VIEWER bloqueado.
+- **Espaços Pai** são estruturais e ficam com DIRECTOR/ADMIN (`canManageSpaces`). A prévia de
+  exclusão (`GET /api/father-spaces/delete`) usa o mesmo gate do `DELETE`.
+- **Usuários**: DIRECTOR gerencia todos; ADMIN todos exceto DIRECTOR; MANAGER só VIEWER; VIEWER
+  não gerencia. Ninguém troca o próprio papel; VIEWER edita apenas o próprio nome/senha.
+  `GET /api/users` é legível por qualquer sessão (campos seguros, sem hash) — ler ≠ gerenciar.
+- **DIRECTOR é singleton**: só o criador (`isCreator`) semeia o primeiro, e só enquanto não existir
+  outro. `signup` e `POST /api/users` aplicam a mesma regra (`lib/rbac.ts` → `canAssignRole`).
+- **Logs**: leitura para DIRECTOR/ADMIN/MANAGER; exclusão para DIRECTOR/ADMIN. A limpeza registra
+  o próprio rastro.
+- **Dashboard**: o card de patrimônio total continua restrito — `GET /api/dashboard/stats` devolve
+  `403` para VIEWER. É a exceção citada na regra de `fixedValue`.
+- **Revert**: DIRECTOR/ADMIN/MANAGER; VIEWER recebe `403` (`pages/api/database/revert.ts`).
 
 **Endpoints sensíveis (contrato de segurança — ver §5.1 e `CONTEXT.md` §3):**
 
@@ -277,19 +291,23 @@ Claims: `{ userId, email, role }`. `verifyAuthToken()` em `lib/auth.ts:20-41` é
 | `/api/auth/logout`          | POST                | público                           | público (limpa auth_token e auth_token_creator)                                                                    |
 | `/api/auth/me`              | GET                 | privado                           | privado (retorna user e impersonation)                                                                             |
 | `/api/auth/seed`            | GET, POST           | público                           | público (bloqueado se `user.count() > 0`)                                                                          |
-| `/api/auth/signup`          | POST                | público                           | público (só cria DIRECTOR)                                                                                         |
+| `/api/auth/signup`          | POST                | público no bootstrap              | público só para o 1º ADMIN; depois exige DIRECTOR/ADMIN, com `canAssignRole` (DIRECTOR é singleton do criador)      |
 | `/api/creator-access`       | POST, DELETE, PATCH | privado (criador)                 | privado (exclusivo do criador)                                                                                     |
 | `/api/public/initial-check` | GET                 | público                           | público (`requiresSetup: userCount === 0`)                                                                         |
 | `/api/qrcode/public-get`    | GET                 | ✅ **privado** (exige sessão)     | privado                                                                                                            |
 | `/api/storage/upload-url`   | POST                | ✅ **privado** (exige sessão)     | **privado**                                                                                                        |
 | `/api/storage/delete-url`   | DELETE              | ✅ **privato** (exige sessão)     | **privado**                                                                                                        |
 | `/api/storage/file`         | GET                 | privado                           | privado (proxy autenticado)                                                                                        |
-| `/api/users`                | GET                 | ✅ **privado** (`authMiddleware`) | **privado**                                                                                                        |
+| `/api/users`                | GET                 | ✅ **privado** (`authMiddleware`) | **privado**; leitura liberada a autenticados, campos seguros (sem hash)                                            |
+| `/api/users`                | POST                | ✅ **privado** (`authMiddleware`) | DIRECTOR todos; ADMIN exceto DIRECTOR; MANAGER só VIEWER (`lib/rbac.ts`)                                           |
+| `/api/users/[id]`           | PATCH, DELETE       | ✅ **privado** (`getSessionUser`) | mesma regra da linha acima; perfil próprio sem troca de papel                                                     |
+| `/api/father-spaces/*`      | POST, PATCH, DELETE | ✅ **privado** (`getSessionUser`) | DIRECTOR/ADMIN                                                                                                     |
+| `/api/logs/clear`           | DELETE              | ✅ **privado** (`getSessionUser`) | DIRECTOR/ADMIN; MANAGER só lê (`/api/logs/list`)                                                                   |
 | `/api/users/check-director` | GET                 | ✅ **privado** (`authMiddleware`) | privado                                                                                                            |
 | `/api/database/revert`      | GET, POST           | privado, bloqueia VIEWER          | privado, bloqueia VIEWER · POST valida o `timestamp` do cliente contra o derivado do histórico (`409` se divergir) |
 | `/api/actives/update`       | PUT                 | ✅ **privado** (`authMiddleware`) | privado                                                                                                            |
 
-> Os seis endpoints marcados com ✅ foram fechados na branch `chore/security-p0-debt`. **A proteção
+> Os endpoints marcados com ✅ foram fechados na branch `chore/security-p0-debt`. **A proteção
 > está no handler**, não só no middleware: `authMiddleware` envolve o handler e devolve `401` sem
 > sessão. Nenhum deles depende mais exclusivamente do `middleware.ts` para ser privado.
 
@@ -311,13 +329,13 @@ falha fechado). Requisito novo ou alteração nestes contratos nem reintroduzir 
 - O card de patrimônio total do dashboard é a exceção e **permanece restrito**
   (`dashboard/stats.ts` já devolve `403` para `VIEWER`).
 
-> **Matriz RBAC acima está defasada nas linhas "Vê `fixedValue`" de ADMIN/MANAGER**, que ainda
-> dizem "não" — a correção documental, incluindo a regra de escrita (`clone-batch`/`update`), é o
-> escopo da `ADR-002` (pendente).
+> A matriz acima reflete a `ADR/ADR-002.md`. A coluna "Vê/edita `fixedValue`" já incorpora a
+> decisão de 18/10/2026, e a regra de escrita (`clone-batch`/`update`) segue a Etapa 0/1 da
+> `ADR-001`.
 
 **Exclusão de espaço e tamanho da subárvore (ADR-001, Etapa 2):** `SPECS.md:239` exige que o
 endpoint avise o tamanho da subárvore. `GET /api/father-spaces/delete?id=<id>` (mesmo gate do
-`DELETE`: sessão + `ADMIN`) devolve `{ spaceId, spaceName, spaces, actives }`, onde `spaces` conta
+`DELETE`: sessão + DIRECTOR/ADMIN, `ADR-002`) devolve `{ spaceId, spaceName, spaces, actives }`, onde `spaces` conta
 o espaço e **todos** os descendentes (`parentId`) e `actives` conta os ativos de **todos** esses
 espaços. O `DELETE` usa a mesma subárvore (`lib/spaceTree.ts`): apaga os ativos de todos os espaços
 da árvore — `Active.fatherSpace` é Restrict, então não se pode confiar no cascade para os filhos —

@@ -3,6 +3,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { getSessionUser, isPrivileged } from '@/lib/apiAuth';
+import { canAssignRole, isUserRole } from '@/lib/rbac';
+import type { UserRole } from '@prisma/client';
 
 const saltRounds = 10;
 
@@ -27,7 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Se JÁ existe ADMIN, exigir sessão de ADMIN **ou DIRECTOR**.
     //    A tabela de RBAC (SPECS.md §4.2) dá a DIRECTOR "todos" em Gerencia
     //    usuários, e o ADMIN é quem tem o papel oposto (exceto DIRECTOR).
-    //    Antes, `session.role !== 'ADMIN'` barrava o próprio DIRECTOR.
+    let requester: { id: string; role: UserRole; isCreator: boolean } | null = null;
+
     if (adminCount > 0) {
       const session = await getSessionUser(req);
       if (!session) {
@@ -37,6 +40,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!isPrivileged(session)) {
         return res.status(403).json({ message: 'Apenas ADMIN e DIRECTOR podem criar novos usuários.' });
       }
+
+      // `isCreator` não está no token: é o banco que decide se este ADMIN
+      // pode semear o único DIRECTOR.
+      requester = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { id: true, role: true, isCreator: true },
+      });
+
+      if (!requester) {
+        return res.status(401).json({ message: 'Usuário não encontrado.' });
+      }
     }
 
     // 4. Verificar se email já existe
@@ -45,20 +59,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(409).json({ message: 'Já existe um usuário com este email.' });
     }
 
-    // 5. Se é primeiro ADMIN, o role deve ser ADMIN
-    const requestedRole = ["VIEWER", "MANAGER", "ADMIN", "DIRECTOR"].includes(role) ? role : "VIEWER";
-    if (requestedRole === "DIRECTOR") {
-      const existingDirector = await prisma.user.findFirst({
-        where: { role: "DIRECTOR" },
-      });
-    
-      if (existingDirector) {
-        throw new Error("Já existe um usuário com a role DIRECTOR no sistema.");
+    // 5. Validar o papel pedido. Papel desconhecido é erro do cliente — o
+    //    default silencioso de antes escondia payload inválido.
+    if (role !== undefined && role !== null && role !== '' && !isUserRole(role)) {
+      return res.status(400).json({ message: 'Papel inválido.' });
+    }
+    const requestedRole: UserRole = isUserRole(role) ? role : 'VIEWER';
+
+    if (adminCount > 0) {
+      // DIRECTOR é singleton: só o criador pode semear o primeiro, e só
+      // enquanto não existir outro. ADMIN comum não cria DIRECTOR.
+      const directorExists =
+        requestedRole === 'DIRECTOR'
+          ? (await prisma.user.findFirst({
+              where: { role: 'DIRECTOR' },
+              select: { id: true },
+            })) !== null
+          : false;
+
+      if (requestedRole === 'DIRECTOR' && directorExists) {
+        return res.status(409).json({ message: 'Já existe um usuário com a role DIRECTOR no sistema.' });
+      }
+
+      if (!requester || !canAssignRole(requester, requestedRole, { directorExists })) {
+        return res.status(403).json({
+          message: 'Você não tem permissão para criar um usuário com este papel.',
+        });
       }
     }
 
     const userRole = adminCount === 0 ? "ADMIN" : requestedRole;
-    const userIsCreator = adminCount === 0 ? true : false;
+    const userIsCreator = adminCount === 0;
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 

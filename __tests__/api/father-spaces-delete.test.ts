@@ -102,7 +102,16 @@ describe('GET /api/father-spaces/delete — prévia da cascata', () => {
     });
   });
 
-  it('não ADMIN é barrado antes de qualquer contagem', async () => {
+  it('DIRECTOR recebe a contagem da subárvore inteira', async () => {
+    setRole('DIRECTOR');
+    const res = makeRes();
+
+    await callHandler(authedReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('MANAGER é barrado antes de qualquer contagem', async () => {
     setRole('MANAGER');
     const res = makeRes();
 
@@ -153,6 +162,19 @@ describe('DELETE /api/father-spaces/delete — cascata', () => {
 
   it('apaga os ativos da subárvore inteira, não só do espaço clicado', async () => {
     setRole('ADMIN');
+    const res = makeRes();
+
+    await callHandler(authedReq({ method: 'DELETE' }), res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(dbMock.active.deleteMany).toHaveBeenCalledWith({
+      where: { fatherSpaceId: { in: ['root', 'child-a', 'grandchild'] } },
+    });
+    expect(dbMock.fatherSpace.delete).toHaveBeenCalledWith({ where: { id: 'root' } });
+  });
+
+  it('DIRECTOR também exclui a subárvore (ADR-002)', async () => {
+    setRole('DIRECTOR');
     const res = makeRes();
 
     await callHandler(authedReq({ method: 'DELETE' }), res);
