@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 20/10/2026 · **Branch:** `fix/rbac-matrix` (próxima: `refactor/modularize-ui`)
+**Última atualização:** 21/10/2026 · **Branch:** `refactor/modularize-ui`
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -178,12 +178,17 @@ singleton semeado apenas pelo criador; (c) `logs/clear` era ADMIN-only, mas a UI
 ao DIRECTOR — agora DIRECTOR/ADMIN apagam e MANAGER só lê. Testes em `__tests__/lib/rbac.test.ts` e
 `__tests__/api/rbac-*.test.ts` (90 novos), validados por mutação.
 
-> **Próximo foco — `ADR-003` (modularização + Shadcn UI).** Long method detectado em três arquivos:
-> `pages/dashboard.tsx` (375 L), `pages/settings.tsx` (1.254 L) e
-> `components/ListSection.tsx` (2.151 L). Plano: extrair componentes por feature,
-> hooks `use<Domínio><Coisa>`, Zustand para estado global e Shadcn UI para substituir
-> componentes feitos à mão. Ordem: `dashboard.tsx` → `ListSection.tsx` → `settings.tsx`.
-> Cada etapa em branch própria, gates completos por etapa.
+> **`ADR-003` — modularização + Shadcn UI — Etapas A–D concluídas em `refactor/modularize-ui`.**
+> `pages/dashboard.tsx` caiu para **124 linhas**, `components/ListSection.tsx` para **355** e
+> `pages/settings.tsx` para **169**. A tela de settings foi dividida em
+> `components/settings/*` (5 abas + 5 modais + header/nav/modais) e nove hooks de domínio
+> (`useSettingsPermissions`, `useSettingsData`, `useRevertHistory`, `useCreatorAccess`,
+> `useUserCrud`, `useSpaceCrud`, `useCategoryCrud`, `useThemeSettings`, `useSettingsDelete`).
+> `ConfirmDialog` usa `Dialog` do Shadcn por dentro, com a API pública preservada para o
+> `ListSection`; os formulários usam `Dialog` + `Select` e mantêm o clique no backdrop bloqueado.
+> A etapa C foi reparada antes da D: o commit `027baec` havia deixado `ListSection` como stub e
+> comentado a página; o orquestrador foi restaurado a partir de `69bcac3`.
+> **Próximo foco:** Etapa E (revisão final do patch, docs e fechamento da ADR-003).
 
 **Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026. Antes de
 qualquer novo deploy: **rotacionar a credencial MinIO** (item 12) e **aplicar a nova `inventory-policy.json`**
@@ -210,9 +215,9 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 | 1   | **Cobertura de testes ainda parcial** — runner instalado, mas longe do alvo           | projeto inteiro                                                                                                                                    | `vitest` está instalado e roda, mas o gate de cobertura se aplica hoje **só à superfície de segurança** (`lib/middlewares`, `lib/uploadPolicy.ts`, `pages/api/users/{index,check-director}.ts` — 83% linhas / 80% branches). O alvo de `SPECS.md` §5.2 (70–80% por domínio em todo `pages/api/**`) permanece **pendente** e exige cobrir os 36 endpoints.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2   | **Nenhuma CI**                                                                        | sem `.github/`                                                                                                                                     |
 | 3   | ~~**Verificação de JWT replicada**~~ — **consolidada**                                | `lib/apiAuth.ts` (`getSessionUser`)                                                                                                                | A sequência `req.cookies.auth_token \|\| authorization.replace("Bearer ") → jwtVerify` estava replicada em ~20 arquivos de `pages/api/**`, com o prefixo `Bearer` não validado e a leitura do id divergente. Todos passaram a usar `getSessionUser()`, que delega a `verifyAuthToken()` (`lib/auth.ts`, fonte de verdade). `authMiddleware` continua sendo o wrapper para handlers que querem o 401 padronizado.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 4   | **`components/ListSection.tsx` tem 2.150 linhas**                                     | UI + modais + impressão + context menu + upload + revert — alvo da `ADR-003` (etapa C)                                                                                           |
-| 4b  | **`pages/settings.tsx` tem 1.254 linhas**                                             | 14 `useState`, 5 abas, 7 modais, CRUD de usuários/espacos/categorias, logs, revert, creator access — alvo da `ADR-003` (etapa D)                                                  |
-| 4c  | **`pages/dashboard.tsx` tem 375 linhas**                                              | fetch de stats, derived state, paginação, cards KPI, grid de categorias, 2 painéis, 1 modal — alvo da `ADR-003` (etapa B)                                                         |
+| 4   | ~~**`components/ListSection.tsx` tinha 2.150 linhas**~~ — **corrigido**                | `components/ListSection.tsx` (355 L) + `components/list/*` — orquestrador restaurado na Etapa C da `ADR-003`                                                                     |
+| 4b  | ~~**`pages/settings.tsx` tinha 1.254 linhas**~~ — **corrigido**                        | `pages/settings.tsx` (169 L) + `components/settings/*` + `lib/hooks/use*Settings*` — Etapa D da `ADR-003`                                                                        |
+| 4c  | ~~**`pages/dashboard.tsx` tinha 375 linhas**~~ — **corrigido**                         | `pages/dashboard.tsx` (124 L) + `components/dashboard/*` — Etapa B da `ADR-003`                                                                                                  |
 | 5   | **12 dependências declaradas e nunca importadas**                                     | `recharts`, `framer-motion`, `react-rnd`, `@headlessui/react`, `axios`, `jsonwebtoken`, `js-cookie`, `jwt-decode`, `eruda`, `uuid`, `qrcode.react` |
 | 6   | **Espaço de IDs pequeno**: `Active.id`/`FatherSpace.id` = 4 chars hex (65.536)        | `lib/prisma.ts:8-24` — colisão plausível em inventário grande                                                                                      |
 | 7   | `DEBUG_ALLOW_JWT` no `.env` nunca é lido no código                                    | `.env` — variável morta, remover                                                                                                                   |
@@ -273,8 +278,11 @@ a auditoria foi validada só por unidade, sem MinIO.
 
 ### 3.4 Estado do Working Tree
 
-**Limpo** — todo o trabalho do revert (6 commits) e do Estágio 1 (1 commit) foi commitado na branch
-`fix/revert-classification`. Nada pendente de autorização.
+**Etapa D commitada em `refactor/modularize-ui`.** O trabalho do revert, do Estágio 1 e das
+Etapas A–C da ADR-003 também está commitado. Permanecem no working tree **apenas itens externos
+pré-existentes**, fora do escopo desta branch: `.gitignore` (`/runs/harness2/`), `opencode.json`,
+a deleção de `ESTAGIO-1-CREATOR-ACCESS.md` e os arquivos `fowler-*.md`. Nenhum deles foi
+restaurado nem commitado por esta sessão.
 
 - `yarn.lock` e `package-lock.json` — ver §3.2 #2 (artefato de `npm install` acidental).
 

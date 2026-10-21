@@ -1,1253 +1,168 @@
 // pages/settings.tsx
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
-import { useState, useEffect, useCallback } from "react";
-import { 
-  Moon, Sun, Monitor, Loader2, Trash2, 
-  UserCircle, Users, Pencil, Clock, Mail, Settings, X,
-  CheckCircle, CheckCircle2, Plus, LayoutDashboard, ChevronRight, LogIn,
-  CalendarFold, KeyRound, CirclePlus, Activity,
-  ClipboardList, Group, Palette, Undo2
-} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/lib/context/UserContext";
-import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
-import { UseToast } from "@/lib/context/ToastContext";
-import ImageUpload from "@/components/imageUpload";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { PatternFormat } from 'react-number-format';
-import CustomSelect from "@/components/customSelect";
-import { toLocalMediaUrl } from "@/lib/mediaUrl";
-import { ACTION_LABELS, type RevertItem, type RevertSubItem } from "@/lib/revert/types";
-
-// --- INTERFACES ---
-interface User {
-  id: string;
-  name: string | null; 
-  email: string;
-  role: 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
-  isCreator?: boolean;
-  createdAt: string | Date;
-  lastLogin?: string | Date | null;
-  theme?: string;
-}
-
-interface FatherSpace {
-  id: string;
-  name: string;
-  notes?: string;
-  imageUrl?: string;
-  address?: string;
-  responsible?: string;
-  phone?: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  color?: string;
-}
-
-interface Log {
-  id: string;
-  action: string;
-  details: string;
-  createdAt: string;
-  user: { name: string; email: string };
-}
-
-type TabType = 'users' | 'spaces' | 'categories' | 'logs' | 'theme';
+import { useSettingsPermissions } from "@/lib/hooks/useSettingsPermissions";
+import { useSettingsData } from "@/lib/hooks/useSettingsData";
+import { useRevertHistory } from "@/lib/hooks/useRevertHistory";
+import { useCreatorAccess } from "@/lib/hooks/useCreatorAccess";
+import { useUserCrud } from "@/lib/hooks/useUserCrud";
+import { useSpaceCrud } from "@/lib/hooks/useSpaceCrud";
+import { useCategoryCrud } from "@/lib/hooks/useCategoryCrud";
+import { useThemeSettings } from "@/lib/hooks/useThemeSettings";
+import { useSettingsDelete } from "@/lib/hooks/useSettingsDelete";
+import UsersTab from "@/components/settings/UsersTab";
+import SpacesTab from "@/components/settings/SpacesTab";
+import CategoriesTab from "@/components/settings/CategoriesTab";
+import LogsTab from "@/components/settings/LogsTab";
+import ThemeTab from "@/components/settings/ThemeTab";
+import SettingsHeader from "@/components/settings/SettingsHeader";
+import SettingsNav from "@/components/settings/SettingsNav";
+import SettingsModals from "@/components/settings/SettingsModals";
+import type { SettingsTab } from "@/components/settings/types";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { tab } = router.query;
-  const [activeTab, setActiveTab] = useState<TabType>('users');
+  const [activeTab, setActiveTab] = useState<SettingsTab>("users");
   const { user, refreshUser, loading } = useUser();
-  const toast = UseToast();
-  // Stable provider callback — the `toast` object changes identity on every
-  // displayed toast (the context value is not memoized per field), so depending
-  // on the object would refetch the tab on every notification.
-  const { showError } = toast;
-  const [saving, setSaving] = useState(false);
-
-  const [revertItems, setRevertItems] = useState<RevertItem[]>([]);
-  const [isRevertMenuOpen, setIsRevertMenuOpen] = useState(false);
-  const [selectedReverts, setSelectedReverts] = useState<Set<string>>(new Set());
-  const [isReverting, setIsReverting] = useState(false);
-
-  // Listing state
-  const [usersList, setUsersList] = useState<User[]>([]);
-  const [spacesList, setSpacesList] = useState<FatherSpace[]>([]);
-  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
-  const [logsList, setLogsList] = useState<Log[]>([]);
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isSpaceModalOpen, setIsSpaceModalOpen] = useState(false);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedSpace, setSelectedSpace] = useState<FatherSpace | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [spaceImageUrl, setSpaceImageUrl] = useState<string | null>(null);
-  const [role, setRole] = useState(selectedUser?.role || '');
-
-  // Creator access state
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
-  const [transferConfirmInput, setTransferConfirmInput] = useState('');
-  const [isTransferring, setIsTransferring] = useState(false);
-
-  const [enterTargetUser, setEnterTargetUser] = useState<User | null>(null);
-  const [enterPassword, setEnterPassword] = useState('');
-  const [isEnterModalOpen, setIsEnterModalOpen] = useState(false);
-  const [isEntering, setIsEntering] = useState(false);
-
-  // Confirmation dialog state
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    variant: 'danger' | 'warning' | 'info';
-    onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', variant: 'danger', onConfirm: () => {} });
-
-  // Permissions
-  const isDirector = user?.role === 'DIRECTOR';
-  const isAdmin = user?.role === 'ADMIN';
-  const isManager = user?.role === 'MANAGER';
-  const canManageAll = isDirector || isAdmin;
-  const canManageUsers = isDirector || isAdmin || isManager;
-  const canSeeLogs = isDirector || isAdmin || isManager;
-  const existingDirector = usersList.some(u => u.role === 'DIRECTOR');
-
-  const roleOptions = !canManageUsers
-    ? []
-    : isManager
-      ? [{ value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500" }]
-      : [
-          { value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500" },
-          { value: "MANAGER", label: "Gerente", indicatorColor: "bg-amber-500" },
-          { value: "ADMIN", label: "Administrador", indicatorColor: "bg-indigo-500" },
-          // DIRECTOR é singleton: só o criador semeia o primeiro, e só uma vez.
-          ...(user?.isCreator && !existingDirector
-            ? [{ value: "DIRECTOR", label: "Diretor", indicatorColor: "bg-emerald-500" }]
-            : [])
-        ];
 
   useEffect(() => {
-    if (selectedUser) {
-      setRole(selectedUser.role);
-    } else {
-      setRole('');
-    }
-    refreshUser();
-  }, [selectedUser, refreshUser]);
+    if (typeof tab === "string") setActiveTab(tab as SettingsTab);
+  }, [tab]);
 
-  useEscapeKey(() => {
-    if (confirmDialog.isOpen) {
-      setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-      return;
-    }
-    if (selectedSpace) setSelectedSpace(null);
-    if (isSpaceModalOpen) setIsSpaceModalOpen(false);
+  const permissions = useSettingsPermissions(user);
+  const data = useSettingsData({
+    activeTab,
+    canManageAll: permissions.canManageAll,
+    canManageUsers: permissions.canManageUsers,
+    canSeeLogs: permissions.canSeeLogs,
   });
 
-  useEscapeKey(() => setIsUserModalOpen(false), isUserModalOpen);
-  useEscapeKey(() => setIsSpaceModalOpen(false), isSpaceModalOpen);
-  useEscapeKey(() => setIsCategoryModalOpen(false), isCategoryModalOpen);
-  useEscapeKey(() => {
-    setIsEnterModalOpen(false);
-    setEnterTargetUser(null);
-    setEnterPassword('');
-  }, isEnterModalOpen);
-  useEscapeKey(() => {
-    setIsTransferModalOpen(false);
-    setTransferTargetUser(null);
-    setTransferConfirmInput('');
-  }, isTransferModalOpen);
+  const existingDirector = data.usersList.some((member) => member.role === "DIRECTOR");
+  const roleOptions = permissions.buildRoleOptions(existingDirector);
 
-  // --- DATA LOADING ---
-  const fetchData = useCallback(async <T,>(endpoint: string, setter: (data: T) => void) => {
-    try {
-      const res = await fetch(endpoint);
-      if (!res.ok) {
-        // ADR-001 stage 2 (2.4): a failure used to be indistinguishable from
-        // "no records" — the setter never ran and the screen showed an empty
-        // list with the server down. Every other handler here already notifies;
-        // this was the only one swallowing the error (including HTTP != 2xx).
-        let message = 'Erro ao carregar dados.';
-        try {
-          const data = await res.json();
-          if (typeof data?.error === 'string' && data.error) message = data.error;
-        } catch {
-          // Non-JSON body (e.g. a proxy 502): keep the generic message.
-        }
-        showError(message);
-        return;
-      }
-      setter(await res.json());
-    } catch {
-      showError('Erro de conexão ao carregar dados.');
-    }
-  }, [showError]);
+  const revert = useRevertHistory({
+    enabled: !!user,
+    refreshActiveTabData: data.refreshActiveTabData,
+    refreshUser,
+  });
 
-  const refreshActiveTabData = useCallback(() => {
-    if (activeTab === 'users') fetchData('/api/users', setUsersList);
-    if (activeTab === 'spaces' && canManageAll) fetchData('/api/father-spaces/list', setSpacesList);
-    if (activeTab === 'categories' && canManageUsers) fetchData('/api/categories/list', setCategoriesList);
-    if (activeTab === 'logs' && canSeeLogs) fetchData('/api/logs/list', setLogsList);
-  }, [activeTab, canManageAll, canManageUsers, canSeeLogs, fetchData]);
+  const creator = useCreatorAccess();
+  const userCrud = useUserCrud({
+    currentUserId: user?.id,
+    refreshUsers: data.refreshUsers,
+    refreshRevertHistory: revert.fetchRevertHistory,
+    refreshUser,
+  });
+  const spaceCrud = useSpaceCrud({
+    refreshSpaces: data.refreshSpaces,
+    refreshRevertHistory: revert.fetchRevertHistory,
+  });
+  const categoryCrud = useCategoryCrud({
+    refreshCategories: data.refreshCategories,
+    refreshRevertHistory: revert.fetchRevertHistory,
+  });
+  const theme = useThemeSettings({ refreshUser });
+  const deletion = useSettingsDelete({
+    currentUserId: user?.id,
+    refreshActiveTabData: data.refreshActiveTabData,
+    refreshRevertHistory: revert.fetchRevertHistory,
+  });
 
-  useEffect(() => {
-    refreshActiveTabData();
-    if (tab) {
-      setActiveTab(tab as TabType);
-    }
-  }, [refreshActiveTabData, tab]);
+  if (loading) {
+    return (
+      <Layout title="Configurações">
+        <div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">
+          Sincronizando...
+        </div>
+      </Layout>
+    );
+  }
 
-  const fetchRevertHistory = useCallback(async () => {
-    try {
-      const res = await fetch("/api/database/revert");
-      if (!res.ok) {
-        setRevertItems([]);
-        return;
-      }
-      const data = await res.json();
-      setRevertItems(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setRevertItems([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchRevertHistory();
-    const interval = window.setInterval(fetchRevertHistory, 5000);
-    return () => window.clearInterval(interval);
-  }, [user, fetchRevertHistory]);
-
-  const toggleRevertItem = (id: string) => {
-    setSelectedReverts((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // --- REVERT HANDLERS ---
-  const handleRevertSelected = async (targetItems?: RevertItem[]) => {
-    const selectedList = targetItems || revertItems.filter((item) => {
-      const itemKey = item.groupId || item.id;
-      return itemKey && selectedReverts.has(itemKey);
-    });
-  
-    if (selectedList.length === 0 || isReverting) return;
-  
-    setIsReverting(true);
-  
-    // Flatten every sub-item from the selected batches or single items
-    const payloadItems: RevertSubItem[] = selectedList.flatMap((item) => {
-      if (item.items && item.items.length > 0) {
-        return item.items;
-      }
-      return [{ table: item.table!, id: item.id!, timestamp: item.timestamp }];
-    });
-  
-    try {
-      const res = await fetch("/api/database/revert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: payloadItems,
-          mode: "HISTORY",
-        }),
-      });
-  
-      const data = await res.json();
-  
-      if (!res.ok) {
-        toast.showError(data.error || "Não foi possível realizar a reversão.");
-        return;
-      }
-  
-      toast.showSuccess(`${data.revertedCount || payloadItems.length} item(ns) revertido(s) em lote!`);
-      setSelectedReverts(new Set());
-      setIsRevertMenuOpen(false);
-  
-      // Refresh the screen immediately
-      await fetchRevertHistory();
-      refreshActiveTabData();
-      await refreshUser();
-    } catch {
-      toast.showError("Erro ao processar as reversões.");
-    } finally {
-      setIsReverting(false);
-    }
-  };
-
-  const handleQuickUndo = async () => {
-    if (revertItems.length === 0 || isReverting) return;
-    // Revert the most recent change directly
-    await handleRevertSelected([revertItems[0]]);
-  };
-
-  // --- CREATOR ACCESS HANDLERS ---
-  const handleEnterAccount = async (targetUser: User) => {
-    if (isEntering) return;
-    if (!enterPassword) {
-      toast.showWarning("Informe sua senha para entrar na conta.");
-      return;
-    }
-    setIsEntering(true);
-    try {
-      const res = await fetch("/api/creator-access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ targetUserId: targetUser.id, password: enterPassword }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        toast.showSuccess("Acesso ativado. Redirecionando...");
-        window.location.assign("/");
-      } else if (res.status === 401) {
-        toast.showWarning(data.error || "Senha incorreta.");
-        setEnterPassword('');
-      } else if (res.status === 400) {
-        toast.showWarning(data.error || "Senha é obrigatória.");
-        setEnterPassword('');
-      } else if (res.status === 409) {
-        toast.showWarning(data.error || "Restaure sua conta antes de entrar em outra.");
-      } else {
-        toast.showError(data.error || "Erro ao acessar conta.");
-      }
-    } catch {
-      toast.showError("Erro de conexão ao acessar conta.");
-    } finally {
-      setIsEntering(false);
-    }
-  };
-
-  const handleTransferCreator = async (targetUser: User) => {
-    if (isTransferring) return;
-    setIsTransferring(true);
-    try {
-      const res = await fetch("/api/creator-access", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ newCreatorId: targetUser.id }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        toast.showSuccess("Título de criador transferido com sucesso.");
-        setIsTransferModalOpen(false);
-        setTransferTargetUser(null);
-        setTransferConfirmInput('');
-        window.location.assign("/settings");
-      } else {
-        toast.showError(data.error || "Erro ao transferir título.");
-      }
-    } catch {
-      toast.showError("Erro de conexão ao transferir título.");
-    } finally {
-      setIsTransferring(false);
-    }
-  };
-
-  // --- CRUD HANDLERS ---
-  const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSaving(true);
-    const data = Object.fromEntries(new FormData(e.currentTarget));
-    const isEditingSelf = selectedUser?.id === user?.id;
-    const url = selectedUser ? `/api/users/${selectedUser.id}` : '/api/users';
-    const method = selectedUser ? 'PATCH' : 'POST';
-
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        // RBAC failures are client-visible decisions (403) or validation (400,
-        // 409); the modal used to close silently on any non-2xx.
-        let message = 'Erro ao salvar usuário.';
-        try {
-          const body = await res.json();
-          if (typeof body?.message === 'string') message = body.message;
-        } catch {
-          // Non-JSON body (e.g. a proxy 502): keep the generic message.
-        }
-        showError(message);
-        return;
-      }
-      setIsUserModalOpen(false);
-      fetchData('/api/users', setUsersList);
-      if (isEditingSelf) await refreshUser();
-      await fetchRevertHistory();
-    } finally { setSaving(false); }
-  };
-
-  const handleSpaceSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const payload: Record<string, unknown> = Object.fromEntries(formData);
-    
-    if (spaceImageUrl) payload.imageUrl = spaceImageUrl;
-    if (selectedSpace) payload.id = selectedSpace.id;
-
-    try {
-      const res = await fetch(selectedSpace ? '/api/father-spaces/update' : '/api/father-spaces/create', {
-        method: selectedSpace ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        setIsSpaceModalOpen(false);
-        setSpaceImageUrl(null);
-        fetchData('/api/father-spaces/list', setSpacesList);
-        await fetchRevertHistory();
-      }
-    } finally { setSaving(false); }
-  };
-
-  const handleCategorySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const name = formData.get('name') as string;
-    
-    const payload: { name: string; id?: string } = { name };
-    if (selectedCategory) payload.id = selectedCategory.id;
-
-    try {
-      const res = await fetch(selectedCategory ? '/api/categories/update' : '/api/categories/create', {
-        method: selectedCategory ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        setIsCategoryModalOpen(false);
-        fetchData('/api/categories/list', setCategoriesList);
-        toast.showSuccess('Categoria salva com sucesso!');
-        await fetchRevertHistory();
-      } else {
-        const errorData = await res.json();
-        toast.showError(errorData.error || 'Erro ao salvar: este nome pode já estar em uso.');
-      }
-    } catch {
-      toast.showError('Erro de conexão com o servidor ao salvar categoria.');
-    } finally { 
-      setSaving(false); 
-    }
-  };
-
-  const handleDelete = async (type: 'user' | 'space' | 'category' | 'logs', id?: string) => {
-    if (type === 'category' && id) {
-      try {
-        const checkRes = await fetch(`/api/categories/check-assets?id=${id}`);
-        if (checkRes.ok) {
-          const { hasAssets } = await checkRes.json();
-          if (hasAssets) {
-            toast.showError('Não é possível excluir esta categoria pois existem ativos vinculados a ela.');
-            return;
-          }
-        }
-      } catch {
-        toast.showError('Erro ao verificar dependências da categoria.');
-        return;
-      }
-    }
-
-    // ADR-001 stage 2 (2.5): warn about the subtree size BEFORE the cascade
-    // (`SPECS.md` §4.1 requires it). The previous text was generic ("all linked
-    // assets") and the endpoint deleted without saying how many. The preview
-    // comes from the same route and the same subtree the DELETE walks — it is
-    // not an estimate.
-    let spaceMessage: string | null = null;
-    if (type === 'space' && id) {
-      try {
-        const previewRes = await fetch(`/api/father-spaces/delete?id=${id}`);
-        if (!previewRes.ok) {
-          let message = 'Não foi possível verificar o que será excluído.';
-          try {
-            const data = await previewRes.json();
-            if (typeof data?.error === 'string' && data.error) message = data.error;
-          } catch {
-            // Non-JSON body: keep the generic message.
-          }
-          toast.showError(message);
-          return;
-        }
-
-        const data = await previewRes.json();
-        const actives = typeof data.actives === 'number' ? data.actives : 0;
-        const spaces = typeof data.spaces === 'number' ? data.spaces : 1;
-
-        const assetsLabel =
-          actives === 0
-            ? 'Nenhum ativo será excluído.'
-            : actives === 1
-              ? '1 ativo será excluído permanentemente.'
-              : `${actives} ativos serão excluídos permanentemente.`;
-
-        spaceMessage =
-          spaces > 1
-            ? `Tem certeza que deseja excluir este espaço pai e mais ${spaces - 1} espaço(s) filho(s)? ${assetsLabel}`
-            : `Tem certeza que deseja excluir este espaço pai? ${assetsLabel}`;
-      } catch {
-        toast.showError('Erro de conexão ao verificar o tamanho da exclusão.');
-        return;
-      }
-    }
-
-    const dialogConfig: Record<string, { title: string; message: string; variant: 'danger' }> = {
-      user: { 
-        title: 'Confirmar Exclusão de Usuário', 
-        message: 'Tem certeza que deseja excluir este usuário? Esta ação é irreversível e o acesso será removido permanentemente.',
-        variant: 'danger' 
-      },
-      space: { 
-        title: 'Confirmar Exclusão de Espaço', 
-        message: spaceMessage ?? 'Tem certeza que deseja excluir este espaço pai? Todos os ativos associados serão excluídos permanentemente.',
-        variant: 'danger' 
-      },
-      category: { 
-        title: 'Confirmar Exclusão de Categoria', 
-        message: 'Tem certeza que deseja excluir esta categoria? Esta ação é irreversível.',
-        variant: 'danger' 
-      },
-      logs: { 
-        title: 'Confirmar Limpeza de Logs', 
-        message: 'Tem certeza que deseja limpar todos os logs do sistema? Esta ação é irreversível.',
-        variant: 'danger' 
-      },
-    };
-
-    const config = dialogConfig[type];
-    
-    setConfirmDialog({
-      isOpen: true,
-      title: config.title,
-      message: config.message,
-      variant: config.variant,
-      onConfirm: async () => {
-        try {
-          let endpoint = "";
-          if (type === 'user') endpoint = `/api/users/${id}`;
-          else if (type === 'space') endpoint = `/api/father-spaces/delete?id=${id}`;
-          else if (type === 'category') endpoint = `/api/categories/delete?id=${id}`;
-          else if (type === 'logs') endpoint = `/api/logs/clear`;
-
-          const res = await fetch(endpoint, { method: 'DELETE' });
-          
-          if (res.ok) {
-            if (type === 'user' && id === user?.id) window.location.href = '/login';
-            else refreshActiveTabData();
-            toast.showSuccess('Exclusão realizada com sucesso.');
-            await fetchRevertHistory();
-          } else {
-            const errorData = await res.json();
-            toast.showError(errorData.error || 'Erro ao realizar a exclusão.');
-          }
-        } catch { 
-          toast.showError('Erro de conexão com o servidor ao tentar excluir.');
-        } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        }
-      }
-    });
-  };
-
-  const updateConfig = async (body: Record<string, string>, endpoint: string) => {
-    setSaving(true);
-    try {
-      await fetch(`/api/users/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      await refreshUser();
-    } finally { setSaving(false); }
-  };
-
-  if (loading) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Sincronizando...</div></Layout>;
-  if (!user) return <Layout title="Configurações"><div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">Carregando...</div></Layout>;
-
-  const tabs = [
-    { id: 'users', label: 'Acessos e Equipe', icon: Users, show: true },
-    { id: 'spaces', label: 'Espaços Pai', icon: LayoutDashboard, show: canManageAll },
-    { id: 'categories', label: 'Categorias', icon: Group, show: canManageUsers },
-    { id: 'logs', label: 'Logs', icon: ClipboardList, show: canSeeLogs },
-    { id: 'theme', label: 'Tema', icon: Palette, show: true },
-  ];
+  if (!user) {
+    return (
+      <Layout title="Configurações">
+        <div className="h-96 flex items-center justify-center font-black text-blue-900 animate-pulse italic">
+          Carregando...
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="Configurações">
       <div className="max-w-6xl mx-auto pb-10 lg:pb-20">
-        <div className="flex items-center justify-between mb-6 lg:mb-10">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 lg:p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20"><Settings className="w-5 h-5 lg:w-6 lg:h-6"/></div>
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-black text-blue-950 dark:text-white italic tracking-tighter uppercase">Configurações</h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Painel de Controle e personalização</p>
-            </div>
-          </div>
+        <SettingsHeader revert={revert} />
 
-          {/* PAINEL DE REVERSÃO / DESFAZER */}
-          <div className="relative flex items-center gap-2">
-            <button
-              type="button"
-              disabled={revertItems.length === 0 || isReverting}
-              onClick={handleQuickUndo}
-              title="Desfazer última alteração"
-              className="flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-blue-600 border-blue-600 text-white hover:bg-blue-500"
-            >
-              {isReverting ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />}
-              <span className="hidden sm:inline">Desfazer</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={revertItems.length === 0}
-              onClick={() => setIsRevertMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-3 py-3 rounded-2xl text-[10px] font-black uppercase border transition-all disabled:opacity-40 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-white/5 text-zinc-600 dark:text-zinc-300 hover:text-blue-600"
-            >
-              Histórico
-              {revertItems.length > 0 && (
-                <span className="bg-blue-600 text-white min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[9px]">
-                  {revertItems.length}
-                </span>
-              )}
-            </button>
-
-            {isRevertMenuOpen && revertItems.length > 0 && (
-              <div className="absolute right-0 top-full mt-2 z-[150] w-80 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-                <div className="p-4 border-b border-zinc-100 dark:border-white/5 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs font-black uppercase text-zinc-800 dark:text-white">
-                      Reverter alterações
-                    </p>
-                    <p className="text-[9px] text-zinc-400 font-bold mt-1">
-                      Selecione para reverter em lote.
-                    </p>
-                  </div>
-                  <button onClick={() => setIsRevertMenuOpen(false)} className="text-zinc-400 hover:text-red-500">
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <div className="max-h-72 overflow-y-auto">
-                  {revertItems.map((item) => {
-                    const itemKey = (item.groupId || item.id || item.timestamp) as string;
-                    const selected = selectedReverts.has(itemKey);
-                    return (
-                      <button
-                        key={itemKey}
-                        type="button"
-                        onClick={() => toggleRevertItem(itemKey)}
-                        className={`w-full flex items-center gap-3 p-3 text-left border-b border-zinc-100 dark:border-white/5 transition-colors ${
-                          selected ? "bg-blue-50 dark:bg-blue-900/20" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                        }`}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
-                            selected ? "bg-blue-600 border-blue-600 text-white" : "border-zinc-300 dark:border-zinc-700"
-                          }`}
-                        >
-                          {selected && <CheckCircle2 size={14} />}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-black truncate text-zinc-800 dark:text-zinc-200">
-                            {item.name}
-                          </p>
-                          <p className="text-[9px] text-zinc-400 font-bold uppercase">
-                            {item.items
-                              ? ACTION_LABELS[item.action].batch
-                              : ACTION_LABELS[item.action].single}{" "}
-                            · {new Date(item.timestamp).toLocaleTimeString("pt-BR")}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="p-3 bg-zinc-50 dark:bg-zinc-950">
-                  <button
-                    type="button"
-                    disabled={selectedReverts.size === 0 || isReverting}
-                    onClick={() => handleRevertSelected()}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    {isReverting ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
-                    Reverter selecionados ({selectedReverts.size})
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-          {/* MENU LATERAL */}
-          <div className="w-full lg:w-72 2xl:w-80 space-y-2 shrink-0">
-            {tabs.filter(t => t.show).map((tabItem) => (
-              <button 
-                key={tabItem.id}
-                onClick={() => setActiveTab(tabItem.id as TabType)}
-                className={`w-full flex items-center justify-center lg:justify-between px-3 lg:px-5 py-3 lg:py-4 rounded-2xl font-black transition-all text-xs uppercase tracking-tight ${
-                  activeTab === tabItem.id 
-                    ? 'bg-blue-600 text-white shadow-xl translate-x-2' 
-                    : 'bg-white dark:bg-zinc-900 text-gray-400 dark:text-zinc-500 hover:text-blue-600 border border-gray-100 dark:border-white/5'
-                }`}
-              >
-                <tabItem.icon size={18} className="shrink-0" />
-                <span className="hidden lg:inline truncate ml-3">{tabItem.label}</span>
-                {activeTab === tabItem.id && <ChevronRight size={14} className="hidden lg:inline"/>}
-              </button>
-            ))}
-          </div>
+          <SettingsNav
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+            canManageAll={permissions.canManageAll}
+            canManageUsers={permissions.canManageUsers}
+            canSeeLogs={permissions.canSeeLogs}
+          />
 
           <div className="flex-grow bg-white dark:bg-zinc-900 rounded-[2rem] lg:rounded-[3rem] border border-gray-100 dark:border-white/5 shadow-2xl shadow-blue-950/5 overflow-hidden min-h-[400px] lg:min-h-[600px]">
-            
-            {/* TAB: USERS */}
-            {activeTab === 'users' && (
-              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="p-4 md:p-6 lg:p-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-950/30">
-                  <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-                    <div className="relative group">
-                      <div className="w-20 h-20 lg:w-28 lg:h-28 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl transform rotate-3 group-hover:rotate-0 transition-transform">
-                        <UserCircle size={40} className="lg:hidden" />
-                        <UserCircle size={60} className="hidden lg:block" />
-                      </div>
-                      <button onClick={() => { setSelectedUser(user as User); setIsUserModalOpen(true); }} className="absolute -bottom-2 -right-2 bg-white dark:bg-zinc-800 p-2 rounded-xl shadow-lg text-blue-600 border border-gray-100 dark:border-white/5">
-                        <Pencil size={16}/>
-                      </button>
-                    </div>
-                    <div className="text-center md:text-left">
-                      <div className="flex items-center gap-3 justify-center md:justify-start">
-                        <h2 className="text-2xl lg:text-3xl font-black text-blue-950 dark:text-white italic uppercase tracking-tighter">{user?.name || 'Usuário'}</h2>
-                        <span className={`px-3 py-1 ${user?.role === "DIRECTOR" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400" : user?.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : user?.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                          {user?.role}
-                        </span>
-                      </div>
-                      <p className="text-gray-400 font-bold text-sm mt-1">{user?.email}</p>
-                      <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 mt-3 md:mt-4">
-                        <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
-                          <CalendarFold size={12}/> Desde {new Date(user?.createdAt).toLocaleDateString()}
-                        </div>
-                        {user?.lastLogin && (
-                          <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest justify-center md:justify-start">
-                            <Clock size={12}/> Login em {new Date(user.lastLogin).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 md:p-6">
-                  <div className="flex justify-between items-center mb-6 lg:mb-8">
-                    <h3 className="text-xl lg:text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Membros da Equipe</h3>
-                    {canManageUsers && (
-                      <button onClick={() => { setSelectedUser(null); setIsUserModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
-                    )}
-                  </div>
-                  {usersList.filter(u => u.id !== user?.id).length === 0 ? (
-                    <div className="py-20 flex flex-col items-center justify-center text-center">
-                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                        <Users size={32} className="text-gray-400" />
-                      </div>
-                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum membro cadastrado</p>
-                      <p className="text-xs font-bold text-gray-500 mt-1">Adicione membros à equipe</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
-                      {usersList.filter(u => u.id !== user?.id).map((u) => {
-                        const isTargetHigherRank = 
-                          (isManager && u.role !== 'VIEWER') ||
-                          (isAdmin && u.role === 'DIRECTOR');
-
-                        const showActionButtons = canManageUsers && !isTargetHigherRank;
-
-                        return (
-                          <div key={u.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <UserCircle size={18} className="text-zinc-400 shrink-0" />
-                                <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic">{u.name || 'Usuário'}</h4>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs text-zinc-500 font-medium italic">{u.email}</p>
-                                <span className={`px-2 py-0.5 ${u.role === "DIRECTOR" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400" : u.role === "ADMIN" ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400" : u.role === "MANAGER" ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400" : "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400"} text-[9px] font-black rounded-full uppercase tracking-widest border border-current`}>
-                                  {u.role === "MANAGER" ? "Gerente" : u.role === "VIEWER" ? "Visualizador" : u.role === "DIRECTOR" ? "Diretor" : "ADMIN"}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 mt-6">
-                              {user?.isCreator && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEnterTargetUser(u);
-                                      setEnterPassword('');
-                                      setIsEnterModalOpen(true);
-                                    }}
-                                    className="flex-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-amber-300/40 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-900/60 flex items-center justify-center gap-1.5 transition-all"
-                                    title="Entrar nesta conta (requer sua senha)"
-                                  >
-                                    <LogIn size={14} /> Entrar
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setTransferTargetUser(u);
-                                      setTransferConfirmInput('');
-                                      setIsTransferModalOpen(true);
-                                    }}
-                                    className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 flex items-center justify-center gap-1.5 transition-all"
-                                    title="Ceder título de criador"
-                                  >
-                                    <KeyRound size={14} /> Ceder
-                                  </button>
-                                </>
-                              )}
-
-                              {showActionButtons && (
-                                <>
-                                  <button 
-                                    onClick={() => { setSelectedUser(u); setIsUserModalOpen(true); }} 
-                                    className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all"
-                                  >
-                                    Editar
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDelete('user', u.id)} 
-                                    className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"
-                                  >
-                                    <Trash2 size={16}/>
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {activeTab === "users" && (
+              <UsersTab
+                currentUser={user}
+                users={data.usersList}
+                canManageUsers={permissions.canManageUsers}
+                isAdmin={permissions.isAdmin}
+                isManager={permissions.isManager}
+                onEditSelf={() => userCrud.openEditUser(user)}
+                onCreate={userCrud.openCreateUser}
+                onEdit={userCrud.openEditUser}
+                onDelete={(id) => deletion.handleDelete("user", id)}
+                onEnterAccount={creator.openEnterModal}
+                onTransferCreator={creator.openTransferModal}
+              />
             )}
 
-            {/* TAB: SPACES */}
-            {activeTab === 'spaces' && canManageAll && (
-              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="p-8 md:p-12 border-gray-50 dark:border-white/5">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Espaços Pai</h3>
-                    <button onClick={() => { setSelectedSpace(null); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
-                  </div>
-                </div>
-                <div className="p-4 md:p-6">
-                  {spacesList.length === 0 ? (
-                    <div className="py-20 flex flex-col items-center justify-center text-center">
-                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                        <LayoutDashboard size={32} className="text-gray-400" />
-                      </div>
-                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum espaço pai cadastrado</p>
-                      <p className="text-xs font-bold text-gray-500 mt-1">Crie um espaço pai para organizar seus ativos</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
-                      {spacesList.map((space) => (
-                        <div key={space.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col justify-between group">
-                          <div className="p-2 relative overflow-hidden group flex flex-col justify-between">
-                            <div>
-                              <div className="absolute top-0 right-2 p-2 text-blue-500/10 group-hover:scale-125 transition-transform duration-500"><LayoutDashboard size={60} /></div>
-                              <h4 className="text-base lg:text-xl font-black text-blue-950 dark:text-white uppercase italic mt-1">{space.name}</h4>
-                              <p className="text-xs text-zinc-500 mt-2 line-clamp-2 font-medium">{space.notes || 'Sem notas.'}</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-3 mt-6">
-                            <button onClick={() => { setSelectedSpace(space); setSpaceImageUrl(null); setIsSpaceModalOpen(true); }} className="flex-1 bg-white dark:bg-zinc-800 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-zinc-200 dark:border-white/5 hover:bg-blue-600 hover:text-white transition-all">Editar</button>
-                            <button onClick={() => handleDelete('space', space.id)} className="px-4 bg-white dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 border border-zinc-200 dark:border-white/5 transition-all"><Trash2 size={16}/></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {activeTab === "spaces" && permissions.canManageAll && (
+              <SpacesTab
+                spaces={data.spacesList}
+                onCreate={spaceCrud.openCreateSpace}
+                onEdit={spaceCrud.openEditSpace}
+                onDelete={(id) => deletion.handleDelete("space", id)}
+              />
             )}
 
-            {/* TAB: CATEGORIES */}
-            {activeTab === 'categories' && canManageUsers && (
-              <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Categorias</h3>
-                  {categoriesList.length < 18 ? (
-                    <button onClick={() => { setSelectedCategory(null); setIsCategoryModalOpen(true); }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-xl shadow-blue-500/20"><Plus size={24} /></button>
-                  ) : (
-                    <span className="text-[10px] font-black text-zinc-400 uppercase">Limite: 18</span>
-                  )}
-                </div>
-                {categoriesList.length === 0 ? (
-                  <div className="py-20 flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                      <Group size={32} className="text-gray-400" />
-                    </div>
-                    <p className="text-lg font-black text-gray-400 uppercase italic">Nenhuma categoria cadastrada</p>
-                    <p className="text-xs font-bold text-gray-500 mt-1">Crie categorias para classificar seus ativos</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 lg:gap-4">
-                    {categoriesList.map((category) => (
-                      <div key={category.id} className="bg-zinc-50 dark:bg-zinc-950 p-3 lg:p-6 rounded-[2rem] border border-zinc-100 dark:border-white/5 flex flex-col items-center text-center group">
-                        <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl mb-4 flex items-center justify-center text-white shadow-inner" style={{ backgroundColor: category.color || '#2563eb' }}>
-                          <Group size={18} className="lg:hidden" />
-                          <Group size={24} className="hidden lg:block" />
-                        </div>
-                        <h4 className="text-xs lg:text-sm font-black text-blue-950 dark:text-white uppercase italic">{category.name}</h4>
-                        <div className="flex gap-2 mt-4">
-                          <button onClick={() => { setSelectedCategory(category); setIsCategoryModalOpen(true); }} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-blue-600"><Pencil size={14}/></button>
-                          <button onClick={() => handleDelete('category', category.id)} className="p-2 bg-white dark:bg-zinc-800 rounded-lg text-red-500"><Trash2 size={14}/></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {activeTab === "categories" && permissions.canManageUsers && (
+              <CategoriesTab
+                categories={data.categoriesList}
+                onCreate={categoryCrud.openCreateCategory}
+                onEdit={categoryCrud.openEditCategory}
+                onDelete={(id) => deletion.handleDelete("category", id)}
+              />
             )}
 
-            {/* TAB: LOGS */}
-            {activeTab === 'logs' && canSeeLogs && (
-              <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">Logs</h3>
-                  {canManageAll && (
-                    <button onClick={() => handleDelete('logs')} className="flex items-center gap-2 text-red-500 font-black text-[10px] uppercase tracking-widest hover:underline transition-all">
-                      <Trash2 size={14}/> Limpar Tudo
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  {logsList.length === 0 ? (
-                    <div className="py-20 flex flex-col items-center justify-center text-center">
-                      <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                        <ClipboardList size={32} className="text-gray-400" />
-                      </div>
-                      <p className="text-lg font-black text-gray-400 uppercase italic">Nenhum log encontrado</p>
-                      <p className="text-xs font-bold text-gray-500 mt-1">As atividades serão registradas aqui</p>
-                    </div>
-                  ) : (
-                    [...logsList].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((log) => (
-                      <div key={log.id} className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-white/5 flex items-start gap-4 text-[11px]">
-                        <div className={`p-2 rounded-lg shrink-0 ${log.action.includes('DELETE') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                          <Activity size={14}/>
-                        </div>
-                        <div className="flex-grow">
-                          <div className="flex justify-between">
-                            <span className="font-black text-blue-950 dark:text-white uppercase italic">{log.action}</span>
-                            <span className="text-zinc-400 font-bold">{new Date(log.createdAt).toLocaleString()}</span>
-                          </div>
-                          <p className="text-zinc-500 mt-1 font-bold">{log.details}</p>
-                          <p className="text-[9px] font-black text-blue-600 uppercase mt-2">Por: {log.user?.name || log.user?.email || 'Usuário deletado'}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+            {activeTab === "logs" && permissions.canSeeLogs && (
+              <LogsTab
+                logs={data.logsList}
+                canClear={permissions.canManageAll}
+                onClear={() => deletion.handleDelete("logs")}
+              />
             )}
 
-            {/* TAB: THEME */}
-            {activeTab === 'theme' && (
-              <div className="p-8 md:p-12 animate-in fade-in slide-in-from-right-4 duration-500">
-                <h3 className="text-2xl font-black text-blue-950 dark:text-white uppercase italic mb-10 tracking-tighter">Tema</h3>
-                <div className="space-y-4 mb-12">
-                  <div className="grid grid-cols-3 gap-4">
-                    {(['LIGHT', 'DARK', 'SYSTEM'] as const).map((value) => (
-                      <button key={value} onClick={() => updateConfig({ theme: value }, 'update-theme')} className={`flex flex-col items-center gap-3 p-6 border rounded-[2rem] transition-all ${user.theme === value ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100'}`}>
-                        {value === 'LIGHT' ? <Sun size={20}/> : value === 'DARK' ? <Moon size={20}/> : <Monitor size={20}/>}
-                        <span className="text-[10px] font-black uppercase">{value === 'LIGHT' ? 'Claro' : value === 'DARK' ? 'Escuro' : 'Sistema'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+            {activeTab === "theme" && (
+              <ThemeTab currentTheme={user.theme} onSelect={theme.updateTheme} />
             )}
           </div>
         </div>
       </div>
 
-      {/* MODAIS */}
-      {isUserModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="user-modal-title"
-          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
-        >
-          <form onSubmit={handleUserSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
-            <div className="flex justify-between items-center mb-8">
-              <h3 id="user-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedUser?.id === user.id ? 'Meu Perfil' : selectedUser ? 'Editar Membro' : 'Novo Membro'}</h3>
-              <button type="button" onClick={() => setIsUserModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
-            </div>
-            <div className="space-y-4 mb-8">
-              <div className="space-y-1">
-                <label htmlFor="user-name" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><UserCircle size={10}/> Nome Completo</label>
-                <input id="user-name" name="name" defaultValue={selectedUser?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="user-email" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><Mail size={10}/> Email</label>
-                <input id="user-email" name="email" type="email" defaultValue={selectedUser?.email || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="user-password" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1"><KeyRound size={10}/> {selectedUser ? "Mudar Senha (Opcional)" : "Senha"}</label>
-                <input id="user-password" name="password" type="password" className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required={!selectedUser} />
-              </div>
-              {selectedUser?.id !== user.id && (
-                <div className="space-y-1">
-                  <label htmlFor="user-role" className="text-[10px] font-black text-zinc-400 uppercase ml-2 flex items-center gap-1">Nível de Permissão</label>
-                  <input type="hidden" name="role" value={role} />
-                  <CustomSelect
-                    id="user-role"
-                    options={roleOptions}
-                    value={role}
-                    onChange={(val) => setRole(val as "DIRECTOR" | "ADMIN" | "MANAGER" | "VIEWER")}
-                  />
-                </div>
-              )}
-            </div>
-            <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
-              {saving ? <Loader2 className="animate-spin" size={18}/> : <CheckCircle size={18}/>} Confirmar
-            </button>
-          </form>
-        </div>
-      )}
-
-      {isCategoryModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="category-modal-title"
-          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
-        >
-          <form onSubmit={handleCategorySubmit} className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
-            <div className="flex justify-between items-center mb-8">
-              <h3 id="category-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
-            </div>
-            <div className="space-y-4 mb-8">
-              <input name="name" placeholder="Nome da Categoria" defaultValue={selectedCategory?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-            </div>
-            <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
-              {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Salvar Categoria
-            </button>
-          </form>
-        </div>
-      )}
-
-      {isSpaceModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="space-modal-title"
-          className="fixed inset-0 bg-blue-950/40 dark:bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
-        >
-          <form onSubmit={handleSpaceSubmit} className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
-            <div className="flex justify-between items-center mb-8">
-              <h3 id="space-modal-title" className="text-2xl font-black text-blue-950 dark:text-white uppercase italic tracking-tighter">{selectedSpace ? 'Editar Espaço' : 'Novo Espaço Pai'}</h3>
-              <button type="button" onClick={() => setIsSpaceModalOpen(false)} className="text-zinc-400 hover:text-red-500"><X size={24}/></button>
-            </div>
-            <div className="space-y-6 mb-10">
-              <input name="name" placeholder="Nome do Local" defaultValue={selectedSpace?.name || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold" required />
-              <textarea name="notes" rows={4} defaultValue={selectedSpace?.notes || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold resize-none" placeholder="Notas..."></textarea>
-              <ImageUpload 
-                value={toLocalMediaUrl(spaceImageUrl || selectedSpace?.imageUrl)} 
-                onChange={(url) => setSpaceImageUrl(url)}
-                label="Imagem do Espaço" 
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <input type="text" name="address" placeholder="Endereço" defaultValue={selectedSpace?.address || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
-                <input type="text" name="responsible" placeholder="Responsável" defaultValue={selectedSpace?.responsible || ''} className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <PatternFormat
-                  type="tel"
-                  name="phone"
-                  placeholder="Telefone" 
-                  format="(##) #####-####"
-                  mask="_"
-                  defaultValue={selectedSpace?.phone || ''}
-                  className="w-full bg-zinc-50 dark:bg-zinc-950 dark:text-white p-4 rounded-2xl border-none font-bold text-sm"
-                />
-              </div>
-            </div>
-            <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3">
-              {saving ? <Loader2 className="animate-spin" size={18}/> : <CirclePlus size={18}/>} Confirmar Espaço
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Modal de Solicitação de Senha para Entrar na Conta */}
-      {isEnterModalOpen && enterTargetUser && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="enter-modal-title"
-          className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-        >
-          <div className="bg-white dark:bg-zinc-900 border border-amber-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 text-amber-500 mb-4">
-              <div className="p-3 bg-amber-100 dark:bg-amber-950/60 rounded-2xl">
-                <LogIn size={24} />
-              </div>
-              <div>
-                <h3 id="enter-modal-title" className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
-                  Entrar na Conta
-                </h3>
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
-                  Confirmação de segurança
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
-              Para entrar na conta de <strong className="text-zinc-900 dark:text-white">{enterTargetUser.name || enterTargetUser.email}</strong>, confirme a sua senha de criador:
-            </p>
-
-            <input
-              type="password"
-              value={enterPassword}
-              autoComplete="current-password"
-              autoFocus
-              onChange={(e) => setEnterPassword(e.target.value)}
-              placeholder="Sua senha..."
-              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500 mb-6"
-            />
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEnterModalOpen(false);
-                  setEnterTargetUser(null);
-                  setEnterPassword('');
-                }}
-                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isEntering}
-                onClick={() => handleEnterAccount(enterTargetUser)}
-                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
-              >
-                {isEntering ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <LogIn size={16} />
-                )}
-                Confirmar Entrada
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Transferência do Título de Criador */}
-      {isTransferModalOpen && transferTargetUser && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="transfer-modal-title"
-          className="fixed inset-0 z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-        >
-          <div className="bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 text-red-500 mb-4">
-              <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">
-                <KeyRound size={24} />
-              </div>
-              <div>
-                <h3 id="transfer-modal-title" className="text-lg font-black uppercase italic tracking-tight text-zinc-900 dark:text-white">
-                  Ceder Título de Criador
-                </h3>
-                <p className="text-xs text-red-600 dark:text-red-400 font-bold uppercase tracking-wider">
-                  Ação irreversível
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-zinc-600 dark:text-zinc-300 mb-4 leading-relaxed">
-              Ao transferir o título para <strong className="text-zinc-900 dark:text-white">{transferTargetUser.name || transferTargetUser.email}</strong>, você perderá a capacidade de entrar nas contas dos usuários. Digite o nome ou e-mail exato do destinatário para confirmar:
-            </p>
-
-            <div className="mb-4 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-200 dark:border-white/5">
-              <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-1">Confirme digitando:</p>
-              <p className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 select-all">
-                {transferTargetUser.name || transferTargetUser.email}
-              </p>
-            </div>
-
-            <input
-              type="text"
-              value={transferConfirmInput}
-              onChange={(e) => setTransferConfirmInput(e.target.value)}
-              placeholder="Digite exatamente o texto acima..."
-              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl text-xs font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-red-500 mb-6"
-            />
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsTransferModalOpen(false);
-                  setTransferTargetUser(null);
-                  setTransferConfirmInput('');
-                }}
-                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={
-                  transferConfirmInput.trim() !== (transferTargetUser.name || transferTargetUser.email).trim() ||
-                  isTransferring
-                }
-                onClick={() => handleTransferCreator(transferTargetUser)}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
-              >
-                {isTransferring ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <KeyRound size={16} />
-                )}
-                Confirmar Transferência
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-        confirmLabel="Excluir"
-        cancelLabel="Manter"
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      <SettingsModals
+        userCrud={userCrud}
+        categoryCrud={categoryCrud}
+        spaceCrud={spaceCrud}
+        creator={creator}
+        deletion={deletion}
+        roleOptions={roleOptions}
+        currentUserId={user.id}
       />
     </Layout>
   );
