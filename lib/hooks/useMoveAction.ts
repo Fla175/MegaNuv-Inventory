@@ -2,6 +2,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { UseToast } from "@/lib/context/ToastContext";
 import type { InventoryItem } from "@/types/inventory";
+import { collectActiveSubtreeIds } from "@/lib/inventory/tree";
 
 interface UseMoveActionProps {
   actives: InventoryItem[];
@@ -35,19 +36,7 @@ export function useMoveAction({
 
   const excludedMoveIds = useMemo(() => {
     if (!movingItem) return new Set<string>();
-    const ids = new Set<string>([movingItem.id]);
-    const queue = [movingItem.id];
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      actives.forEach((a) => {
-        if (a.parentId === currentId) {
-          ids.add(a.id);
-          queue.push(a.id);
-        }
-      });
-    }
-    return ids;
+    return collectActiveSubtreeIds(actives, movingItem.id);
   }, [movingItem, actives]);
 
   const handleMoveAction = useCallback(

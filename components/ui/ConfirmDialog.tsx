@@ -66,7 +66,7 @@ export function ConfirmDialog({
       <DialogContent
         showCloseButton={false}
         overlayClassName="z-[200] bg-black/60 backdrop-blur-sm"
-        className={`z-[200] w-full max-w-md sm:max-w-md rounded-[2rem] border-2 ${styles.border} ${styles.bg} p-0 shadow-2xl shadow-black/20 overflow-hidden`}
+        className={`z-[200] w-full max-w-[calc(100%-2rem)] sm:max-w-md rounded-[2rem] border-2 ${styles.border} ${styles.bg} p-0 shadow-2xl shadow-black/20 overflow-hidden`}
       >
         <div className="p-8">
           <div className="flex items-start gap-4">

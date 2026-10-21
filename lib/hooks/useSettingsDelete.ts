@@ -2,6 +2,7 @@
 import { useCallback, useState } from "react";
 import { UseToast } from "@/lib/context/ToastContext";
 import type { ConfirmState } from "@/components/settings/types";
+import { buildSpaceDeleteMessage } from "@/lib/settings/deletePreview";
 
 type DeleteType = "user" | "space" | "category" | "logs";
 
@@ -77,18 +78,7 @@ export function useSettingsDelete({
           const data = await previewRes.json();
           const actives = typeof data.actives === "number" ? data.actives : 0;
           const spaces = typeof data.spaces === "number" ? data.spaces : 1;
-
-          const assetsLabel =
-            actives === 0
-              ? "Nenhum ativo será excluído."
-              : actives === 1
-                ? "1 ativo será excluído permanentemente."
-                : `${actives} ativos serão excluídos permanentemente.`;
-
-          spaceMessage =
-            spaces > 1
-              ? `Tem certeza que deseja excluir este espaço pai e mais ${spaces - 1} espaço(s) filho(s)? ${assetsLabel}`
-              : `Tem certeza que deseja excluir este espaço pai? ${assetsLabel}`;
+          spaceMessage = buildSpaceDeleteMessage(actives, spaces);
         } catch {
           showError("Erro de conexão ao verificar o tamanho da exclusão.");
           return;

@@ -261,12 +261,14 @@ export default function ListSection({
         actives={actives}
         fatherSpaces={fatherSpaces}
         categories={categories}
-        isViewer={isViewer}
         onEdit={onEdit}
         onMove={(item) => move.setMovingItem(item)}
         onClone={handleCloneClick}
         onDelete={deleteActions.requestDelete}
-        onPrint={(item) => setSelectedPrintItem(item)}
+        onPrint={(item) => {
+          setSelectedViewItem(null);
+          setSelectedPrintItem(item);
+        }}
       />
 
       <PrintLabelModal

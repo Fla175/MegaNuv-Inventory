@@ -1,7 +1,8 @@
 // lib/hooks/useRevertHistory.ts
 import { useCallback, useEffect, useState } from "react";
 import { UseToast } from "@/lib/context/ToastContext";
-import type { RevertItem, RevertSubItem } from "@/lib/revert/types";
+import type { RevertItem } from "@/lib/revert/types";
+import { buildRevertPayload, selectRevertItems } from "@/lib/settings/revert";
 
 interface UseRevertHistoryParams {
   enabled: boolean;
@@ -59,22 +60,13 @@ export function useRevertHistory({
   const handleRevertSelected = useCallback(
     async (targetItems?: RevertItem[]) => {
       const selectedList =
-        targetItems ||
-        revertItems.filter((item) => {
-          const itemKey = item.groupId || item.id;
-          return itemKey && selectedReverts.has(itemKey);
-        });
+        targetItems || selectRevertItems(revertItems, selectedReverts);
 
       if (selectedList.length === 0 || isReverting) return;
 
       setIsReverting(true);
 
-      const payloadItems: RevertSubItem[] = selectedList.flatMap((item) => {
-        if (item.items && item.items.length > 0) {
-          return item.items;
-        }
-        return [{ table: item.table!, id: item.id!, timestamp: item.timestamp }];
-      });
+      const payloadItems = buildRevertPayload(selectedList);
 
       try {
         const res = await fetch("/api/database/revert", {

@@ -1,20 +1,21 @@
 ---
 stage: E-validation
-status: in_progress
+status: done
 updated: 2026-10-21
 ---
 
 ## Now
-Etapa D concluída: `pages/settings.tsx` (169 L), hooks `useSettings*` e `components/settings/*`.
-Etapa E em andamento: revisão final do patch, documentação e fechamento da ADR-003.
+ADR-003 concluída: `pages/dashboard.tsx` (124 L), `components/ListSection.tsx` (355 L) e
+`pages/settings.tsx` (169 L), com hooks por domínio e `components/settings/*`.
+A revisão final corrigiu impressão/indentação da Etapa C, papel de MANAGER criador e regressões
+visuais dos diálogos da Etapa D.
 
 ## Next
-- Coletar a revisão do subagente `reviewer` sobre a Etapa C reparada e corrigir achados.
-- Confirmar os gates finais e commitar a Etapa D sem push.
-- Marcar os action items da ADR-003 como concluídos.
+- (nenhum para a ADR-003)
 
 ## Blocked
 - (nenhum)
 
 ## Open questions
-- (nenhum)
+- Cobertura de UI React continua ausente (`vitest` em ambiente `node`, sem `jsdom`/`@testing-library`).
+  Registrar como dívida separada se a UI voltar a mudar.

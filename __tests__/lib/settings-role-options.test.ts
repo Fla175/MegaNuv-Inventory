@@ -8,10 +8,15 @@ describe("buildRoleOptions", () => {
     expect(buildRoleOptions({ role: "VIEWER" }, { directorExists: false })).toEqual([]);
   });
 
-  it("offers only VIEWER to MANAGER", () => {
-    expect(buildRoleOptions({ role: "MANAGER" }, { directorExists: false })).toEqual([
+  it("offers only VIEWER to MANAGER, even when MANAGER is the creator", () => {
+    const expected = [
       { value: "VIEWER", label: "Visualizador", indicatorColor: "bg-blue-500" },
-    ]);
+    ];
+
+    expect(buildRoleOptions({ role: "MANAGER" }, { directorExists: false })).toEqual(expected);
+    expect(
+      buildRoleOptions({ role: "MANAGER", isCreator: true }, { directorExists: false })
+    ).toEqual(expected);
   });
 
   it("offers VIEWER, MANAGER and ADMIN to ADMIN and DIRECTOR", () => {

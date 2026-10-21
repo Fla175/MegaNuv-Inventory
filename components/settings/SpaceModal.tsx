@@ -36,7 +36,7 @@ export default function SpaceModal({
         showCloseButton={false}
         onInteractOutside={(event) => event.preventDefault()}
         overlayClassName="z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md"
-        className="z-[100] w-full max-w-lg sm:max-w-lg rounded-[2.5rem] p-10 bg-white dark:bg-zinc-900 border border-white/10 shadow-2xl"
+        className="z-[100] w-full max-w-[calc(100%-2rem)] sm:max-w-lg rounded-[2.5rem] p-10 bg-white dark:bg-zinc-900 border border-white/10 shadow-2xl"
       >
         <form onSubmit={onSubmit}>
           <div className="flex justify-between items-center mb-8">
