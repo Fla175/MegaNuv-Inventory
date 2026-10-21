@@ -1,14 +1,14 @@
 ---
-stage: B-dashboard
+stage: C-listsection
 status: done
 updated: 2026-10-20
 ---
 
 ## Now
-Etapa B concluída: `pages/dashboard.tsx` reduzido de 375 L para ~100 L como orquestrador fino. Hooks e componentes extraídos.
+Etapa C concluída: `components/ListSection.tsx` (2.151 L) reduzido a orquestrador fino. Hooks e componentes extraídos.
 
 ## Next
-Etapa C: modularizar `components/ListSection.tsx` (2.151 L) — árvores, filtros, seleção, modais.
+Etapa D: modularizar `pages/settings.tsx` (1.254 L) — 5 abas + 7 modais extraídos.
 
 ## Blocked
 - (nenhum)
