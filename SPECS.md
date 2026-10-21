@@ -104,7 +104,7 @@ MinIO externo ao compose · `output: "standalone"` no Next.
 | `SYSTEM_TIME_MAX`                       | `2038-01-19 03:14:07.999999` (limite do `ROW_END` do MariaDB)                                        | `lib/revert/history.ts` (`TIMESTAMP_MAX`)          |
 | Tabelas reversíveis                     | `Active`, `FatherSpace`, `Category` (whitelist)                                                      | `lib/revert/history.ts` (`REVERTABLE_TABLES`)      |
 | Escala do inventário                    | `Active.id` = 4 chars hex (65.536 combinações) — colisão provável em inventário grande               | `lib/prisma.ts:8-24`                               |
-| Tamanho máximo de arquivo de componente | **2.150 linhas** em `components/ListSection.tsx`                                                     | —                                                  |
+| Tamanho máximo de arquivo de componente | **775 linhas** em `components/actives/activeForm.tsx`                                                | —                                                  |
 | Threads de conexão Prisma               | 1 (singleton com hot-reload guard)                                                                   | `lib/prisma.ts:46-54`                              |
 
 ---
@@ -151,8 +151,8 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 ├── pages/                   # ← PAGES ROUTER
 │   ├── _app.tsx  _document.tsx
 │   ├── index.tsx            # Gestão de Ativos
-│   ├── dashboard.tsx        # 374 L
-│   ├── settings.tsx         # 1.235 L — abas users|spaces|categories|logs|theme
+│   ├── dashboard.tsx        # 124 L — orquestrador da Etapa B da ADR-003
+│   ├── settings.tsx         # 169 L — orquestrador da Etapa D da ADR-003
 │   ├── login.tsx  initial-setup/register.tsx  qrcode/view.tsx (614 L)
 │   └── api/                 # 36 endpoints .ts
 │       ├── actives/  auth/  categories/  dashboard/
@@ -160,13 +160,16 @@ Serverless-first (Pages Router → cada `pages/api/**` é uma função independe
 │       ├── internal/  logs/  public/  qrcode/
 │       ├── storage/  users/
 │       ├── hello.ts  protected.ts
-├── components/              # 13 .tsx
-│   ├── ListSection.tsx      # 2.150 L ← gargalo
+├── components/              # 32 .tsx (features + ui)
+│   ├── ListSection.tsx      # 355 L — orquestrador da Etapa C da ADR-003
 │   ├── Layout.tsx  HeaderSection.tsx  SearchSection.tsx
 │   ├── FileUpload.tsx (307 L)  imageUpload.tsx  customSelect.tsx
 │   ├── AddLocationModal.tsx
 │   ├── actives/activeForm.tsx (775 L)
-│   └── ui/  ConfirmDialog.tsx  Toast.tsx  ToastContainer.tsx
+│   ├── dashboard/           # KPICards, CategoriesGrid, Recent*, StructureSummary, CategoryAssetsModal
+│   ├── list/                # ActiveTree, SelectionToolbar, ContextMenu, Move*, UndoToast, modais
+│   ├── settings/            # 5 abas + 5 modais + RevertHistory, SettingsHeader/Nav/Modals
+│   └── ui/                  # Shadcn (button, dialog, select, ...) + ConfirmDialog/Toast
 ├── lib/                     # nunca importa de pages/ ou components/
 │   ├── prisma.ts  auth.ts  apiAuth.ts  minio.ts  logger.ts
 │   ├── mediaUrl.ts  mediaReferences.ts  version.ts  types.ts  uploadPolicy.ts
@@ -432,9 +435,9 @@ Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versiona
   `targetUserId` ausente → `400 { error: 'targetUserId é obrigatório.' }`;
   senha ausente/vazia → `400 { error: 'Senha é obrigatória.' }`;
   senha errada → `401 { error: 'Senha incorreta.' }` (sem emitir cookie de impersonação).
-- `pages/settings.tsx` pede a senha em um modal próprio (`input type="password"` com
-  `autoComplete="current-password"`, para o autofill do navegador/Bitwarden funcionar) antes de chamar a API,
-  e trata `400`/`401` com toast + limpeza do campo.
+- `components/settings/EnterAccountModal.tsx` (orquestrado por `useCreatorAccess`) pede a senha em um
+  modal próprio (`input type="password"` com `autoComplete="current-password"`, para o autofill do
+  navegador/Bitwarden funcionar) antes de chamar a API, e trata `400`/`401` com toast + limpeza do campo.
 - A visibilidade dos botões "Entrar"/"Ceder" depende **apenas** de `user.isCreator`. O campo
   `creatorAccessEnabled` foi removido de `/api/auth/me` e de `lib/context/UserContext.tsx`.
 - Regras que permanecem válidas para qualquer flag futura: **nenhuma flag de kill switch pode ser semeada

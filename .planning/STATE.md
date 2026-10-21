@@ -1,17 +1,17 @@
 ---
-stage: D-settings
-status: not_started
-updated: 2026-10-20
+stage: E-validation
+status: in_progress
+updated: 2026-10-21
 ---
 
 ## Now
-Etapa D pendente: modularizar `pages/settings.tsx` (1.254 L) — 5 abas + 7 modais extraídos.
+Etapa D concluída: `pages/settings.tsx` (169 L), hooks `useSettings*` e `components/settings/*`.
+Etapa E em andamento: revisão final do patch, documentação e fechamento da ADR-003.
 
 ## Next
-- Extrair `useSettingsPermissions()`, `useSettingsData()`, `useRevertHistory()`, `useCreatorAccess()`, `useUserCrud()`
-- Extrair componentes: `UsersTab`, `SpacesTab`, `CategoriesTab`, `LogsTab`, `ThemeTab` + modais
-- Substituir `ConfirmDialog` por `Dialog`/`AlertDialog` do Shadcn
-- Reescrever `SettingsPage` como orquestrador fino (<200 linhas)
+- Coletar a revisão do subagente `reviewer` sobre a Etapa C reparada e corrigir achados.
+- Confirmar os gates finais e commitar a Etapa D sem push.
+- Marcar os action items da ADR-003 como concluídos.
 
 ## Blocked
 - (nenhum)

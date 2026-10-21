@@ -954,6 +954,35 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
   + 5 skipped · `yarn build:opt` OK (90 MB). O HTML pré-renderizado de `/` voltou a conter
   "Nenhum Espaço Cadastrado" e não contém o texto do stub.
 
+### 🤖 OpenCode Operations (8)
+
+#### Refactored
+
+- **Etapa D da ADR-003 — `pages/settings.tsx` saiu de 1.254 para 169 linhas.** A página virou
+  orquestrador: `useSettingsPermissions` (flags + opções de papel), `useSettingsData` (listas e
+  refresh por aba), `useRevertHistory` (polling de 5 s, seleção e POST de reversão),
+  `useCreatorAccess` (entrar na conta + ceder título), `useUserCrud`, `useSpaceCrud`,
+  `useCategoryCrud`, `useThemeSettings` e `useSettingsDelete`. Nenhuma regra de negócio ficou no
+  JSX da página.
+- **Abas extraídas** para `components/settings/{UsersTab,SpacesTab,CategoriesTab,LogsTab,ThemeTab}.tsx`,
+  com `SettingsHeader`, `SettingsNav` e `SettingsModals` fechando o orquestrador. Os sete modais
+  viraram `UserModal`, `CategoryModal`, `SpaceModal`, `EnterAccountModal` e
+  `TransferCreatorModal`; `ConfirmDialog` passou a usar `Dialog` do Shadcn por dentro, mantendo a
+  API pública usada também por `ListSection`.
+- **Formulários migrados para `Dialog` + `Select` do Shadcn.** `onInteractOutside` é bloqueado nos
+  modais de formulário para preservar o comportamento antigo (clique no backdrop não descarta o que
+  foi digitado); `Esc`, foco e `aria-*` ficam com o Radix. `DialogContent` ganhou
+  `overlayClassName` para manter o backdrop e o z-index da tela.
+- **Opções de papel agora derivam de `lib/rbac.ts`** via `lib/settings/roleOptions.ts`: a UI não
+  repete a regra do DIRECTOR singleton. Teste novo cobre VIEWER, MANAGER, ADMIN, DIRECTOR e o
+  criador com/sem DIRECTOR existente.
+
+#### Verification
+
+- `npx tsc --noEmit` 0 erros · `eslint .` 0/0 · `npx prisma validate` OK · `yarn test` **354 passed**
+  + 5 skipped (4 testes novos) · `yarn build:opt` OK (93 MB). Rotas `/` e `/settings` geradas no
+  build standalone sem erro de SSR.
+
 ---
 
 ## - Initial Setup
