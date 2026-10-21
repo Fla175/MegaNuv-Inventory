@@ -188,7 +188,10 @@ ao DIRECTOR — agora DIRECTOR/ADMIN apagam e MANAGER só lê. Testes em `__test
 > `ListSection`; os formulários usam `Dialog` + `Select` e mantêm o clique no backdrop bloqueado.
 > A etapa C foi reparada antes da D: o commit `027baec` havia deixado `ListSection` como stub e
 > comentado a página; o orquestrador foi restaurado a partir de `69bcac3`.
-> **Próximo foco:** Etapa E (revisão final do patch, docs e fechamento da ADR-003).
+> A revisão final corrigiu a impressão e a indentação da árvore (C), o papel de MANAGER criador e
+> as gutters/altura do Select (D), e extraiu lógica pura testável para `lib/inventory/*` e
+> `lib/settings/*`. **ADR-003 concluída** com **371 testes + 5 skipped**, tsc/eslint/prisma/build
+> verdes. A UI React segue sem testes automatizados (`environment: 'node'`, sem `jsdom`).
 
 **Bloqueia release?** Não foi declarado bloqueador duro por decisão do usuário em 25/09/2026. Antes de
 qualquer novo deploy: **rotacionar a credencial MinIO** (item 12) e **aplicar a nova `inventory-policy.json`**

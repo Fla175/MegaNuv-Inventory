@@ -36,7 +36,7 @@ export default function TransferCreatorModal({
         showCloseButton={false}
         onInteractOutside={(event) => event.preventDefault()}
         overlayClassName="z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md"
-        className="z-[100] w-full max-w-md sm:max-w-md bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 shadow-2xl"
+        className="z-[100] w-full max-w-[calc(100%-2rem)] sm:max-w-md bg-white dark:bg-zinc-900 border border-red-500/30 rounded-[2.5rem] p-8 shadow-2xl"
       >
         <div className="flex items-center gap-3 text-red-500 mb-4">
           <div className="p-3 bg-red-100 dark:bg-red-950/60 rounded-2xl">

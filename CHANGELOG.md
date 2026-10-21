@@ -983,6 +983,41 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
   + 5 skipped (4 testes novos) · `yarn build:opt` OK (93 MB). Rotas `/` e `/settings` geradas no
   build standalone sem erro de SSR.
 
+### 🤖 OpenCode Operations (9)
+
+#### Fixed (achados da revisão)
+
+- **Etapa C — impressão:** `ListSection` fecha o `ItemDetailModal` antes de abrir o
+  `PrintLabelModal`. Antes o preview (`z-[700]`) ficava atrás do detalhe (`z-[800]`) e o botão de
+  imprimir era inalcançável.
+- **Etapa C — indentação da árvore:** `ActiveTreeNode` voltou a receber `level` e a envolver os
+  filhos em `border-l-2 dark:border-white/5 pl-4` com `marginLeft: (level + 1) * 1.5rem`; o ghost
+  de espaço vazio usa `(level + 1) * 2rem`, como no componente original.
+- **Etapa C — gate de edição:** o botão \"Editar\" do `ItemDetailModal` voltou a aparecer para
+  VIEWER, igual ao menu de contexto e ao comportamento pré-refatoração. A API continua sendo a
+  autoridade que barra a escrita.
+- **Etapa D — papel do MANAGER criador:** `buildRoleOptions` só oferece `DIRECTOR` a
+  ADMIN/DIRECTOR criador. MANAGER criador continua vendo apenas `VIEWER`, preservando o seletor
+  antigo; teste cobre o caso.
+- **Etapa D — regressões visuais:** os seis diálogos usam
+  `max-w-[calc(100%-2rem)] sm:max-w-*` (gutter de 16 px no mobile) e o `SelectTrigger` do
+  `UserModal` fixa `data-[size=default]:h-[52px]`, alinhado aos inputs vizinhos.
+
+#### Tests
+
+- Lógica pura extraída dos hooks para permitir teste sem `jsdom`:
+  `lib/inventory/filter.ts` (`filterInventory`, `buildExpandedNodes`),
+  `lib/inventory/tree.ts` (`collectSelectionChildIds`, `collectActiveSubtreeIds`),
+  `lib/settings/tabAccess.ts`, `lib/settings/revert.ts` e `lib/settings/deletePreview.ts`.
+- **17 testes novos** (371 passed + 5 skipped). A UI React continua sem cobertura automatizada —
+  `vitest.config.ts` usa `environment: 'node'` e o projeto não tem `@testing-library`/`jsdom`; por
+  isso a afirmação correta é **gates verdes + revisão estática**, não \"sem regressão\".
+
+#### Verification
+
+- `npx tsc --noEmit` 0 erros · `eslint .` 0/0 · `npx prisma validate` OK · `yarn test`
+  **371 passed** + 5 skipped · `yarn build:opt` OK.
+
 ---
 
 ## - Initial Setup

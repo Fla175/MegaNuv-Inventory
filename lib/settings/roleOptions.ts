@@ -28,9 +28,10 @@ export function buildRoleOptions(
 ): RoleOption[] {
   const roles = assignableRoles(actor);
 
-  // A creator with no assignable role (e.g. VIEWER) still sees no options:
-  // the selector is only shown to roles that manage users at all.
-  if (roles.length > 0 && actor?.isCreator && !options.directorExists) {
+  // Preserve the original selector: MANAGER may only create VIEWER; the
+  // creator title is offered only to ADMIN/DIRECTOR while no DIRECTOR exists.
+  const canSeedDirector = actor?.role === "ADMIN" || actor?.role === "DIRECTOR";
+  if (canSeedDirector && actor?.isCreator && !options.directorExists) {
     roles.push("DIRECTOR");
   }
 

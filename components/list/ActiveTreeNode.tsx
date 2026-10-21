@@ -35,6 +35,8 @@ interface ActiveTreeNodeProps {
   ) => void;
   isSelectionMode: boolean;
   longPressItem: string | null;
+  /** Depth in the active tree; the root is 0. */
+  level?: number;
 }
 
 export default function ActiveTreeNode({
@@ -53,6 +55,7 @@ export default function ActiveTreeNode({
   handleCheckboxChange,
   isSelectionMode,
   longPressItem,
+  level = 0,
 }: ActiveTreeNodeProps) {
   const isExpanded = expandedNodes[item.id];
   const childActives = actives.filter((a) => a.parentId === item.id);
@@ -207,28 +210,37 @@ export default function ActiveTreeNode({
 
       {isExpanded &&
         (visibleChildren.length > 0 ? (
-          visibleChildren.map((child) => (
-            <ActiveTreeNode
-              key={child.id}
-              item={child}
-              actives={actives}
-              visibleActives={visibleActives}
-              categories={categories}
-              selectedItems={selectedItems}
-              isViewer={isViewer}
-              onContextMenu={onContextMenu}
-              onItemClick={onItemClick}
-              onToggleExpand={onToggleExpand}
-              expandedNodes={expandedNodes}
-              handleLongPressStart={handleLongPressStart}
-              handleLongPressEnd={handleLongPressEnd}
-              handleCheckboxChange={handleCheckboxChange}
-              isSelectionMode={isSelectionMode}
-              longPressItem={longPressItem}
-            />
-          ))
+          <div
+            className="border-l-2 dark:border-white/5 pl-4"
+            style={{ marginLeft: `${(level + 1) * 1.5}rem` }}
+          >
+            {visibleChildren.map((child) => (
+              <ActiveTreeNode
+                key={child.id}
+                item={child}
+                actives={actives}
+                visibleActives={visibleActives}
+                categories={categories}
+                selectedItems={selectedItems}
+                isViewer={isViewer}
+                onContextMenu={onContextMenu}
+                onItemClick={onItemClick}
+                onToggleExpand={onToggleExpand}
+                expandedNodes={expandedNodes}
+                handleLongPressStart={handleLongPressStart}
+                handleLongPressEnd={handleLongPressEnd}
+                handleCheckboxChange={handleCheckboxChange}
+                isSelectionMode={isSelectionMode}
+                longPressItem={longPressItem}
+                level={level + 1}
+              />
+            ))}
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40 border-l-2 dark:border-white/5 ml-8">
+          <div
+            className="flex flex-col items-center justify-center py-8 px-6 opacity-40 border-l-2 dark:border-white/5"
+            style={{ marginLeft: `${(level + 1) * 2}rem` }}
+          >
             <Ghost size={24} className="mb-2 text-zinc-400" />
             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
               Este espaço físico está vazio

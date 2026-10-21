@@ -48,7 +48,7 @@ export default function UserModal({
         showCloseButton={false}
         onInteractOutside={(event) => event.preventDefault()}
         overlayClassName="z-[100] bg-blue-950/40 dark:bg-black/80 backdrop-blur-md"
-        className="z-[100] w-full max-w-md sm:max-w-md rounded-[2.5rem] p-10 bg-white dark:bg-zinc-900 border border-white/10 shadow-2xl"
+        className="z-[100] w-full max-w-[calc(100%-2rem)] sm:max-w-md rounded-[2.5rem] p-10 bg-white dark:bg-zinc-900 border border-white/10 shadow-2xl"
       >
         <form onSubmit={onSubmit}>
           <div className="flex justify-between items-center mb-8">
@@ -130,7 +130,7 @@ export default function UserModal({
                 <Select value={role} onValueChange={onRoleChange}>
                   <SelectTrigger
                     id="user-role"
-                    className="w-full h-[52px] bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border-none font-bold dark:text-white"
+                    className="w-full h-[52px] data-[size=default]:h-[52px] bg-zinc-50 dark:bg-zinc-950 p-4 rounded-2xl border-none font-bold dark:text-white"
                   >
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>

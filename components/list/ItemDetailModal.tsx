@@ -15,7 +15,6 @@ interface ItemDetailModalProps {
   actives: InventoryItem[];
   fatherSpaces: FatherSpace[];
   categories: Category[];
-  isViewer: boolean;
   onEdit: (item: InventoryItem, mode: "view" | "edit") => void;
   onMove: (item: InventoryItem) => void;
   onClone: (item: InventoryItem) => void;
@@ -30,7 +29,6 @@ export default function ItemDetailModal({
   actives,
   fatherSpaces,
   categories,
-  isViewer,
   onEdit,
   onMove,
   onClone,
@@ -163,11 +161,9 @@ export default function ItemDetailModal({
         </div>
 
         <div className="p-4 border-t dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center gap-2 overflow-x-auto custom-scrollbar">
-          {!isViewer && (
-            <button onClick={() => { onClose(); onEdit(item, "edit"); }} className="flex-1 sm:flex-none px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
-              <Pencil size={16} /> <span className="hidden sm:inline">Editar</span>
-            </button>
-          )}
+          <button onClick={() => { onClose(); onEdit(item, "edit"); }} className="flex-1 sm:flex-none px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
+            <Pencil size={16} /> <span className="hidden sm:inline">Editar</span>
+          </button>
           <button onClick={() => { onClose(); onMove(item); }} className="flex-1 sm:flex-none px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors whitespace-nowrap">
             <Move size={16} /> <span className="hidden sm:inline">Mover</span>
           </button>

@@ -8,6 +8,7 @@ import type {
   SettingsTab,
   SettingsUser,
 } from "@/components/settings/types";
+import { canFetchTab } from "@/lib/settings/tabAccess";
 
 interface UseSettingsDataParams {
   activeTab: SettingsTab;
@@ -76,10 +77,15 @@ export function useSettingsData({
   );
 
   const refreshActiveTabData = useCallback(() => {
+    if (
+      !canFetchTab(activeTab, { canManageAll, canManageUsers, canSeeLogs })
+    ) {
+      return;
+    }
     if (activeTab === "users") refreshUsers();
-    if (activeTab === "spaces" && canManageAll) refreshSpaces();
-    if (activeTab === "categories" && canManageUsers) refreshCategories();
-    if (activeTab === "logs" && canSeeLogs) refreshLogs();
+    if (activeTab === "spaces") refreshSpaces();
+    if (activeTab === "categories") refreshCategories();
+    if (activeTab === "logs") refreshLogs();
   }, [
     activeTab,
     canManageAll,

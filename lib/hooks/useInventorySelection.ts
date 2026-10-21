@@ -1,5 +1,6 @@
 // lib/hooks/useInventorySelection.ts
 import { useState, useCallback } from "react";
+import { collectSelectionChildIds } from "@/lib/inventory/tree";
 
 interface UseInventorySelectionProps {
   actives: { id: string; parentId?: string | null; isPhysicalSpace?: boolean }[];
@@ -23,17 +24,7 @@ export function useInventorySelection({
   const [longPressItem, setLongPressItem] = useState<string | null>(null);
 
   const getAllChildIds = useCallback(
-    (parentId: string): string[] => {
-      const children = actives.filter((a) => a.parentId === parentId);
-      let ids: string[] = [];
-      children.forEach((child) => {
-        ids.push(child.id);
-        if (child.isPhysicalSpace) {
-          ids = [...ids, ...getAllChildIds(child.id)];
-        }
-      });
-      return ids;
-    },
+    (parentId: string): string[] => collectSelectionChildIds(actives, parentId),
     [actives]
   );
 
