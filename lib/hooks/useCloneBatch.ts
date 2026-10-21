@@ -1,15 +1,17 @@
 // lib/hooks/useCloneBatch.ts
 import { useState, useCallback, useMemo } from "react";
 import { UseToast } from "@/lib/context/ToastContext";
-const toast = UseToast();
 
 import type { InventoryItem, FatherSpace } from "@/types/inventory";
+import type { SearchableSelectOption } from "@/lib/searchableSelect";
 
 interface UseCloneBatchProps {
   selectedItems: Set<string>;
   fatherSpaces: FatherSpace[];
   actives: InventoryItem[];
   onRefresh: () => void;
+  /** Called after a successful clone so the caller can leave selection mode. */
+  onCloned?: () => void;
 }
 
 export function useCloneBatch({
@@ -17,14 +19,16 @@ export function useCloneBatch({
   fatherSpaces,
   actives,
   onRefresh,
+  onCloned,
 }: UseCloneBatchProps) {
+  const { showError, showSuccess } = UseToast();
   const [isCloneBatchOpen, setIsCloneBatchOpen] = useState(false);
   const [cloneQuantity, setCloneQuantity] = useState<number>(1);
   const [cloneDestinationSpaceId, setCloneDestinationSpaceId] =
     useState<string>("");
   const [isCloning, setIsCloning] = useState(false);
 
-  const cloneLocationOptions = useMemo(() => {
+  const cloneLocationOptions = useMemo<SearchableSelectOption[]>(() => {
     return [
       {
         id: "",
@@ -79,17 +83,18 @@ export function useCloneBatch({
         throw new Error(data.error || "Erro ao clonar em lote");
       }
 
-      toast.showSuccess(`${data.count} ativo(s) clonado(s) com sucesso!`);
+      showSuccess(`${data.count} ativo(s) clonado(s) com sucesso!`);
       setIsCloneBatchOpen(false);
+      onCloned?.();
       onRefresh();
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Erro ao processar clonagem";
-      toast.showError(msg);
+      showError(msg);
     } finally {
       setIsCloning(false);
     }
-  }, [selectedItems, cloneDestinationSpaceId, cloneQuantity, onRefresh]);
+  }, [selectedItems, cloneDestinationSpaceId, cloneQuantity, onRefresh, onCloned, showError, showSuccess]);
 
   return {
     isCloneBatchOpen,

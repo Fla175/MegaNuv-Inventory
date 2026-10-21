@@ -1,7 +1,6 @@
 // lib/hooks/useUndo.ts
 import { useState, useCallback, useEffect } from "react";
 import { UseToast } from "@/lib/context/ToastContext";
-const toast = UseToast();
 
 export interface UndoData {
   table: string;
@@ -21,6 +20,7 @@ interface UseUndoProps {
  * `timestamp`). Delete e clone não geram undo — eles vão pelo History em Settings.
  */
 export function useUndo({ onRefresh }: UseUndoProps) {
+  const { showError, showSuccess } = UseToast();
   const [undoData, setUndoData] = useState<UndoData | null>(null);
   const [undoSeconds, setUndoSeconds] = useState(0);
   const [isUndoing, setIsUndoing] = useState(false);
@@ -81,16 +81,16 @@ export function useUndo({ onRefresh }: UseUndoProps) {
       }
 
       if (successCount === 0) {
-        toast.showError("Nenhuma alteração pôde ser revertida.");
+        showError("Nenhuma alteração pôde ser revertida.");
         return;
       }
 
       if (successCount < undoData.ids.length) {
-        toast.showError(
+        showError(
           `${successCount} de ${undoData.ids.length} alterações foram revertidas.`
         );
       } else {
-        toast.showSuccess(
+        showSuccess(
           successCount === 1
             ? "Alteração revertida com sucesso."
             : `${successCount} alterações revertidas com sucesso.`
@@ -102,11 +102,11 @@ export function useUndo({ onRefresh }: UseUndoProps) {
       onRefresh();
     } catch (error) {
       console.error("Erro no undo:", error);
-      toast.showError("Erro de conexão ao tentar reverter.");
+      showError("Erro de conexão ao tentar reverter.");
     } finally {
       setIsUndoing(false);
     }
-  }, [undoData, isUndoing, onRefresh]);
+  }, [undoData, isUndoing, onRefresh, showError, showSuccess]);
 
   return {
     undoData,

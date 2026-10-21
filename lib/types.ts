@@ -16,4 +16,9 @@ export interface ListSectionProps {
   onMove?: (item: InventoryItem) => void;
   actives: InventoryItem[];
   fatherSpaces: FatherSpace[];
+  /**
+   * Role decision made by the page. Passing it down keeps `ListSection` free of
+   * `useUser()`, which is not resolvable while Next collects page data.
+   */
+  isViewer: boolean;
 }

@@ -1,12 +1,7 @@
 // components/list/CloneBatchModal.tsx
 import { X, Copy, Loader2 } from "lucide-react";
-
-interface SearchableSelectOption {
-  id: string;
-  name: string;
-  type: "default" | "space" | "active";
-  parentId?: string | null;
-}
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import type { SearchableSelectOption } from "@/lib/searchableSelect";
 
 interface CloneBatchModalProps {
   isOpen: boolean;
@@ -57,12 +52,14 @@ export default function CloneBatchModal({
           </div>
           <div>
             <label htmlFor="clone-destination" className="block text-[10px] font-black uppercase text-zinc-400 mb-1.5">Localização</label>
-            <select id="clone-destination" value={cloneDestinationSpaceId} onChange={(e) => setCloneDestinationSpaceId(e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500">
-              <option value="">Selecione o espaço de destino...</option>
-              {cloneLocationOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>{opt.name}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              id="clone-destination"
+              options={cloneLocationOptions}
+              value={cloneDestinationSpaceId}
+              onChange={(id: string) => setCloneDestinationSpaceId(id)}
+              placeholder="Selecione o espaço de destino..."
+              variant="list"
+            />
           </div>
         </div>
 
