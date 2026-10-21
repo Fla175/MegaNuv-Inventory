@@ -1,5 +1,5 @@
 // components/list/MoveModal.tsx
-import { X, MapPin } from "lucide-react";
+import { X, MapPin, ChevronRight } from "lucide-react";
 import type { InventoryItem } from "@/types/inventory";
 import MoveTree from "./MoveTree";
 
@@ -79,7 +79,12 @@ export default function MoveModal({
                       }}
                       className="p-4 mr-1 text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                      <ChevronRight
+                        size={16}
+                        className={`transition-transform ${
+                          isExpanded ? "rotate-90" : ""
+                        }`}
+                      />
                     </button>
                   )}
                 </div>

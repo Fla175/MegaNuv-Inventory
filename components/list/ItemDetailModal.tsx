@@ -1,7 +1,7 @@
 // components/list/ItemDetailModal.tsx
 import { X, Layers, Box, Barcode, Hash, MapPin, Factory, Cpu, Tag, Boxes, Printer, Pencil, Move, Copy, Trash2, FileText } from "lucide-react";
 import Image from "next/image";
-import { useUser } from "@/lib/context/UserContext";
+import QRCode from "react-qr-code";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
 import { getItemColors } from "@/lib/constants/colors";
 import { parseFileUrls } from "@/lib/mediaReferences";
@@ -15,6 +15,7 @@ interface ItemDetailModalProps {
   actives: InventoryItem[];
   fatherSpaces: FatherSpace[];
   categories: Category[];
+  isViewer: boolean;
   onEdit: (item: InventoryItem, mode: "view" | "edit") => void;
   onMove: (item: InventoryItem) => void;
   onClone: (item: InventoryItem) => void;
@@ -29,15 +30,13 @@ export default function ItemDetailModal({
   actives,
   fatherSpaces,
   categories,
+  isViewer,
   onEdit,
   onMove,
   onClone,
   onDelete,
   onPrint,
 }: ItemDetailModalProps) {
-  const { user } = useUser();
-  const isViewer = user?.role === "VIEWER";
-
   if (!isOpen || !item) return null;
 
   const getCategory = (categoryId: string | null | undefined) => {
@@ -87,8 +86,10 @@ export default function ItemDetailModal({
                 Class="truncate"
                 value={
                   (item.parentId
-                    ? actives.find((a) => a.id === item.parentId)?.name
-                    : fatherSpaces.find((s) => s.id === item.fatherSpaceId)?.name) || "N/A"
+                    ? actives.find((a) => a.id === item.parentId)?.name ||
+                      item.fatherSpace?.name
+                    : fatherSpaces.find((s) => s.id === item.fatherSpaceId)
+                        ?.name) || "N/A"
                 }
               />
               <InfoItem icon={<Barcode size={16} />} label="ID do Sistema" Class="font-mono text-[10px] truncate" value={item.id} />
@@ -130,7 +131,14 @@ export default function ItemDetailModal({
             {item.isPhysicalSpace && (
               <div className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border dark:border-white/5">
                 <div className="bg-white p-3 rounded-2xl shadow-md mb-4 border border-zinc-100">
-                  <Image src={`${typeof window !== "undefined" ? window.location.origin : ""}/qrcode/view?id=${item.id}`} width={160} height={160} alt="QR Code" />
+                  <QRCode
+                    value={`${
+                      typeof window !== "undefined"
+                        ? window.location.origin
+                        : ""
+                    }/qrcode/view?id=${item.id}`}
+                    size={160}
+                  />
                 </div>
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-tighter mb-4 text-center">QR Code</p>
                 <button onClick={() => onPrint(item)} className="w-full py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-colors">

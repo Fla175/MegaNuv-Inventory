@@ -51,14 +51,21 @@ export function useInventorySelection({
     (e: React.MouseEvent | React.TouchEvent, activeId: string) => {
       if (isSelectionMode) return;
       e.preventDefault();
+      const item = actives.find((a) => a.id === activeId);
       const timer = setTimeout(() => {
-        activateSelectionMode(activeId);
+        setIsSelectionMode(true);
+        if (item?.isPhysicalSpace) {
+          const childIds = getAllChildIds(activeId);
+          setSelectedItems(new Set([activeId, ...childIds]));
+        } else {
+          setSelectedItems(new Set([activeId]));
+        }
         setLongPressItem(null);
       }, 1000);
       setLongPressTimer(timer);
       setLongPressItem(activeId);
     },
-    [isSelectionMode, activateSelectionMode]
+    [isSelectionMode, actives, getAllChildIds]
   );
 
   const handleLongPressEnd = useCallback(() => {

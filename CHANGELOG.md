@@ -915,6 +915,45 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 
 - **`ADR/ADR-003.md`** — contexto, decisão, alternativas, trade-offs, consequências e action items detalhados por etapa.
 
+### 🤖 OpenCode Operations (7)
+
+#### Fixed
+
+- **Etapa C da ADR-003 — `ListSection` havia sido substituído por um stub.** O commit `027baec`
+  entregou `components/ListSection.tsx` renderizando texto de teste (`"ListSection: X ativos..."`),
+  itens fake (`{ id: "test" }`) e handlers vazios, além de comentar `<ListSection>` em
+  `pages/index.tsx`. A listagem de ativos estava fora do ar e o gate passou porque a suíte não cobre
+  UI. O orquestrador foi reconstruído a partir da fonte de verdade
+  (`git show 69bcac3:components/ListSection.tsx`) e a página foi religada.
+- **`UseToast()` chamado no escopo do módulo em `useUndo` e `useCloneBatch`.** Era a causa real do
+  `TypeError: Cannot read properties of null (reading 'useContext')` na fase "Collecting page data":
+  o hook de contexto executava durante a avaliação do módulo, fora de um componente React. As duas
+  chamadas passaram para dentro dos hooks. `ListSection` também deixou de chamar `useUser()`: a
+  página calcula `isViewer` e passa por prop (`ListSectionProps`).
+
+#### Changed
+
+- **Hooks da Etapa C completados:** `useMoveAction` absorveu `handleMoveAction` (payload de lote,
+  timestamp, undo e mensagens), `useCloneBatch` ganhou `onCloned`, `useInventorySelection` passou a
+  selecionar os filhos no long press de espaço físico, e `useInventoryDelete` centraliza exclusão
+  individual/em massa.
+- **Componentes da Etapa C alinhados ao comportamento original:** `ActiveTreeNode` recursa pelos
+  filhos filtrados mantendo contagens na coleção completa, usa `getItemColors` de
+  `lib/constants/colors`, restaura o estado vazio de espaço físico e o chevron rotativo; o modal de
+  clonagem voltou a usar `SearchableSelect`; os QR Codes de detalhe/impressão voltaram para
+  `react-qr-code`; `InventorySpaces` isola o estado vazio e os cards de Espaço Pai.
+
+#### Added
+
+- `components/list/InventorySpaces.tsx`, `components/list/executeIframePrint.ts`,
+  `lib/hooks/useInventoryCategories.ts`, `lib/hooks/useInventoryDelete.ts`.
+
+#### Verification
+
+- `npx tsc --noEmit` 0 erros · `eslint .` 0/0 · `npx prisma validate` OK · `yarn test` **350 passed**
+  + 5 skipped · `yarn build:opt` OK (90 MB). O HTML pré-renderizado de `/` voltou a conter
+  "Nenhum Espaço Cadastrado" e não contém o texto do stub.
+
 ---
 
 ## - Initial Setup

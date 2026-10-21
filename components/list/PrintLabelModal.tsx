@@ -1,7 +1,7 @@
 // components/list/PrintLabelModal.tsx
 import { X, Printer } from "lucide-react";
+import QRCode from "react-qr-code";
 import type { InventoryItem } from "@/types/inventory";
-import Image from "next/image";
 
 interface PrintLabelModalProps {
   isOpen: boolean;
@@ -23,7 +23,15 @@ export default function PrintLabelModal({ isOpen, onClose, item, onPrint }: Prin
 
         <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-700 print:border-2 print:border-black print:rounded-lg print:m-4 print:p-4 text-black" id="qrcode-print-label">
           <div className="bg-white p-3">
-            <Image src={`${typeof window !== "undefined" ? window.location.origin : ""}/qrcode/view?id=${item.id}`} alt="QR Code" width={160} height={160} />
+            <QRCode
+              value={`${
+                typeof window !== "undefined" ? window.location.origin : ""
+              }/qrcode/view?id=${item.id}`}
+              size={180}
+              level="H"
+              bgColor="#FFFFFF"
+              fgColor="#000000"
+            />
           </div>
           <div className="mt-4 text-center">
             <h4 className="font-black text-lg uppercase tracking-tight leading-tight max-w-[200px]">{item.name}</h4>
