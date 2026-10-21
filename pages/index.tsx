@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import HeaderSection from "@/components/HeaderSection";
 import SearchSection from "@/components/SearchSection";
-import ListSection from "@/components/ListSection";
 import ActiveForm from "@/components/actives/activeForm";
 import { useUser } from "@/lib/context/UserContext";
 import type { FatherSpace, InventoryItem } from "@/types/inventory";
@@ -76,15 +75,14 @@ export default function GestaoAtivosPage() {
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 space-y-6">
         <HeaderSection onNewActive={() => handleOpenForm("create")} />
         <SearchSection filters={filters} setFilters={setFilters} />
-
-        <ListSection 
+        {/* <ListSection
           actives={actives}
           fatherSpaces={fatherSpaces}
-          filters={filters} 
+          filters={filters}
           onRefresh={loadData}
           onEdit={(data) => handleOpenForm("edit", data)}
           onClone={(data) => handleOpenForm("clone", data)}
-        />
+        /> */}
       </div>
 
       {isFormOpen && (
