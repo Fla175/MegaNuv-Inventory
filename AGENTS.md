@@ -51,7 +51,7 @@ e a divergência deve ser registrada em `CHANGELOG.md` na mesma alteração.
 | `SPECS.md` | Contrato técnico verificável (stack, layout, dependências, contratos, DoD). | Alta — acompanha o código. |
 | `CONTEXT.md` | Foto do "agora": foco atual, bloqueadores, débitos abertos. | **Alta — atualizada a cada sessão.** |
 | `CHANGELOG.md` | Diário de alterações por agente de IA. | **Alta — append-only, uma seção por sessão.** |
-| `ESTAGIO-1-CREATOR-ACCESS.md` | Arquitetura do acesso do criador (Estágio 1). | Média |
+| `fowler-smells.md` | Guia de referência rápida de code smells para revisões. | Baixa |
 | `README.md` | Documentação de uso humano (existente, parcialmente desatualizada). | Média |
 
 ---
