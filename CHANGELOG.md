@@ -1018,6 +1018,17 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 - `npx tsc --noEmit` 0 erros · `eslint .` 0/0 · `npx prisma validate` OK · `yarn test`
   **371 passed** + 5 skipped · `yarn build:opt` OK.
 
+### 🤖 OpenCode Operations (10)
+
+#### Chores
+
+- **Alterações locais do dono commitadas a pedido explícito:** `.gitignore` passa a ignorar
+  `/runs/harness2/`; `opencode.json` remove `layout` e o hostname de servidor antigo; o documento
+  histórico `ESTAGIO-1-CREATOR-ACCESS.md` é removido; e o guia `fowler-smells.md` entra no
+  repositório. Nenhum segredo foi introduzido.
+- **Índice em `AGENTS.md` atualizado:** a linha do `ESTAGIO-1-CREATOR-ACCESS.md` deu lugar ao
+  `fowler-smells.md`; `CONTEXT.md` §3.4 registra o working tree limpo.
+
 ---
 
 ## - Initial Setup

@@ -281,11 +281,10 @@ a auditoria foi validada só por unidade, sem MinIO.
 
 ### 3.4 Estado do Working Tree
 
-**Etapa D commitada em `refactor/modularize-ui`.** O trabalho do revert, do Estágio 1 e das
-Etapas A–C da ADR-003 também está commitado. Permanecem no working tree **apenas itens externos
-pré-existentes**, fora do escopo desta branch: `.gitignore` (`/runs/harness2/`), `opencode.json`,
-a deleção de `ESTAGIO-1-CREATOR-ACCESS.md` e os arquivos `fowler-*.md`. Nenhum deles foi
-restaurado nem commitado por esta sessão.
+**Working tree limpo em `refactor/modularize-ui`.** O trabalho do revert, do Estágio 1 e das
+Etapas A–E da ADR-003 está commitado. As alterações locais do dono também foram commitadas nesta
+sessão: `.gitignore` (`/runs/harness2/`), `opencode.json` (sem `layout`/hostname antigos), a
+deleção de `ESTAGIO-1-CREATOR-ACCESS.md` e a adição de `fowler-smells.md`.
 
 - `yarn.lock` e `package-lock.json` — ver §3.2 #2 (artefato de `npm install` acidental).
 
