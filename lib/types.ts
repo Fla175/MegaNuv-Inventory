@@ -1,5 +1,5 @@
 // lib/types.ts
-import type { FatherSpace, InventoryItem } from "@/types/inventory";
+import type { FatherSpace, InventoryItem, SpaceDetail } from "@/types/inventory";
 
 export interface ListSectionFilters {
   query?: string;
@@ -21,4 +21,8 @@ export interface ListSectionProps {
    * `useUser()`, which is not resolvable while Next collects page data.
    */
   isViewer: boolean;
+  /** DIRECTOR/ADMIN may edit father spaces (the modal shows the action). */
+  canEditSpace: boolean;
+  /** Entry point for the edit action; the page decides where it leads. */
+  onEditSpace?: (space: SpaceDetail) => void;
 }

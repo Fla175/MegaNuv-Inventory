@@ -304,6 +304,8 @@ Regras que a tabela não expressa sozinha:
 | `/api/users`                | GET                 | ✅ **privado** (`authMiddleware`) | **privado**; leitura liberada a autenticados, campos seguros (sem hash)                                            |
 | `/api/users`                | POST                | ✅ **privado** (`authMiddleware`) | DIRECTOR todos; ADMIN exceto DIRECTOR; MANAGER só VIEWER (`lib/rbac.ts`)                                           |
 | `/api/users/[id]`           | PATCH, DELETE       | ✅ **privado** (`getSessionUser`) | mesma regra da linha acima; perfil próprio sem troca de papel                                                     |
+| `/api/father-spaces/list`   | GET                 | ✅ **privado** (`getSessionUser`) | privado; todos os papéis autenticados                                                                              |
+| `/api/father-spaces/[id]`   | GET                 | ✅ **privado** (`getSessionUser`) | privado; todos os papéis autenticados, `404` se o espaço não existe (ADR-004)                                      |
 | `/api/father-spaces/*`      | POST, PATCH, DELETE | ✅ **privado** (`getSessionUser`) | DIRECTOR/ADMIN                                                                                                     |
 | `/api/logs/clear`           | DELETE              | ✅ **privado** (`getSessionUser`) | DIRECTOR/ADMIN; MANAGER só lê (`/api/logs/list`)                                                                   |
 | `/api/users/check-director` | GET                 | ✅ **privado** (`authMiddleware`) | privado                                                                                                            |
@@ -347,6 +349,16 @@ UI é a prévia, não uma estimativa: o que o diálogo conta é o que o `DELETE`
 
 **Paginação:** não existe. `list` devolve o conjunto inteiro; `/api/logs/list` limita a 200.
 Ao adicionar listagem, **não** quebrar o formato de resposta atual sem versionar.
+
+**Detalhe do espaço pai e modal read-only (ADR-004):** `GET /api/father-spaces/[id]` devolve o
+`FatherSpace` completo pelo id — incluindo `address`, `responsible`, `phone` e `imageUrl`, que o
+type `FatherSpace` da lista não expõe — mais `createdBy` (`id`, `name`, `role`) e `parent`
+(`id`, `name`). A leitura é liberada a **qualquer papel autenticado**; o endpoint responde `401`
+sem sessão, `400` sem `id`, `404` quando o espaço não existe e `405` fora de `GET`. A escrita de
+espaços continua restrita a DIRECTOR/ADMIN (`update.ts`/`create.ts`). No front-end,
+`components/list/SpaceDetailModal.tsx` (somente leitura) consome esse payload; o botão de edição
+só é renderizado quando a página informa `canEditSpace` (DIRECTOR/ADMIN) e leva ao modal de
+edição de `/settings?tab=spaces&spaceId=<id>`.
 
 ### 4.3 State Management & Idempotency Rules
 

@@ -1,6 +1,11 @@
 // __tests__/lib/inventory-filter.test.ts
 import { describe, expect, it } from "vitest";
-import { buildExpandedNodes, filterInventory } from "@/lib/inventory/filter";
+import {
+  buildExpandedNodes,
+  filterInventory,
+  isSpaceExpanded,
+  toggleSpaceExpansion,
+} from "@/lib/inventory/filter";
 import type { FatherSpace, InventoryItem } from "@/types/inventory";
 
 const spaces = [
@@ -113,5 +118,35 @@ describe("buildExpandedNodes", () => {
       rack: true,
       switch: true,
     });
+  });
+});
+
+describe("father-space expansion", () => {
+  it("treats a space without an entry as expanded", () => {
+    expect(isSpaceExpanded({}, "space-a")).toBe(true);
+    expect(isSpaceExpanded({ "space-a": true }, "space-a")).toBe(true);
+  });
+
+  it("respects an explicit collapse", () => {
+    expect(isSpaceExpanded({ "space-a": false }, "space-a")).toBe(false);
+    expect(isSpaceExpanded({ "space-a": false }, "space-b")).toBe(true);
+  });
+
+  it("collapses on the first toggle and expands on the second", () => {
+    const collapsed = toggleSpaceExpansion({}, "space-a");
+    expect(collapsed).toEqual({ "space-a": false });
+    expect(isSpaceExpanded(collapsed, "space-a")).toBe(false);
+
+    const expanded = toggleSpaceExpansion(collapsed, "space-a");
+    expect(expanded).toEqual({ "space-a": true });
+    expect(isSpaceExpanded(expanded, "space-a")).toBe(true);
+  });
+
+  it("does not mutate the previous map", () => {
+    const previous = { "space-a": false };
+    const next = toggleSpaceExpansion(previous, "space-b");
+
+    expect(previous).toEqual({ "space-a": false });
+    expect(next).not.toBe(previous);
   });
 });

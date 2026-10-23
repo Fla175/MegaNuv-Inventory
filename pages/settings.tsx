@@ -24,7 +24,7 @@ import type { SettingsTab } from "@/components/settings/types";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { tab } = router.query;
+  const { tab, spaceId } = router.query;
   const [activeTab, setActiveTab] = useState<SettingsTab>("users");
   const { user, refreshUser, loading } = useUser();
 
@@ -60,6 +60,31 @@ export default function SettingsPage() {
     refreshSpaces: data.refreshSpaces,
     refreshRevertHistory: revert.fetchRevertHistory,
   });
+  const openEditSpace = spaceCrud.openEditSpace;
+
+  // The inventory list's "Editar espaço" action deep-links here. Open the
+  // matching space once the spaces tab has loaded, then drop the id so closing
+  // the modal does not reopen it after a refresh.
+  useEffect(() => {
+    if (typeof spaceId !== "string" || !permissions.canManageAll) return;
+
+    const space = data.spacesList.find((item) => item.id === spaceId);
+    if (!space) return;
+
+    openEditSpace(space);
+    router.replace(
+      { pathname: "/settings", query: { tab: "spaces" } },
+      undefined,
+      { shallow: true }
+    );
+  }, [
+    spaceId,
+    permissions.canManageAll,
+    data.spacesList,
+    openEditSpace,
+    router,
+  ]);
+
   const categoryCrud = useCategoryCrud({
     refreshCategories: data.refreshCategories,
     refreshRevertHistory: revert.fetchRevertHistory,

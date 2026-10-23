@@ -4,7 +4,7 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 21/10/2026 · **Branch:** `refactor/modularize-ui`
+**Última atualização:** 23/10/2026 · **Branch:** `refactor/modularize-ui`
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
@@ -27,6 +27,16 @@ em segurança, testes e manutenção. Ver §3.
 
 ### 2.1 Foco atual
 
+> **`ADR-004` — detalhe do espaço-pai no index — concluída em `refactor/modularize-ui` (23/10/2026).**
+> Clicar no nome/corpo do espaço-pai abre o `SpaceDetailModal` (somente leitura) com foto, endereço,
+> responsável e telefone; o chevron ao lado do nome expande/colapsa os ativos do espaço. VIEWER vê o
+> modal sem edição; DIRECTOR/ADMIN veem "Editar espaço", que abre o `SpaceModal` de `/settings` já
+> preenchido via deep-link (`?tab=spaces&spaceId=<id>`). Os dados vêm do novo
+> `GET /api/father-spaces/[id]` e do type `SpaceDetail`; o type `FatherSpace` da lista não foi
+> ampliado. Gates: `yarn lint` 0/0, `npx tsc --noEmit` 0, `npx prisma validate` OK,
+> **382 testes + 5 skipped**, `yarn build:opt` standalone 93M. Rastro para o PR em
+> `.planning/stages/03-list-section-space-detail/PR.md`; decisão em `ADR/ADR-004.md`.
+>
 > **Execução da `ADR/ADR-001.md` — Etapas 0, 1, 2 e 3 concluídas, em branches empilhadas.**
 > Etapa 0 (`fix/actives-write-authz`, `49a2b58`): autorização de escrita em `clone-batch` e `update`.
 > Etapa 1 (`fix/actives-value-visibility`, `d76992a`): redação de `fixedValue` por papel, preservação
@@ -281,11 +291,13 @@ a auditoria foi validada só por unidade, sem MinIO.
 
 ### 3.4 Estado do Working Tree
 
-**Working tree limpo em `refactor/modularize-ui`.** O trabalho do revert, do Estágio 1 e das
-Etapas A–E da ADR-003 está commitado. As alterações locais do dono também foram commitadas nesta
-sessão: `.gitignore` (`/runs/harness2/`), `opencode.json` (sem `layout`/hostname antigos), a
-deleção de `ESTAGIO-1-CREATOR-ACCESS.md` e a adição de `fowler-smells.md`.
+**ADR-004 commitada em `refactor/modularize-ui` (sem push).** O trabalho do revert, do Estágio 1,
+das Etapas A–E da ADR-003 e das alterações locais do dono já estava commitado. Nesta sessão entraram
+o endpoint `GET /api/father-spaces/[id]`, o `SpaceDetailModal`, os controles de clique/colapso no
+`InventorySpaces`, o deep-link de edição e os testes/documentos da ADR-004.
 
+- `components/dashboard/RecentList.tsx` aparece modificado no working tree por **edição
+  concorrente fora desta tarefa**; não faz parte da ADR-004 e não deve ser commitado junto.
 - `yarn.lock` e `package-lock.json` — ver §3.2 #2 (artefato de `npm install` acidental).
 
 ### 3.5 Dependências do ambiente

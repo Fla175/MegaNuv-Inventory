@@ -119,3 +119,27 @@ export function buildExpandedNodes(
 
   return expanded;
 }
+
+/*
+ * Father-space bodies default to expanded, unlike active-tree nodes (which
+ * default to collapsed). `expandedNodes` therefore stores only the spaces the
+ * user collapsed: an absent key means expanded, not collapsed.
+ */
+export function isSpaceExpanded(
+  expandedNodes: Record<string, boolean>,
+  spaceId: string
+): boolean {
+  return expandedNodes[spaceId] !== false;
+}
+
+/**
+ * Toggles a father-space body. Because the default is expanded, the first click
+ * has to store `false`; `!expandedNodes[spaceId]` would store `true` and leave
+ * the body visually unchanged.
+ */
+export function toggleSpaceExpansion(
+  expandedNodes: Record<string, boolean>,
+  spaceId: string
+): Record<string, boolean> {
+  return { ...expandedNodes, [spaceId]: expandedNodes[spaceId] === false };
+}

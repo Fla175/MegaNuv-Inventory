@@ -1,7 +1,7 @@
 // components/ListSection.tsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ListSectionProps } from "@/lib/types";
-import type { InventoryItem } from "@/types/inventory";
+import type { FatherSpace, InventoryItem, SpaceDetail } from "@/types/inventory";
 import { useIsMobile } from "@/lib/hooks/useMediaQuery";
 import { UseToast } from "@/lib/context/ToastContext";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
@@ -12,10 +12,12 @@ import { useInventoryDelete } from "@/lib/hooks/useInventoryDelete";
 import { useMoveAction } from "@/lib/hooks/useMoveAction";
 import { useUndo } from "@/lib/hooks/useUndo";
 import { useCloneBatch } from "@/lib/hooks/useCloneBatch";
+import { toggleSpaceExpansion } from "@/lib/inventory/filter";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import InventorySpaces from "@/components/list/InventorySpaces";
 import ContextMenu from "@/components/list/ContextMenu";
 import ItemDetailModal from "@/components/list/ItemDetailModal";
+import SpaceDetailModal from "@/components/list/SpaceDetailModal";
 import PrintLabelModal from "@/components/list/PrintLabelModal";
 import MoveModal from "@/components/list/MoveModal";
 import CloneBatchModal from "@/components/list/CloneBatchModal";
@@ -38,6 +40,8 @@ export default function ListSection({
   actives,
   fatherSpaces,
   isViewer,
+  canEditSpace,
+  onEditSpace,
 }: ListSectionProps) {
   const isMobile = useIsMobile();
   const { showError } = UseToast();
@@ -48,6 +52,7 @@ export default function ListSection({
     useState<InventoryItem | null>(null);
   const [selectedViewItem, setSelectedViewItem] =
     useState<InventoryItem | null>(null);
+  const [selectedSpace, setSelectedSpace] = useState<SpaceDetail | null>(null);
 
   const { filteredData, expandedNodes, setExpandedNodes } = useInventoryFilter({
     filters,
@@ -101,6 +106,7 @@ export default function ListSection({
     fatherSpaces.length > 0 && filteredData.spaces.length === 0;
 
   useEscapeKey(() => setSelectedViewItem(null), !!selectedViewItem);
+  useEscapeKey(() => setSelectedSpace(null), !!selectedSpace);
   useEscapeKey(() => setSelectedPrintItem(null), !!selectedPrintItem);
   useEscapeKey(() => move.setMovingItem(null), !!move.movingItem);
   useEscapeKey(() => setContextMenu(null), !!contextMenu);
@@ -190,6 +196,25 @@ export default function ListSection({
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleSpaceToggleExpand = (id: string) => {
+    setExpandedNodes((prev) => toggleSpaceExpansion(prev, id));
+  };
+
+  const handleSpaceClick = useCallback(
+    async (space: FatherSpace) => {
+      try {
+        const response = await fetch(`/api/father-spaces/${space.id}`);
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+
+        const detail = (await response.json()) as SpaceDetail;
+        setSelectedSpace(detail);
+      } catch {
+        showError("Não foi possível carregar os detalhes do espaço.");
+      }
+    },
+    [showError]
+  );
+
   const handleItemLongPress = (
     e: React.MouseEvent | React.TouchEvent,
     id: string
@@ -247,6 +272,8 @@ export default function ListSection({
             onContextMenu={handleContextMenu}
             onItemClick={handleItemClick}
             onToggleExpand={handleToggleExpand}
+            onSpaceClick={handleSpaceClick}
+            onSpaceToggleExpand={handleSpaceToggleExpand}
             handleLongPressStart={handleItemLongPress}
             handleLongPressEnd={handleLongPressEnd}
             handleCheckboxChange={handleCheckboxChange}
@@ -269,6 +296,14 @@ export default function ListSection({
           setSelectedViewItem(null);
           setSelectedPrintItem(item);
         }}
+      />
+
+      <SpaceDetailModal
+        isOpen={!!selectedSpace}
+        onClose={() => setSelectedSpace(null)}
+        space={selectedSpace}
+        canEdit={canEditSpace}
+        onEdit={onEditSpace}
       />
 
       <PrintLabelModal

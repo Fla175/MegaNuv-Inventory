@@ -66,6 +66,32 @@ export interface FatherSpace {
   updatedAt: string | Date;
 }
 
+/**
+ * Payload of `GET /api/father-spaces/[id]` (ADR-004).
+ *
+ * Separate from `FatherSpace` on purpose: the list only needs identity and
+ * counts, while the detail modal needs the location metadata. Widening the list
+ * type would make every consumer carry fields it never reads.
+ */
+export interface SpaceDetail {
+  id: string;
+  name: string;
+  notes?: string | null;
+  address?: string | null;
+  imageUrl?: string | null;
+  phone?: string | null;
+  responsible?: string | null;
+
+  createdById?: string | null;
+  createdBy?: Pick<User, "id" | "name" | "role"> | null;
+
+  parentId?: string | null;
+  parent?: Pick<FatherSpace, "id" | "name"> | null;
+
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface Active {
   id: string;
   name: string;
