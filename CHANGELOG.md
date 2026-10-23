@@ -1029,6 +1029,44 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 - **Índice em `AGENTS.md` atualizado:** a linha do `ESTAGIO-1-CREATOR-ACCESS.md` deu lugar ao
   `fowler-smells.md`; `CONTEXT.md` §3.4 registra o working tree limpo.
 
+### 🤖 OpenCode Operations (11)
+
+#### Added
+
+- **ADR-004 — detalhe read-only do espaço-pai.** Novo `GET /api/father-spaces/[id]`
+  (`pages/api/father-spaces/[id].ts`) devolve o espaço completo — `address`, `responsible`,
+  `phone` e `imageUrl`, que o type da lista não expõe — mais `createdBy` e `parent`. A leitura é
+  liberada a qualquer sessão autenticada; `401` sem sessão, `400` sem id, `404` inexistente e
+  `405` fora de `GET`. Payload tipado por `SpaceDetail` (`types/inventory.ts`).
+- **`components/list/SpaceDetailModal.tsx`** — modal somente-leitura espelhando
+  `ItemDetailModal`: foto com fallback, nome, endereço, responsável, telefone e notas. Campos
+  vazios mostram "Não informado"; `Esc` e `X` fecham. O botão "Editar espaço" só é renderizado
+  quando `canEdit` (DIRECTOR/ADMIN) e não fecha o modal ao acionar.
+- **Testes:** `__tests__/api/father-spaces-detail.test.ts` (7 casos) e +4 casos em
+  `__tests__/lib/inventory-filter.test.ts` para `isSpaceExpanded`/`toggleSpaceExpansion`.
+
+#### Changed
+
+- **`InventorySpaces` / `ListSection`:** clicar no cabeçalho do espaço-pai abre o modal (fetch do
+  detalhe); o chevron expande/colapsa os ativos sem abrir o modal. `expandedNodes` guarda apenas
+  espaços recolhidos — ausente = expandido, preservando o estado anterior. A árvore de ativos
+  continua intocada e cliques em ativos não borbulham para o espaço. O `onContextMenu` do espaço
+  foi movido também para o cabeçalho, então o menu continua acessível com o corpo recolhido; em
+  modo de seleção o clique do cabeçalho é ignorado para não abrir o detalhe sobre a árvore.
+- **Edição a partir do modal:** `pages/index.tsx` calcula `canEditSpace` e navega para
+  `/settings?tab=spaces&spaceId=<id>`; `pages/settings.tsx` abre o `SpaceModal` já preenchido uma
+  vez e limpa o parâmetro com `router.replace(..., { shallow: true })`.
+
+#### Docs
+
+- `ADR/ADR-004.md`, `.planning/stages/03-list-section-space-detail/{SPEC,PLAN,NOTES,PR}.md`,
+  `.planning/STATE.md`, `SPECS.md` (contrato do endpoint e regra de acesso) e este changelog.
+
+#### Verification
+
+- `yarn lint` 0/0 · `npx tsc --noEmit` 0 erros · `npx prisma validate` OK · `yarn test`
+  **382 passed** + 5 skipped · `yarn build:opt` OK (standalone 93 MB, rota `[id]` no manifesto).
+
 ---
 
 ## - Initial Setup

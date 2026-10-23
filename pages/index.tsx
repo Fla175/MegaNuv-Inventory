@@ -1,5 +1,6 @@
 // pages/index.tsx
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import Layout from "@/components/Layout";
 import HeaderSection from "@/components/HeaderSection";
 import SearchSection from "@/components/SearchSection";
@@ -9,6 +10,7 @@ import { useUser } from "@/lib/context/UserContext";
 import type { FatherSpace, InventoryItem } from "@/types/inventory";
 
 export default function GestaoAtivosPage() {
+  const router = useRouter();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit" | "clone">("create");
   const [selectedActive, setSelectedActive] = useState<Partial<InventoryItem> | null>(null);
@@ -84,6 +86,12 @@ export default function GestaoAtivosPage() {
           onEdit={(data) => handleOpenForm("edit", data)}
           onClone={(data) => handleOpenForm("clone", data)}
           isViewer={user?.role === "VIEWER"}
+          canEditSpace={user?.role === "DIRECTOR" || user?.role === "ADMIN"}
+          onEditSpace={(space) =>
+            router.push(
+              `/settings?tab=spaces&spaceId=${encodeURIComponent(space.id)}`
+            )
+          }
         />
       </div>
 

@@ -1,17 +1,20 @@
 ---
-stage: E-validation
+stage: 03-list-section-space-detail
 status: done
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 ## Now
-ADR-003 concluída: `pages/dashboard.tsx` (124 L), `components/ListSection.tsx` (355 L) e
-`pages/settings.tsx` (169 L), com hooks por domínio e `components/settings/*`.
-A revisão final corrigiu impressão/indentação da Etapa C, papel de MANAGER criador e regressões
-visuais dos diálogos da Etapa D.
+ADR-004 concluída e commitada na branch `refactor/modularize-ui` (sem push): endpoint
+`GET /api/father-spaces/[id]`, type `SpaceDetail`, `InventorySpaces` com clique no cabeçalho +
+chevron de colapso, `ListSection` com `selectedSpace` e `SpaceDetailModal` read-only, e deep-link
+de edição para `/settings`. O rastro para o agente Commit está em
+`.planning/stages/03-list-section-space-detail/PR.md` e no `CHANGELOG.md`
+(`OpenCode Operations (11)`).
 
 ## Next
-- (nenhum para a ADR-003)
+- Revisão humana e teste manual do dono (VIEWER × DIRECTOR/ADMIN).
+- Quando o PR for aberto, usar `PR.md` como descrição.
 
 ## Blocked
 - (nenhum)
