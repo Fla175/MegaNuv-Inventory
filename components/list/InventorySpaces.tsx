@@ -1,5 +1,5 @@
 // components/list/InventorySpaces.tsx
-import { ChevronDown, Ghost, MapPin, SearchX } from "lucide-react";
+import { Ghost, MapPin, SearchX } from "lucide-react";
 import { getParentSpaceColors } from "@/lib/constants/colors";
 import { isSpaceExpanded } from "@/lib/inventory/filter";
 import ActiveTree from "./ActiveTree";
@@ -7,9 +7,7 @@ import type { Category, FatherSpace, InventoryItem } from "@/types/inventory";
 
 interface InventorySpacesProps {
   spaces: FatherSpace[];
-  /** Full collection — forwarded for counts. */
   actives: InventoryItem[];
-  /** Filtered collection — decides which rows render. */
   visibleActives: InventoryItem[];
   categories: Category[];
   selectedItems: Set<string>;
@@ -32,7 +30,7 @@ interface InventorySpacesProps {
   onToggleExpand: (id: string) => void;
   /** Opens the read-only detail modal for the clicked father space. */
   onSpaceClick: (space: FatherSpace) => void;
-  /** Collapses/expands the actives of a father space. */
+  /** Collapses/expands the actives of a father space (map-pin toggle). */
   onSpaceToggleExpand: (id: string) => void;
   handleLongPressStart: (
     e: React.MouseEvent | React.TouchEvent,
@@ -99,13 +97,13 @@ export default function InventorySpaces({
         const hasActives = visibleActives.some(
           (a) => a.fatherSpaceId === space.id
         );
-        const spaceColors = getParentSpaceColors(hasActives);
+        const spaceColors = getParentSpaceColors(hasActives); // usado no botão de expansão
         const isExpanded = isSpaceExpanded(expandedNodes, space.id);
         const bodyId = `space-actives-${space.id}`;
 
-        // The space itself is not a selection target: while the user is picking
-        // actives, a header click must not open the details on top of the tree.
-        const openDetails = () => {
+        // Entire card body opens the read-only detail modal.
+        // The map-pin icon alone toggles expansion — no extra chevron.
+        const openSpaceDetail = () => {
           if (!isSelectionMode) onSpaceClick(space);
         };
 
@@ -114,31 +112,11 @@ export default function InventorySpaces({
             key={space.id}
             className="group bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-gray-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
           >
-            <div
-              onContextMenu={(e) => onContextMenu(e, space, true)}
-              className="p-6 flex items-center justify-between gap-4 bg-gray-50/50 dark:bg-white/[0.02] border-b dark:border-white/5"
-            >
-              <div
-                role="button"
-                tabIndex={isSelectionMode ? -1 : 0}
-                aria-disabled={isSelectionMode}
-                aria-label={`Ver detalhes do espaço ${space.name}`}
-                onClick={openDetails}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openDetails();
-                  }
-                }}
-                className={`flex items-center gap-4 min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isSelectionMode ? "cursor-default" : "cursor-pointer"}`}
-              >
-                <div className={`p-2 rounded-lg shrink-0 ${spaceColors.bg} ${spaceColors.text}`}>
-                  <MapPin size={20} />
-                </div>
-                <h2 className="text-xl font-black italic text-gray-500 dark:text-white uppercase truncate">
-                  {space.name}
-                </h2>
-              </div>
+            {/* Header: name + map-pin toggle only */}
+            <div className="p-6 flex items-center justify-between gap-4 bg-gray-50/50 dark:bg-white/[0.02] border-b dark:border-white/5">
+              <h2 className="text-xl font-black italic text-gray-500 dark:text-white uppercase truncate">
+                {space.name}
+              </h2>
               <button
                 type="button"
                 onClick={() => onSpaceToggleExpand(space.id)}
@@ -152,49 +130,59 @@ export default function InventorySpaces({
                 title={isExpanded ? "Recolher ativos" : "Expandir ativos"}
                 className="p-2 shrink-0 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-white/5 transition-colors"
               >
-                <ChevronDown
+                <MapPin
                   size={20}
-                  className={`transition-transform ${isExpanded ? "" : "-rotate-90"}`}
+                  className={`transition-transform ${isExpanded ? "" : "-rotate-90"} ${spaceColors.text}`}
+                  aria-hidden="true"
                 />
               </button>
             </div>
-            {isExpanded && (
-              <div
-                id={bodyId}
-                onContextMenu={(e) => onContextMenu(e, space, true)}
-                className="bg-white dark:bg-zinc-900/50"
-              >
-                {hasActives ? (
-                  <ActiveTree
-                    spaceId={space.id}
-                    actives={actives}
-                    visibleActives={visibleActives}
-                    categories={categories}
-                    selectedItems={selectedItems}
-                    expandedNodes={expandedNodes}
-                    isViewer={isViewer}
-                    isSelectionMode={isSelectionMode}
-                    longPressItem={longPressItem}
-                    onContextMenu={onContextMenu}
-                    onItemClick={onItemClick}
-                    onToggleExpand={onToggleExpand}
-                    handleLongPressStart={handleLongPressStart}
-                    handleLongPressEnd={handleLongPressEnd}
-                    handleCheckboxChange={handleCheckboxChange}
-                  />
-                ) : (
-                  <div
-                    onClick={openDetails}
-                    className={`flex flex-col items-center justify-center py-8 px-6 opacity-40 transition-opacity ${isSelectionMode ? "cursor-default" : "cursor-pointer hover:opacity-60"}`}
-                  >
-                    <Ghost size={24} className="mb-2 text-zinc-400" />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
-                      Nenhum ativo neste local
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+
+            {/* Card body: click opens detail; contextMenu is NOT exposed for father-space */}
+            <div
+              onClick={openSpaceDetail}
+              onContextMenu={(e) => {
+                // Original architecture gate: context menu only for actives / physical spaces,
+                // not for father-spaces (the modal handles edits/inspection instead).
+                if (!isSelectionMode) {
+                  // Intentionally suppressed for father-space cards.
+                  // The detail modal replaces menu actions for spaces.
+                  e.preventDefault();
+                }
+              }}
+              className={`bg-white dark:bg-zinc-900/50 ${isSelectionMode ? "cursor-default" : "cursor-pointer hover:bg-gray-50/30 dark:hover:bg-white/[0.01]"} transition-colors`}
+            >
+              {isExpanded && (
+                <div id={bodyId} className="">
+                  {hasActives ? (
+                    <ActiveTree
+                      spaceId={space.id}
+                      actives={actives}
+                      visibleActives={visibleActives}
+                      categories={categories}
+                      selectedItems={selectedItems}
+                      expandedNodes={expandedNodes}
+                      isViewer={isViewer}
+                      isSelectionMode={isSelectionMode}
+                      longPressItem={longPressItem}
+                      onContextMenu={onContextMenu}
+                      onItemClick={onItemClick}
+                      onToggleExpand={onToggleExpand}
+                      handleLongPressStart={handleLongPressStart}
+                      handleLongPressEnd={handleLongPressEnd}
+                      handleCheckboxChange={handleCheckboxChange}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 px-6 opacity-40">
+                      <Ghost size={24} className="mb-2 text-zinc-400" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">
+                        Nenhum ativo neste local
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         );
       })}

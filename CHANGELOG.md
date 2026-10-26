@@ -1082,3 +1082,18 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 - **Funcionalidades:** hierarquia recursiva de espaços e ativos · movimentação com histórico (`Movement`) · 5 papéis de acesso (`DIRECTOR`/`ADMIN`/`MANAGER`/`VIEWER`) · upload de até 5 arquivos por ativo (10 MB) · etiquetas com QR Code · dashboard com agregados · auditoria em log imutável · **revert temporal** (`QUICK` em 10 s e `HISTORY`) · tema light/dark/system persistido por usuário.
 - **Infra:** `compose.yml` com serviço `app` (Next, `192.168.20.2:3000`) e `banco` (MariaDB, `192.168.20.3`) na rede interna `192.168.20.0/24`; `Dockerfile` de 2 estágios em `node:22-alpine` com `output: "standalone"`; MinIO externo ao compose.
 - **Estado de qualidade no início do setup multi-IA:** `yarn lint` ✅ · `npx tsc --noEmit` ✅ · `yarn build:opt` ✅ · **testes ❌ (0%, sem runner)** · **CI ❌ (ausente)**.
+
+---
+
+### 🤖 OpenCode Operations — Limpeza Global de Espaço (sessão 2026-10-23)
+
+#### Removed
+
+- **Remoção completa do harness² global:** `/root/.config/opencode/harness2/` (incluindo `.venv`, `runs/` `jb`/`demo`, `.env`, `.git`, código fonte, testes, assets, docs internos) — confirmada via `ls` (REMOVIDO).
+- **Remoção do notesmd-cli:** `/root/.config/opencode/tools/notesmd-cli/` e binário associado — confirmada (REMOVIDO).
+- **Limpeza de `/tmp`:** removidos `hrender_jb-*` (benchmark harness), caches `node-compile-cache`, `v8-compile-cache-0`, `yarn--*`, `.bun-*`, `hevo_ws/`, `opencode/`, arquivos soltos (`broken_test.py`, `truly_broken.py`, `test_codot.xlsx`, `test_wisdot.pdf`, `status_now.json`, hashes, `tmp.*`).
+- **Limpeza de `/root/.cache/`:** removidos `pip`, `huggingface`, `matplotlib`, `Microsoft`, `opencode`, `typescript`, `checkpoint-nodejs` (mantidos apenas `prisma`/`prisma-nodejs`).
+- **Remoção de backups/recuperação:** `/root/recovery-opencode/` e `/root/backups/` (backups antigos `pre-sury-20261020/`, `antes-senhas-20261015/`) removidos.
+- **Remoção de `.npm/` e resíduos apt:** `/root/.npm/` removido; arquivos `ngrok-agent.s3.amazonaws.com_*` em `/var/lib/apt/lists/` removidos (ngrok já purgado em 2026-10-21).
+- **Workspace preservado:** `/var/code/inventory` (projeto) e `/workspace/` (placeholder) não afetados.
+- **Verificação:** `yarn lint` não executado (não há alterações de código no projeto); a operação é puramente de infraestrutura/limpeza de container, sem impacto no código-fonte.
