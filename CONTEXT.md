@@ -5,7 +5,6 @@
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
 **Última atualização:** 23/10/2026 · **Branch:** `refactor/modularize-ui`
-**Nota de sessão:** limpeza global de espaço concluída — `harness2` (`/root/.config/opencode/harness2/`), `notesmd-cli` (`tools/notesmd-cli/`), caches `/tmp`, `/root/.cache/`, backups `/root/backups/`, `.npm/` e resíduos `ngrok` removidos; workspace `/var/code/inventory` preservado.
 **Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
