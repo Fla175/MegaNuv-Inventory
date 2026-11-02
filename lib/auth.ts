@@ -40,6 +40,25 @@ export async function verifyAuthToken(token: string): Promise<AuthTokenPayload |
   }
 }
 
+/**
+ * Tempo de vida de um token, em segundos, derivado do próprio JWT.
+ *
+ * O `maxAge` de um cookie tem de ser **igual ou menor** que o `exp` do token que
+ * ele guarda: cookie mais duradouro que o token sobrevive à sessão e vira um
+ * `401` em loop (ou, no caso de `auth_token_creator`, um stash sem validade que
+ * o `DELETE /api/creator-access` antigo copiava para `auth_token`).
+ *
+ * @returns Segundos restantes até `exp`, ou `null` se o payload não trouxer
+ * `exp`/`iat` numéricos.
+ */
+export function tokenLifetimeSeconds(
+  payload: Pick<AuthTokenPayload, 'exp' | 'iat'>,
+): number | null {
+  if (typeof payload.exp !== 'number' || typeof payload.iat !== 'number') return null;
+  const lifetime = payload.exp - payload.iat;
+  return lifetime > 0 ? lifetime : null;
+}
+
 export async function generateAuthToken(
   payload: Omit<AuthTokenPayload, 'iat' | 'exp'>,
   options?: { expiresIn?: string | number },

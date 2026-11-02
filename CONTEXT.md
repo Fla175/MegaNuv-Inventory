@@ -4,9 +4,9 @@
 > Ele responde: o que o sistema é, o que está em foco agora, e o que está quebrado.
 > Não é um documento normativo — para regras, ver `AGENTS.md` e `SPECS.md`.
 
-**Última atualização:** 23/10/2026 · **Branch:** `refactor/modularize-ui`
-**Nota de sessão:** limpeza global de espaço concluída — `harness2` (`/root/.config/opencode/harness2/`), `notesmd-cli` (`tools/notesmd-cli/`), caches `/tmp`, `/root/.cache/`, backups `/root/backups/`, `.npm/` e resíduos `ngrok` removidos; workspace `/var/code/inventory` preservado.
-**Versão:** `2.25.2` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
+**Última atualização:** 30/10/2026 · **Branch:** `fix/creator-stash-hijack`
+**Nota de sessão:** P0 de segurança fechado — o `auth_token_creator` sobrevivente à expiração permitia **tomada da conta do criador**; o `DELETE /api/creator-access` agora exige a senha do criador, todo `maxAge` é derivado do `exp` do token e o login apaga o stash. P1 e P2 mapeados abaixo (§3.2 #10–13, §3.3 #19–22), **não executados**.
+**Versão:** `2.27.1` · **Documentos canônicos:** `AGENTS.md`, `SPECS.md`, `OPENCODE.md`
 
 ---
 
@@ -27,6 +27,29 @@ em segurança, testes e manutenção. Ver §3.
 ## 2. Active Focus & Current Task
 
 ### 2.1 Foco atual
+
+> **P0 de segurança — sequestro da conta do criador por stash sobrevivente — concluído em
+> `fix/creator-stash-hijack` (30/10/2026).** Investigação pedida pelo dono: como o sistema fica
+> exposto quando a aba fica aberta com login feito **depois** da expiração do cookie. A resposta
+> tem duas camadas, e a segunda era a grave:
+> (a) **UI viva sem sessão** — não há `getServerSideProps` em nenhuma página, o `middleware.ts`
+> só roda em requisição, e o `UserProvider` busca `/api/auth/me` **uma única vez** no mount. Não
+> há timer de expiração, listener de `visibilitychange` nem interceptor de `401`. `user` nunca
+> volta a `null`, então a aba aberta segue exibindo lista de usuários, logs com IP/user-agent,
+> patrimônio e os controles de escrita. **Não corrigido — é o P1 (§3.2 #10–12).**
+> (b) **Tomada da conta do criador** — `POST /api/creator-access` gravava `auth_token` (2 h) **e**
+> `auth_token_creator` (8 h); o middleware apagava **só** o `auth_token`; o login gravava **só**
+> `auth_token`; e o `DELETE /api/creator-access` copiava o stash para `auth_token` **sem senha,
+> sem validar o token e sem checar o dono dele**. Quem fizesse login naquela janela de 8 h virava
+> criador com uma requisição — e criador semeia `DIRECTOR` e transfere o título.
+> **Corrigido:** `DELETE` exige a senha do criador (verifica o stash, `403` se não for criador,
+> `401` na senha errada, `bcrypt` só depois); stash expirado deixou de travar o `POST` em `409`;
+> todo `maxAge` deriva do `exp` via `tokenLifetimeSeconds`/`stashMaxAge`, com 2 h de fallback;
+> o login apaga `auth_token_creator` na mesma resposta; `CREATOR_ACCESS_RESTORE` volta a ser
+> logado com o `creator.id`. Novo `RestoreCreatorModal` + `confirmRestoreCreatorSession` porque
+> a UI chamava o `DELETE` sem corpo. **10 testes** em
+> `__tests__/api/creator-stash-hardening.test.ts`. Gates: `eslint .`/tsc/prisma limpos,
+> **392 testes** + 5 skipped, build standalone 93M.
 
 > **`ADR-004` — detalhe do espaço-pai no index — concluída em `refactor/modularize-ui` (23/10/2026).**
 > Clicar no nome/corpo do espaço-pai abre o `SpaceDetailModal` (somente leitura) com foto, endereço,
@@ -150,6 +173,19 @@ conjunto de correções de segurança.
     Não há MinIO local, e o de produção **não tem versioning** — por isso a auditoria foi validada só por
     unidade. Fazer uma execução de leitura com `--saida`, conferir a lista contra anexos conhecidos de um
     ativo, e só então considerar `--apagar --confirmar`.
+13. **P1 — matar o estado "logado depois da expiração"** (§3.2 #10–12), em branch própria
+    `fix/session-expiry-ui`, empilhada sobre `fix/creator-stash-hijack`:
+    (a) interceptor único de `fetch` que em `401` limpa o `UserContext` e redireciona para `/login`;
+    (b) `middleware.ts` apagando **os dois** cookies (`auth_token` e `auth_token_creator`);
+    (c) timer de expiração derivado do `exp` do JWT no `UserProvider` (ou `getServerSideProps` nas
+    páginas principais). O cálculo do timer e a decisão do interceptor são lógica pura e testável em
+    `environment: 'node'`; o resto é verificação manual.
+14. **P2 — revogabilidade e defesa em profundidade** (§3.3 #19–22), em branch própria
+    `fix/token-revocation`: coluna `tokenVersion` em `User` (**exige migration nova** — as 16
+    existentes são imutáveis), checagem em `getSessionUser`, incremento em troca de senha/papel/
+    exclusão, reemissão do cookie após troca de e-mail; `requiredRoles` explícito em `GET /api/users`;
+    auth nos handlers de `categories/check-assets.ts` e `storage/file.ts`; fim do bypass
+    `pathname.includes('.')`; `secure: true` por padrão no cookie.
 
 ---
 
@@ -160,7 +196,12 @@ conjunto de correções de segurança.
 > **Itens 1 a 10 foram corrigidos nesta branch** (`chore/security-p0-debt`) — ver `CHANGELOG.md`.
 > **Itens 13 e 14 foram corrigidos pela Etapa 0 da `ADR/ADR-001.md`** (branch `fix/actives-write-authz`).
 > **Itens 15 (e 14, par 1.2) pela Etapa 1** (branch `fix/actives-value-visibility`).
+> **Item 16 pelo P0 de `fix/creator-stash-hijack`** (30/10/2026).
 > **Os itens 11 e 12 continuam abertos.** A coluna _Estado_ reflete a situação pós-correção.
+>
+> **O item 16 não esgota a investigação de 30/10/2026:** ele fecha a **escalada de privilégio**;
+> a **sessão viva em aba aberta** (UI, listagens e logs continuam na tela com o cookie expirado) e
+> a **revogabilidade** do JWT ficaram mapeadas como P1 (§3.2 #10–12) e P2 (§3.3 #19).
 
 | #   | Problema                                                       | Onde                                                             | Estado / Impacto                                                                                                                                                                             |
 | --- | -------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -179,6 +220,7 @@ conjunto de correções de segurança.
 | 13  | **`clone-batch` sem verificação de papel**                     | `pages/api/actives/clone-batch.ts`                               | ✅ **Corrigido** (Etapa 0 da `ADR/ADR-001.md`) — o handler **não importava `authMiddleware`** e não resolvia sessão: exportava-se cru. A proteção vinha só do `middleware.ts`, que valida **token, não papel** (`middleware.ts:58-86`), então qualquer `VIEWER` autenticado criava **até 50 cópias** de qualquer ativo (`qty` máx. 50 em `:18`), copiando `fixedValue` e `notes` (`:79-80`). Agora resolve a sessão com `getSessionUser`, barra `VIEWER` com `403`, registra `createdById` (`:95-99`) e é envolvido por `authMiddleware`. **Não era acesso anônimo** — o matcher do middleware cobre a rota; o defeito era qualquer sessão de menor privilégio escrever. 12 testes em `__tests__/api/actives-write-authz.test.ts`. |
 | 14  | **`actives/update` sem verificação de papel**                   | `pages/api/actives/update.ts`                                    | ✅ **Corrigido** (Etapa 0) — usava `authMiddleware(handler)` **sem `requiredRoles`**, que é o terceiro parâmetro do helper (`lib/middlewares/authMiddleware.ts:24,51-55`) e **não tinha nenhum chamador no projeto**. Um `VIEWER` autenticado editava qualquer ativo por ID, e `applyToSimilar` (`:79-106`) propagava a alteração para todos os ativos de mesmo `name`/`manufacturer`/`model`/`sku` — escrita em N registros com um único `PUT`. Agora passa `["DIRECTOR","ADMIN","MANAGER"]`, o complemento de `VIEWER` na matriz RBAC, mesma semântica de `delete.ts:17` e `move.ts:41`. Corrigido de passagem: era o **único** arquivo a instanciar `new PrismaClient()` fora de `lib/prisma.ts`, o que o tornava **impossível de testar** com o mock do projeto. |
 | 15  | **`fixedValue` no payload para quem não pode vê-lo + apagado pela edição sem o campo** | `actives/list.ts` · `actives/update.ts` · `qrcode/public-get.ts` · `qrcode/view.tsx` | ✅ **Corrigido** (Etapa 1 da `ADR/ADR-001.md`, `fix/actives-value-visibility`) — os três endpoints de leitura devolviam **todos** os escalares a qualquer papel autenticado: o gate de coluna da UI escondia o valor do `VIEWER`, mas o JSON entregava o patrimônio (`curl` bastava). E o `update` parseava `fixedValue` com `\|\| 0` incondicionalmente — **ausência era "zerar"**, destruindo o valor em silêncio no primeiro salvamento sem o campo (com `applyToSimilar`, em N). Agora `canViewValue(user)` (predicado puro em `lib/apiAuth.ts:64-77`, falha fechado) redige o campo **ausente do objeto**, não `undefined`; o `update` distingue ausente (preserva `originalActive.fixedValue`) de `0` explícito (zera); e o **"Valor Total" da tela do QR Code passou a ser somado no servidor** (`totalValue: 0` para `VIEWER`) — a soma client-side reduzia `sec.fixedValue`, que a resposta jamais carregou, e reportava só o valor da raiz. Regra de produto (dono, 18/10/2026): ADMIN/MANAGER/DIRECTOR veem e editam; somente VIEWER não vê. 16 testes em `__tests__/api/actives-value-visibility.test.ts`, validados por 6 mutações. |
+| 16  | **`auth_token_creator` sobrevivente à expiração permitia tomada da conta do criador** | `pages/api/creator-access.ts` · `pages/api/auth/login.ts` · `lib/auth.ts` · `lib/context/UserContext.tsx` | ✅ **Corrigido** (P0, `fix/creator-stash-hijack`) — `POST /api/creator-access` gravava `auth_token` (2 h) **e** `auth_token_creator` (8 h); o `middleware.ts` apagava **só** o `auth_token`; o login gravava **só** `auth_token`; e o `DELETE` copiava o stash para `auth_token` **sem senha, sem validar o token e sem checar o dono dele**. Quem fizesse login naquela janela de 8 h — inclusive um `VIEWER` — virava criador com uma requisição, e criador semeia o `DIRECTOR` singleton e transfere o título (`PATCH`). Agora o `DELETE` exige a senha do criador (verifica o stash → `401`+cookie apagado se inválido; `400` sem senha; `403` se o dono do stash não for `isCreator`; `401 'Senha incorreta.'`; `bcrypt` só depois disso); stash morto deixou de travar o `POST` em `409`; todo `maxAge` deriva do `exp` (`tokenLifetimeSeconds`/`stashMaxAge`, fallback 2 h); o login apaga o stash na mesma resposta; `CREATOR_ACCESS_RESTORE` volta a logar `creator.id`; novo `RestoreCreatorModal`. 10 testes em `__tests__/api/creator-stash-hardening.test.ts`. |
 
 **RBAC (ADR-002, 20/10/2026) — drifts fechados.** Três gates não correspondiam à matriz:
 (a) `father-spaces/{create,update,delete}` exigiam ADMIN, embora a UI mostrasse a aba a DIRECTOR —
@@ -221,6 +263,9 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 | 7   | `/qrcode` em `PUBLIC_PATHS` mas sem `pages/qrcode/index.tsx`      | `middleware.ts:17`                | A rota `/qrcode` retorna 404. Existe apenas `/qrcode/view`.                                                                                                                                                                                                                                                                                                                           |
 | 8   | Shield de "setup inicial" totalmente comentado                    | `middleware.ts:41-59`             | A verificação é feita client-side em `pages/login.tsx:16-38`. Fragilidade conhecida.                                                                                                                                                                                                                                                                                                  |
 | 9   | ~~`next lint` depreciado~~ — **corrigido**                        | `package.json:9`                  | Migrado para `eslint .` com `ignores` apenas de build/dependências (`.next/`, `node_modules/`, `coverage/`, `next-env.d.ts`). O gate passou a cobrir `__tests__` e revelou **149 erros** (140 `no-explicit-any`, 5 `no-unused-vars`, 4 `no-non-null-asserted-optional-chain`), todos corrigidos com o helper `__tests__/helpers/http.ts`.                                                                                                                                                                            |
+| 10  | **Aba aberta continua exibindo dados após a sessão expirar** | `lib/context/UserContext.tsx` · `pages/*.tsx` · `middleware.ts` | 🔴 **ABERTO** — nenhuma página usa `getServerSideProps`/`getInitialProps` (grep = 0), então o `middleware.ts` só roda em **requisição**: a aba parada nunca é revalidada. O `UserProvider` busca `/api/auth/me` **uma única vez** no mount, sem timer de expiração, sem listener de `visibilitychange` e sem interceptor de `fetch`. `user` nunca volta a `null` depois de preenchido, e `pages/settings.tsx` só sai do render em `loading`/`!user` — logo a lista de usuários, os logs com IP/user-agent, o patrimônio e os botões de escrita seguem na tela indefinidamente. O back/forward cache restaura o DOM sem disparar requisição nenhuma. **Correção planejada:** interceptor único de `fetch` que, em `401`, limpa o `UserContext` e faz `window.location.assign('/login')`. |
+| 11  | **`middleware.ts` apaga só `auth_token` no token inválido** | `middleware.ts:84` | 🔴 **ABERTO** — `res.cookies.delete("auth_token")` deixa o `auth_token_creator` para trás. O P0 (item 16 da §3.1) já neutralizou o sequestro porque o `DELETE` exige senha, mas o cookie órfão continua sendo resíduo de sessão que o banner de impersonação lê (`/api/auth/me` deriva `impersonation` da **presença** do stash). **Correção planejada:** apagar os dois cookies no mesmo redirect. |
+| 12  | **Nenhum timer de expiração no cliente** | `lib/context/UserContext.tsx` | 🔴 **ABERTO** — o `exp` do JWT é conhecido no cliente (o payload é legível), mas nada agenda a saída. **Correção planejada:** agendar `setTimeout` até `exp` (com folga) no `UserProvider`, revalidando com `refreshUser()` e caindo para `/login`; alternativa mais robusta é `getServerSideProps` nas páginas principais. |
 
 ### 3.3 🟡 P2 — Manutenção e Qualidade
 
@@ -246,6 +291,10 @@ no servidor (item 9) — as duas são ações humanas, não de código.
 | 16  | **`ListSectionProps.onMove?` declarado mas nunca usado**                              | `lib/types.ts:16` vs `components/ListSection.tsx:411`                                                                                              | A prop `onMove?: (item: Active) => void` está declarada na interface `ListSectionProps`, mas `ListSection` não a desestrutura na assinatura do componente e nenhum chamador a fornece (`grep -c onMove components/ListSection.tsx` → 0). É tipagem morta. **Pendente de investigação** (nenhum teste em runtime foi feito): confirmar se a movimentação de ativos perdeu o atalho que usava essa via — ou se a prop é apenas um resíduo de uma refatoração e pode ser removida. Não registrar como comportamento quebrado sem verificação.                                                                                                                                                                                                                                                                                                                                                                          |
 | 17  | **Credencial do auditor de órfãos não existe no MinIO**                               | `inventory-policy-auditor.json` (novo) · `scripts/audit-minio.ts`                                                                                  | 🟡 **PENDENTE — ação humana.** O script está pronto e não roda até a credencial existir. Detalhes, razão e passo a passo: **§3.3.1**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 18  | ~~**`deleteFileFromMinio` derivava a chave com `split('/').pop()`**~~ — **corrigido** | `lib/minio.ts:39`                                                                                                                                  | ✅ **Corrigido nesta branch.** Dois defeitos: (1) com **subpasta**, o banco guarda a URL completa e o bucket a chave nua, então o `pop()` devolvia `1792-foto.jpg` em vez de `subpasta/1792-foto.jpg` e apagava o objeto errado — ou nada, sem sinalizar, porque o `catch` era mudo; (2) com **link externo** ("Cole um link", ex.: Google Drive), `.../file/d/x/view` virava `removeObject('inventory', 'view')` — remoção no bucket que o usuário nunca pediu. A chave agora sai de `getMinioKeyFromUrl()` (`lib/mediaUrl.ts`), que devolve `null` para o que não é do bucket `inventory` e aí **não remove**; o `catch` virou `console.warn` com URL e motivo, e a função segue **sem lançar** porque `removeObject` é idempotente e os chamadores de delete dependem disso. 11 testes de regressão em `__tests__/lib/minio-delete.test.ts` (6 falham contra a implementação antiga). Regras em `SPECS.md` §5.1. |
+| 19  | **JWT sem revogação: `tokenVersion`/`passwordChangedAt` inexistentes** | `prisma/schema.prisma` · `lib/apiAuth.ts` | 🟡 **ABERTO** — o token é a única autoridade. Um JWT continua válido por até 8 h **depois** de logout (§3.1 item 11), de troca de senha, de rebaixamento de papel (o `role` fica congelado no token) e até de **exclusão do usuário**. Trocar o e-mail quebra a sessão de forma torta: `/api/auth/me` resolve o usuário por `email`, então devolve `404` e a tela de settings fica em "Carregando..." para sempre. **Correção planejada:** coluna `tokenVersion` (ou `passwordChangedAt`) em `User`, checada em `getSessionUser`, incrementada em troca de senha/papel/exclusão, e reemissão do cookie após troca de e-mail. |
+| 20  | **`pathname.includes('.')` libera qualquer rota com ponto** | `middleware.ts:27` | 🟡 **ABERTO** — o bypass existe para estáticos, mas é aplicado ao pathname inteiro: `/api/users/foo.bar` ou qualquer rota futura com ponto passa sem verificação de token no middleware. Hoje os handlers cobertos pelo P0 de segurança seguram sozinhos; a defesa em profundidade é que está furada. **Correção planejada:** restringir o bypass a `/_next/` e a uma allow-list de extensões. |
+| 21  | **Handlers sem autenticação própria** | `pages/api/categories/check-assets.ts` · `pages/api/storage/file.ts` | 🟡 **ABERTO** — `check-assets.ts` **não tem verificação alguma** no handler (depende só do middleware) e `storage/file.ts` serve **qualquer objeto do MinIO** por `key`, sem checar dono nem vínculo com ativo. **Correção planejada:** `getSessionUser` nos dois e, no `file.ts`, validar que a `key` pertence a um anexo existente. |
+| 22  | **`verifyAuthToken` sem `await` em `ensure-location-item.ts`** | `pages/api/internal/ensure-location-item.ts:12` | 🟡 **ABERTO** — `if (!token || !verifyAuthToken(token))` compara uma **Promise**, que é sempre truthy: a checagem é um no-op e o endpoint aceita qualquer token não vazio. **Correção planejada:** `await` (ou trocar por `getSessionUser`). |
 
 ### 3.3.1 Credencial do auditor de órfãos — o que falta e como criar
 
@@ -292,14 +341,17 @@ a auditoria foi validada só por unidade, sem MinIO.
 
 ### 3.4 Estado do Working Tree
 
-**ADR-004 commitada em `refactor/modularize-ui` (sem push).** O trabalho do revert, do Estágio 1,
-das Etapas A–E da ADR-003 e das alterações locais do dono já estava commitado. Nesta sessão entraram
-o endpoint `GET /api/father-spaces/[id]`, o `SpaceDetailModal`, os controles de clique/colapso no
-`InventorySpaces`, o deep-link de edição e os testes/documentos da ADR-004.
+**P0 de segurança commitado em `fix/creator-stash-hijack` (sem push).** A branch saiu de `main`
+(`a1fe49a`) e contém **apenas** a correção do sequestro do stash do criador (§3.1 item 16):
+`lib/auth.ts` (`tokenLifetimeSeconds`), `pages/api/creator-access.ts`, `pages/api/auth/login.ts`,
+`components/RestoreCreatorModal.tsx` (novo), `lib/context/UserContext.tsx`,
+`__tests__/api/creator-stash-hardening.test.ts` (novo, 10 testes) e dois testes legados de
+`__tests__/api/creator-access.test.ts` atualizados. Nada de P1/P2 entrou nesta branch.
 
 - `components/dashboard/RecentList.tsx` aparece modificado no working tree por **edição
-  concorrente fora desta tarefa**; não faz parte da ADR-004 e não deve ser commitado junto.
+  concorrente fora desta tarefa**; não faz parte do P0 e não deve ser commitado junto.
 - `yarn.lock` e `package-lock.json` — ver §3.2 #2 (artefato de `npm install` acidental).
+- **ADR-004** segue commitada em `refactor/modularize-ui` (base desta branch).
 
 ### 3.5 Dependências do ambiente
 

@@ -1067,6 +1067,97 @@ boolean`), que é a origem dos dados vindos de `/api/auth/me`;
 - `yarn lint` 0/0 · `npx tsc --noEmit` 0 erros · `npx prisma validate` OK · `yarn test`
   **382 passed** + 5 skipped · `yarn build:opt` OK (standalone 93 MB, rota `[id]` no manifesto).
 
+### 🤖 OpenCode Operations (12)
+
+> **P0 de segurança — sequestro da conta do criador por `auth_token_creator` sobrevivente.**
+> Origem: investigação pedida pelo dono sobre como o sistema fica exposto quando uma aba fica
+> aberta com login feito **depois** da expiração do cookie de autenticação. A conclusão foi que
+> o problema visível (UI viva sem sessão) escondia um problema pior: uma **tomada de conta**.
+
+#### Security
+
+- **`DELETE /api/creator-access` trocava o stash do criador por `auth_token` sem nenhuma prova.**
+  A cadeia completa, com o código anterior:
+  1. `POST /api/creator-access` gravava `auth_token` (impersonação, `maxAge` 2 h) **e**
+     `auth_token_creator` (a sessão original do criador, `maxAge` **8 h**) — dois cookies com
+     validades diferentes no mesmo navegador.
+  2. O `auth_token` de 2 h expirava e o `middleware.ts` apagava **somente `auth_token`**.
+  3. O `POST /api/auth/login` gravava **somente `auth_token`** — não tocava no stash.
+  4. `DELETE /api/creator-access` copiava `auth_token_creator` para `auth_token` **sem senha,
+     sem validar o token e sem checar a quem ele pertencia**.
+
+  Resultado: qualquer pessoa que fizesse login naquele navegador durante a janela de 8 h do stash
+  — inclusive um `VIEWER` recém-chegado, e inclusive quem entrasse **depois** de o cookie de
+  autenticação principal expirar — virava criador com **uma requisição autenticada**. Ser criador
+  (`isCreator`) não é só um rótulo: habilita semear o `DIRECTOR` singleton e transferir o título
+  (`PATCH`), ou seja, era tomada de conta com escalada para o topo da RBAC.
+- **A senha do criador passou a ser exigida no `DELETE` (restore), como já era no `POST` (enter).**
+  O handler agora valida o stash com `verifyAuthToken` antes de qualquer coisa (`401` +
+  cookie apagado quando expirado/adulterado, e `bcrypt` **não** é chamado), exige `password`
+  (`400`), carrega o criador pelo `userId` do stash (`403` se não existir ou não for `isCreator`)
+  e só então compara com `bcrypt.compare` (`401 'Senha incorreta.'`). A senha nunca é guardada:
+  sai do cliente no `body` do `DELETE` e morre na comparação.
+- **Um stash morto deixou de travar o criador em `409`.** O guard de "Restaure sua conta antes de
+  entrar em outra" olhava apenas a **presença** do cookie, então um `auth_token_creator` vencido
+  (sobrevivente de um `auth_token` de 2 h que expirou) bloqueava uma nova impersonação até o
+  cookie de 8 h caducar — `409` sem saída visível na UI. Agora o guard só dispara para stash
+  **validável**; stash inválido é ignorado e sobrescrito.
+- **`maxAge` de todo cookie derivado do `exp` do próprio token, nunca valor fixo.**
+  `lib/auth.ts` ganhou `tokenLifetimeSeconds(payload)` (puro: `exp - iat`, `null` quando não há
+  números válidos) e `pages/api/creator-access.ts` ganhou `stashMaxAge(token)`, que decodifica o
+  payload em `base64url` para obter esse tempo de vida. Os três cookies de impersonação
+  (stash emitido, `auth_token` renovado no restore) passaram a usar esse valor, com
+  `IMPERSONATION_TTL_SECONDS` (2 h) apenas como fallback. O desenho anterior — stash de 8 h
+  guardando um token de 8 h, mas restaurado com `maxAge` fixo de 8 h — era exatamente o que
+  produzia cookie mais duradouro que o token: um `401` em loop na melhor hipótese, e a janela de
+  sequestro na pior.
+- **`POST /api/auth/login` encerra o stash na mesma resposta.** O `Set-Cookie` passou a ser um
+  array que grava `auth_token` e **apaga `auth_token_creator`** (`maxAge: -1`). Login é o começo
+  de uma sessão nova; herdar o botão "Voltar à minha conta" de uma sessão anterior era o que
+  tornava a janela do stash alcançável por quem apenas fizesse login na máquina.
+- **Autoria corrigida no log de restore.** `CREATOR_ACCESS_RESTORE` era gravado com o usuário
+  **efetivo** (o impersonado) — o log dizia que o `VIEWER` havia restaurado a sessão do criador.
+  Agora registra `creator.id` e a mensagem cita de qual `userId` se saiu.
+
+#### Added
+
+- **`components/RestoreCreatorModal.tsx`** — modal de confirmação que coleta a senha do criador
+  antes de sair da impersonação, espelhando o `EnterAccountModal` (Shadcn `Dialog`, `Esc`/`X`,
+  botão desabilitado sem senha, estado de carregamento, erro inline). Necessário porque a UI
+  chamava o `DELETE` **sem corpo** e o endpoint agora exige senha.
+- **`lib/context/UserContext.tsx`**: `restoreCreatorSession()` deixou de fazer `fetch` direto e
+  passou a **abrir o modal** (assinatura virou `() => void`); o envio mora em
+  `confirmRestoreCreatorSession(password)`, que trata `!res.ok` exibindo o `error` do servidor e
+  redireciona para `/` no sucesso. O `components/Layout.tsx` não mudou — continua chamando
+  `restoreCreatorSession`.
+- **`__tests__/api/creator-stash-hardening.test.ts`** — **10 testes de regressão** que travam cada
+  elo da cadeia: login apaga o stash; `DELETE` sem senha → `400` **sem** emitir `auth_token`;
+  senha errada → `401 'Senha incorreta.'`; stash expirado → `401` + cookie apagado e `bcrypt`
+  nunca chamado; stash de usuário que não é criador → `403`; senha correta → troca o token e
+  limpa o stash; `maxAge` renovado ≤ 2 h; stash expirado deixa de bloquear o `POST` com `409`;
+  stash vivo continua bloqueando; `maxAge` do stash emitido ≤ tempo de vida do token.
+
+#### Changed
+
+- **`__tests__/api/creator-access.test.ts`** — dois testes codificavam o contrato **inseguro** e
+  foram atualizados, não removidos: o caso de `409` mandava a string literal `'existing-stash'`
+  como cookie (agora precisa de um JWT vivo, senão o guard é corretamente ignorado) e o caso de
+  restore no `DELETE` mockava o criador sem `password` e chamava o handler sem corpo (agora manda
+  `{ password }` e um criador com `isCreator: true`).
+
+#### Docs
+
+- `CONTEXT.md` §3.1 (item novo de P0 + cabeçalho da tabela) e §2.1 (foco da sessão). O item 11
+  (logout não revoga o JWT) **continua aberto** — esta correção fecha a janela do stash, não a
+  revogabilidade, que é o P2 #7 (ver §3.1).
+
+#### Verification
+
+- `yarn lint` 0/0 · `npx tsc --noEmit` 0 erros · `npx prisma validate` OK · `yarn test`
+  **392 passed** + 5 skipped (28 arquivos) · `yarn build:opt` OK (standalone 93 MB).
+- O P0 é independente dos P1/P2 mapeados na mesma investigação (UI sem sessão viva, revogação de
+  token, `pathname.includes('.')` do middleware, `secure` do cookie) — nada deles foi tocado aqui.
+
 ---
 
 ## - Initial Setup

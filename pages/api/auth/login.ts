@@ -43,14 +43,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .setExpirationTime('8h')
       .sign(secret);
 
-    // Configurando o Cookie
-    res.setHeader('Set-Cookie', serialize('auth_token', token, {
-      httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
-      maxAge: 60 * 60 * 8, // 8 horas
-      path: '/',
-      sameSite: 'lax',
-    }));
+    // Configurando o Cookie.
+    //
+    // O login **encerra** qualquer sessão anterior desta máquina: o stash de
+    // impersonação (`auth_token_creator`) é apagado na mesma resposta. Sem
+    // isso, um stash de até 8 h sobrevivia ao `auth_token` de 2 h expirado e o
+    // próximo login herdava o botão de "voltar à conta do criador" — quem
+    // entrasse depois naquela janela assumia o criador com uma requisição.
+    res.setHeader('Set-Cookie', [
+      serialize('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.COOKIE_SECURE === 'true',
+        maxAge: 60 * 60 * 8, // 8 horas
+        path: '/',
+        sameSite: 'lax',
+      }),
+      serialize('auth_token_creator', '', {
+        httpOnly: true,
+        secure: process.env.COOKIE_SECURE === 'true',
+        maxAge: -1,
+        path: '/',
+        sameSite: 'lax',
+      }),
+    ]);
 
     // Atualiza o último login
     await prisma.user.update({ 
