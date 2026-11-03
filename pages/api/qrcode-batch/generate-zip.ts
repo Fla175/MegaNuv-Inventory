@@ -46,7 +46,7 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
     }
 
     // Gerar ZIP com QR codes
-    const zipBuffer = await generatePhysicalSpacesQRCodeZip(physicalSpaces as any);
+    const zipBuffer = await generatePhysicalSpacesQRCodeZip(physicalSpaces);
 
     // Streaming direto
     const fileName = `qrcodes-espacos-fisicos-${new Date().toISOString().split('T')[0]}.zip`;

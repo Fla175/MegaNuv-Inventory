@@ -41,7 +41,7 @@ export default function QRCodeBatchDownload({ hasPhysicalSpaces }: QRCodeBatchDo
 
       // Obter nome do arquivo do header
       const contentDisposition = response.headers.get('Content-Disposition');
-      let fileName = 'qrcodes-espacos-fisicos.zip';
+      let fileName = 'qrcodes.zip';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
         if (match) {
@@ -93,7 +93,7 @@ export default function QRCodeBatchDownload({ hasPhysicalSpaces }: QRCodeBatchDo
       {error && (
         <p className="text-xs text-red-500 font-medium">{error}</p>
       )}
-      {!hasPhysicalSpaces && !error && (
+      {!hasPhysicalSpaces && (
         <p className="text-xs text-gray-500 font-medium dark:text-gray-400">
           Nenhum espaço físico cadastrado
         </p>
