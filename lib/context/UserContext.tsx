@@ -1,5 +1,6 @@
 // lib/context/UserContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import RestoreCreatorModal from "@/components/RestoreCreatorModal";
 
 export type Role = 'DIRECTOR' | 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type Theme = 'DARK' | 'LIGHT' | 'SYSTEM';
@@ -23,7 +24,8 @@ type UserContextType = {
   loading: boolean;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
-  restoreCreatorSession: () => Promise<void>;
+  /** Abre o modal que pede a senha do criador antes de voltar à conta. */
+  restoreCreatorSession: () => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -32,6 +34,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [impersonation, setImpersonation] = useState<Impersonation>(null);
   const [loading, setLoading] = useState(true);
+  const [isRestoreOpen, setIsRestoreOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   const fetchUser = useCallback(async () => {
     // Iniciamos o loading sempre que houver um refresh manual
@@ -69,19 +74,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const restoreCreatorSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/creator-access", {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (res.ok) {
-        window.location.assign("/");
-      }
-    } catch (err) {
-      console.error("Erro ao restaurar sessão:", err);
-    }
+  /**
+   * Restaurar a sessão do criador devolve o maior privilégio do sistema, então
+   * o `DELETE /api/creator-access` exige a senha do criador. O banner do
+   * `Layout` abre este modal; a senha só sai do cliente dentro do `body` do
+   * `DELETE` — nunca é guardada.
+   */
+  const restoreCreatorSession = useCallback(() => {
+    setRestoreError(null);
+    setIsRestoreOpen(true);
   }, []);
+
+  const confirmRestoreCreatorSession = useCallback(
+    async (password: string) => {
+      setIsRestoring(true);
+      setRestoreError(null);
+      try {
+        const res = await fetch("/api/creator-access", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ password }),
+        });
+
+        if (res.ok) {
+          setIsRestoreOpen(false);
+          window.location.assign("/");
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        setRestoreError(data?.error || "Não foi possível voltar à conta.");
+      } catch {
+        setRestoreError("Erro de conexão ao restaurar a sessão.");
+      } finally {
+        setIsRestoring(false);
+      }
+    },
+    []
+  );
 
   // Execução inicial ao carregar o app
   useEffect(() => {
@@ -128,6 +159,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
   return (
     <UserContext.Provider value={{ user, impersonation, loading, setUser, refreshUser: fetchUser, restoreCreatorSession }}>
       {children}
+      <RestoreCreatorModal
+        isOpen={isRestoreOpen}
+        creatorName={impersonation?.creatorName || "Criador"}
+        isRestoring={isRestoring}
+        error={restoreError}
+        onConfirm={confirmRestoreCreatorSession}
+        onClose={() => {
+          if (isRestoring) return;
+          setIsRestoreOpen(false);
+          setRestoreError(null);
+        }}
+      />
     </UserContext.Provider>
   );
 }

@@ -303,13 +303,15 @@ describe('pages/api/creator-access', () => {
       expect(resState.jsonBody.error).toMatch(/própria conta/);
     });
 
-    it('returns 409 when stash cookie auth_token_creator is already present', async () => {
+    // O guard de 409 olha um stash **vivo**. Stash expirado é ignorado
+    // (regressão do P0): ver `creator-stash-hardening.test.ts`.
+    it('returns 409 when a live stash cookie auth_token_creator is already present', async () => {
       const token = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN });
       asMock(prisma.user.findUnique).mockResolvedValue({ id: 'c-1', role: UserRole.ADMIN, isCreator: true });
 
       const { req, res, resState } = createMockReqRes({
         method: 'POST',
-        cookies: { auth_token: token, auth_token_creator: 'existing-stash' },
+        cookies: { auth_token: token, auth_token_creator: token },
         body: { targetUserId: 'target-1' },
       });
 
@@ -356,9 +358,17 @@ describe('pages/api/creator-access', () => {
       expect(resState.jsonBody.error).toMatch(/Nenhuma sessão/);
     });
 
-    it('swaps auth_token to stash and clears auth_token_creator on DELETE', async () => {
+    // O restore devolve o maior privilégio do sistema, então exige a senha do
+    // criador — como o POST que entrou na conta (P0 do `creator-stash-hijack`).
+    it('swaps auth_token to stash and clears auth_token_creator on DELETE, given the creator password', async () => {
       const creatorToken = await generateAuthToken({ userId: 'c-1', email: 'creator@ex.com', role: UserRole.ADMIN, name: 'Creator' });
       const targetToken = await generateAuthToken({ userId: 't-1', email: 'target@ex.com', role: UserRole.VIEWER });
+      asMock(prisma.user.findUnique).mockResolvedValue({
+        id: 'c-1',
+        role: UserRole.ADMIN,
+        isCreator: true,
+        password: CREATOR_PASSWORD_HASH,
+      });
 
       const { req, res, resState } = createMockReqRes({
         method: 'DELETE',
@@ -366,6 +376,7 @@ describe('pages/api/creator-access', () => {
           auth_token: targetToken,
           auth_token_creator: creatorToken,
         },
+        body: { password: 'CreatorPassword123!' },
       });
 
       await creatorAccessHandler(req, res);

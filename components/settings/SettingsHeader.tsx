@@ -12,50 +12,7 @@ interface SettingsHeaderProps {
 }
 
 export default function SettingsHeader({ revert, spacesList = [] }: SettingsHeaderProps) {
-  const [hasPhysicalSpaces, setHasPhysicalSpaces] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    async function checkPhysicalSpaces() {
-      try {
-        const res = await fetch('/api/settings/has-physical-spaces', {
-          cache: 'no-store',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setHasPhysicalSpaces(data.hasPhysicalSpaces);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar espaços físicos:', error);
-        setHasPhysicalSpaces(false);
-      }
-    }
-
-    checkPhysicalSpaces();
-  }, []);
-
-  // Se spacesList mudar, também verificar (para casos de atualização de dados)
-  useEffect(() => {
-    if (spacesList.length > 0 && hasPhysicalSpaces === null) {
-      async function checkPhysicalSpaces() {
-        try {
-          const res = await fetch('/api/settings/has-physical-spaces', {
-            cache: 'no-store',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setHasPhysicalSpaces(data.hasPhysicalSpaces);
-          }
-        } catch (error) {
-          console.error('Erro ao verificar espaços físicos:', error);
-          setHasPhysicalSpaces(false);
-        }
-      }
-      checkPhysicalSpaces();
-    }
-  }, [spacesList]);
-
-  // Fallback: se ainda não foi verificado via endpoint, usar o spacesList.length
-  const effectiveHasPhysicalSpaces = hasPhysicalSpaces !== null ? hasPhysicalSpaces : (spacesList.length > 0);
+  const hasPhysicalSpaces = spacesList.length > 0; // Verificado pelo endpoint
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 lg:mb-10">
@@ -74,7 +31,7 @@ export default function SettingsHeader({ revert, spacesList = [] }: SettingsHead
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <QRCodeBatchDownload hasPhysicalSpaces={effectiveHasPhysicalSpaces} />
+        <QRCodeBatchDownload hasPhysicalSpaces={hasPhysicalSpaces} />
         <RevertHistory
           revertItems={revert.revertItems}
           selectedReverts={revert.selectedReverts}

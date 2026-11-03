@@ -10,8 +10,29 @@ import { serialize } from 'cookie';
 import bcrypt from 'bcryptjs';
 import { Prisma, UserRole } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { generateAuthToken, verifyAuthToken } from '@/lib/auth';
+import { generateAuthToken, verifyAuthToken, tokenLifetimeSeconds } from '@/lib/auth';
 import { createLog } from '@/lib/logger';
+
+/** Vida do token de impersonação (2 h) — o cookie nunca pode durar mais que isso. */
+const IMPERSONATION_TTL_SECONDS = 2 * 60 * 60;
+
+/**
+ * `maxAge` seguro para um cookie que guarda `token`: o tempo de vida do próprio
+ * JWT, ou `null` quando ele não pode ser lido (aí quem chama decide o default).
+ */
+function stashMaxAge(token: string): number | null {
+  const [, encodedPayload] = token.split('.');
+  if (!encodedPayload) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    return tokenLifetimeSeconds({
+      exp: typeof payload?.exp === 'number' ? payload.exp : undefined,
+      iat: typeof payload?.iat === 'number' ? payload.iat : undefined,
+    });
+  } catch {
+    return null;
+  }
+}
 
 function extractToken(req: NextApiRequest): string | null {
   if (req.cookies.auth_token) {
@@ -59,7 +80,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Não é possível entrar na própria conta.' });
     }
 
-    if (req.cookies.auth_token_creator) {
+    // Um stash vivo bloqueia uma segunda entrada. Um stash **morto** (token
+    // expirado/adulterado) não é sessão: antes esta checagem só olhava a
+    // presença do cookie, então um `auth_token_creator` vencido — sobrevivente
+    // de um `auth_token` de 2 h que expirou — travava o criador em 409 até o
+    // cookie de 8 h caducar. Stash inválido é ignorado e sobrescrito abaixo.
+    const existingStash = req.cookies.auth_token_creator;
+    if (existingStash && (await verifyAuthToken(existingStash))) {
       return res.status(409).json({ error: 'Restaure sua conta antes de entrar em outra.' });
     }
 
@@ -101,14 +128,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         httpOnly: true,
         secure: isSecure,
         path: '/',
-        maxAge: 2 * 60 * 60,
+        maxAge: IMPERSONATION_TTL_SECONDS,
         sameSite: 'lax',
       }),
+      // `maxAge` derivado do `exp` do stash, nunca um valor fixo maior que ele:
+      // cookie mais duradouro que o token é cookie que expira na cara do
+      // usuário (401) ou que o restore aceita sem prova.
       serialize('auth_token_creator', tokenCriador, {
         httpOnly: true,
         secure: isSecure,
         path: '/',
-        maxAge: 8 * 60 * 60,
+        maxAge: stashMaxAge(tokenCriador) ?? IMPERSONATION_TTL_SECONDS,
         sameSite: 'lax',
       }),
     ]);
@@ -130,15 +160,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Nenhuma sessão de criador para restaurar.' });
     }
 
+    // Restaurar a sessão do criador **devolve o maior privilégio do sistema**
+    // (`isCreator` habilita semear DIRECTOR e transferir o título). Portanto
+    // exige, como o POST, a senha do criador: antes bastava o cookie, e um
+    // stash sobrevivente de um login anterior — ou de outra pessoa na mesma
+    // máquina — era trocado por `auth_token` sem nenhuma prova.
+    const stashPayload = await verifyAuthToken(stashToken);
+    if (!stashPayload) {
+      // Stash expirado/adulterado: não é sessão. Apaga para não deixar o
+      // usuário preso no banner de impersonação nem em 409 no POST.
+      res.setHeader('Set-Cookie', [
+        serialize('auth_token_creator', '', {
+          httpOnly: true,
+          secure: isSecure,
+          path: '/',
+          maxAge: -1,
+          sameSite: 'lax',
+        }),
+      ]);
+      return res.status(401).json({ error: 'Sessão do criador expirada. Faça login novamente.' });
+    }
+
+    const { password } = req.body || {};
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Senha é obrigatória.' });
+    }
+
+    const creator = await prisma.user.findUnique({ where: { id: stashPayload.userId } });
+    if (!creator || !creator.isCreator) {
+      return res.status(403).json({ error: 'Acesso restrito ao criador.' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, creator.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
     const currentToken = extractToken(req);
     const currentPayload = currentToken ? await verifyAuthToken(currentToken) : null;
     const effectiveUserId = currentPayload?.userId || null;
 
     await createLog(
       req,
-      effectiveUserId,
+      creator.id,
       'CREATOR_ACCESS_RESTORE',
-      'Restaurou a sessão do criador'
+      `Restaurou a sessão do criador${effectiveUserId ? ` (saindo de ${effectiveUserId})` : ''}`
     );
 
     res.setHeader('Set-Cookie', [
@@ -146,7 +212,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         httpOnly: true,
         secure: isSecure,
         path: '/',
-        maxAge: 8 * 60 * 60,
+        // Renova até o `exp` do stash, não 8 h fixas: o stash foi verificado
+        // acima, então este `maxAge` nunca ultrapassa a validade do token.
+        maxAge: stashMaxAge(stashToken) ?? IMPERSONATION_TTL_SECONDS,
         sameSite: 'lax',
       }),
       serialize('auth_token_creator', '', {
