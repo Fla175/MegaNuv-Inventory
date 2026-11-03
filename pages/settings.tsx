@@ -119,7 +119,7 @@ export default function SettingsPage() {
   return (
     <Layout title="Configurações">
       <div className="max-w-6xl mx-auto pb-10 lg:pb-20">
-        <SettingsHeader revert={revert} />
+        <SettingsHeader revert={revert} spacesList={data.spacesList} />
 
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           <SettingsNav
