@@ -1,4 +1,5 @@
 // components/settings/SettingsHeader.tsx
+import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import RevertHistory from "@/components/settings/RevertHistory";
 import QRCodeBatchDownload from "@/components/settings/QRCodeBatchDownload";
