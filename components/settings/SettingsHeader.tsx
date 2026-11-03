@@ -52,7 +52,7 @@ export default function SettingsHeader({ revert, spacesList = [] }: SettingsHead
       }
       checkPhysicalSpaces();
     }
-  }, [spacesList]);
+  }, [spacesList, hasPhysicalSpaces]);
 
   // Fallback: se ainda não foi verificado via endpoint, usar o spacesList.length
   const effectiveHasPhysicalSpaces = hasPhysicalSpaces !== null ? hasPhysicalSpaces : (spacesList.length > 0);
