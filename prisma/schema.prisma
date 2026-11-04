@@ -50,6 +50,8 @@ model Log {
   ip        String?
   userAgent String?  @db.Text
   userId    String?
+  success   Boolean? @default(null)
+  targetUserId String?
   createdAt DateTime @default(now())
   user      User?    @relation("UserLogs", fields: [userId], references: [id])
 

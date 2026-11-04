@@ -7,12 +7,18 @@ import { NextApiRequest } from "next";
  * @param userId - ID do usuário autenticado (viesse do JWT)
  * @param action - Nome da ação (ex: "CREATE_AREA", "UPDATE_ACTIVE")
  * @param details - Texto detalhando a mudança
+ * @param metadata - Metadados opcionais (ex: { action: "enter", success: true, targetUserId: "u1" })
  */
 export async function createLog(
   req: NextApiRequest,
   userId: string | null,
   action: string,
-  details: string
+  details: string,
+  metadata?: {
+    action?: string | null;
+    success?: boolean;
+    targetUserId?: string | null;
+  }
 ) {
 
   try {
@@ -26,6 +32,10 @@ export async function createLog(
         ip: Array.isArray(ip) ? ip[0] : (ip as string) || "Ip desconhecido",
         userAgent: userAgent || "Agente desconhecido",
         userId,
+        ...(metadata && {
+          success: metadata.success,
+          targetUserId: metadata.targetUserId,
+        }),
       },
     });
   } catch (err) {
