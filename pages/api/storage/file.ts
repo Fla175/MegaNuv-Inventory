@@ -1,6 +1,6 @@
 // pages/api/storage/file.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { minioClient, BUCKET_NAME } from '@/lib/minio';
+import { getMinioClient, BUCKET_NAME } from '@/lib/minio';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,9 +13,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const minio = getMinioClient('app');
     let stat;
     try {
-      stat = await minioClient.statObject(BUCKET_NAME, key);
+      stat = await minio.statObject(BUCKET_NAME, key);
     } catch {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
@@ -28,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Força visualização inline no navegador para PDFs/imagens
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(key.split('/').pop() || 'file')}"`);
 
-    const stream = await minioClient.getObject(BUCKET_NAME, key);
+    const stream = await minio.getObject(BUCKET_NAME, key);
     
     stream.on('error', () => {
       if (!res.headersSent) res.status(500).json({ error: 'Erro ao ler arquivo' });

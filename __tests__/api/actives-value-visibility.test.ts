@@ -56,6 +56,9 @@ vi.mock('@/lib/prisma', () => ({
 const presignedGetObject = vi.fn(async () => 'https://signed.example/presigned');
 
 vi.mock('@/lib/minio', () => ({
+  getMinioClient: vi.fn(() => ({
+    presignedGetObject: presignedGetObject,
+  })),
   minioPublicClient: { presignedGetObject },
   BUCKET_NAME: 'inventory-test',
 }));

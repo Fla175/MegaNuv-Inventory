@@ -17,25 +17,60 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/**
+ * Constrói um cliente MinIO com as credenciais especificadas.
+ * Modo 'app' usa MINIO_ACCESS_KEY/MINIO_SECRET_KEY.
+ * Modo 'auditor' usa MINIO_AUDIT_ACCESS_KEY/MINIO_AUDIT_SECRET_KEY.
+ */
+function buildMinioClient(mode: 'app' | 'auditor'): Minio.Client {
+  const endPoint = process.env.MINIO_ENDPOINT!;
+  const port = Number(process.env.MINIO_PORT) || 9000;
+  const useSSL = process.env.MINIO_USE_SSL === 'true';
+
+  let accessKey: string;
+  let secretKey: string;
+
+  if (mode === 'auditor') {
+    accessKey = process.env.MINIO_AUDIT_ACCESS_KEY!;
+    secretKey = process.env.MINIO_AUDIT_SECRET_KEY!;
+    if (!accessKey || !secretKey) {
+      throw new Error(
+        'Variáveis de ambiente MINIO_AUDIT_ACCESS_KEY e MINIO_AUDIT_SECRET_KEY são necessárias para o modo auditor.'
+      );
+    }
+  } else {
+    accessKey = requireEnv('MINIO_ACCESS_KEY');
+    secretKey = requireEnv('MINIO_SECRET_KEY');
+  }
+
+  return new Minio.Client({
+    endPoint,
+    port,
+    useSSL,
+    accessKey,
+    secretKey,
+  });
+}
+
 // Cliente para uso interno no servidor/proxy (porta da API MinIO, padrão 9000)
-export const minioClient = new Minio.Client({
-  endPoint: requireEnv('MINIO_ENDPOINT'),
-  port: Number(process.env.MINIO_PORT) || 9000,
-  useSSL: process.env.MINIO_USE_SSL === 'true',
-  accessKey: requireEnv('MINIO_ACCESS_KEY'),
-  secretKey: requireEnv('MINIO_SECRET_KEY'),
-});
+// Usa credenciais da aplicação por padrão.
+export const minioClient = buildMinioClient('app');
 
 // Cliente público para geração de Presigned URLs acessíveis pelos navegadores
-export const minioPublicClient = new Minio.Client({
-  endPoint: requireEnv('MINIO_PUBLIC_ENDPOINT'),
-  port: Number(process.env.MINIO_PUBLIC_PORT) || 80,
-  useSSL: process.env.MINIO_PUBLIC_USE_SSL === 'true',
-  accessKey: requireEnv('MINIO_ACCESS_KEY'),
-  secretKey: requireEnv('MINIO_SECRET_KEY'),
-});
+// Usa credenciais da aplicação por padrão.
+export const minioPublicClient = buildMinioClient('app');
 
 export const BUCKET_NAME = 'inventory';
+
+/**
+ * Retorna um cliente MinIO configurado para o modo especificado.
+ * Use 'app' para credenciais da aplicação (operações de upload/download normais).
+ * Use 'auditor' para credenciais de auditoria (necessário quando a policy da aplicação
+ * não possui ListBucket ou em operações que requerem enumeração do bucket).
+ */
+export function getMinioClient(mode: 'app' | 'auditor'): Minio.Client {
+  return buildMinioClient(mode);
+}
 
 /**
  * Remove o objeto do MinIO referenciado por uma URL guardada no banco.
