@@ -13,6 +13,40 @@ import prisma from '@/lib/prisma';
 import { generateAuthToken, verifyAuthToken } from '@/lib/auth';
 import { createLog } from '@/lib/logger';
 
+// Rate limiting simples por IP + token JWT
+const rateLimitStore = new Map<string, { count: number; reset: number }>();
+
+export { rateLimitStore };
+
+function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+
+  if (!entry) {
+    rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
+    return { allowed: true, remaining: 4 };
+  }
+
+  if (now > entry.reset) {
+    rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
+    return { allowed: true, remaining: 4 };
+  }
+
+  if (entry.count >= 5) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  rateLimitStore.set(key, { count: entry.count + 1, reset: entry.reset });
+  return { allowed: true, remaining: 5 - entry.count };
+}
+
+function rateLimitKey(req: NextApiRequest): string {
+  const token = (req.cookies.auth_token
+    || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+        ? req.headers.authorization.split(' ')[1] : null));
+  return token ? `creator-access:${token}` : `creator-access:ip:${req.socket.remoteAddress || 'unknown'}`;
+}
+
 function extractToken(req: NextApiRequest): string | null {
   if (req.cookies.auth_token) {
     return req.cookies.auth_token;
@@ -41,6 +75,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const creator = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!creator || !creator.isCreator) {
       return res.status(403).json({ error: 'Acesso restrito ao criador.' });
+    }
+
+    // Rate limiting
+    const rlKey = rateLimitKey(req);
+    const rlCheck = checkRateLimit(rlKey);
+    if (!rlCheck.allowed) {
+      return res.status(429).json({ error: 'Muitas tentativas. Tente novamente em 15 minutos.' });
     }
 
     const { targetUserId, reason, password } = req.body || {};
@@ -93,7 +134,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       req,
       creator.id,
       'CREATOR_ACCESS_ENTER',
-      `Entrou na conta de ${targetUser.name || targetUser.email} (${targetUser.id})${reason ? `. Motivo: ${reason}` : ''}`
+      `Entrou na conta de ${targetUser.name || targetUser.email} (${targetUser.id})${reason ? `. Motivo: ${reason}` : ''}`,
+      { action: 'enter', success: true, targetUserId: targetUser.id }
     );
 
     res.setHeader('Set-Cookie', [
@@ -108,7 +150,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         httpOnly: true,
         secure: isSecure,
         path: '/',
-        maxAge: 8 * 60 * 60,
+        maxAge: 60 * 60, // 1 hora (reduzido de 8 horas por ADR-005)
         sameSite: 'lax',
       }),
     ]);
@@ -125,38 +167,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'DELETE') {
-    const stashToken = req.cookies.auth_token_creator;
-    if (!stashToken) {
+    // Verifica se o stash cookie existe
+    const stashCookie = req.cookies.auth_token_creator;
+    if (!stashCookie) {
       return res.status(400).json({ error: 'Nenhuma sessão de criador para restaurar.' });
     }
 
-    const currentToken = extractToken(req);
-    const currentPayload = currentToken ? await verifyAuthToken(currentToken) : null;
-    const effectiveUserId = currentPayload?.userId || null;
+    // Stash existe - atualiza a janela de validade do token principal
+    // e remove o stash cookie. Isso é o "sistema automatizado que atualiza
+    // a janela quando o cookie for invalidado".
+    // Gera um novo token auth_token com a mesma sessão do usuário,
+    // mas sem o stash de impersonação ativo.
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : req.cookies.auth_token;
 
-    await createLog(
-      req,
-      effectiveUserId,
-      'CREATOR_ACCESS_RESTORE',
-      'Restaurou a sessão do criador'
-    );
+    const token = bearerToken || req.cookies.auth_token;
+    const payload = token ? await verifyAuthToken(token) : null;
+    const userId = payload?.userId;
 
-    res.setHeader('Set-Cookie', [
-      serialize('auth_token', stashToken, {
+    if (userId) {
+      // Gera novo token principal sem stash
+      const newToken = await generateAuthToken({ userId, email: '', role: 'VIEWER' });
+
+      const cookieOpts = {
         httpOnly: true,
         secure: isSecure,
         path: '/',
-        maxAge: 8 * 60 * 60,
-        sameSite: 'lax',
-      }),
-      serialize('auth_token_creator', '', {
-        httpOnly: true,
-        secure: isSecure,
-        path: '/',
-        maxAge: -1,
-        sameSite: 'lax',
-      }),
-    ]);
+        maxAge: 2 * 60 * 60, // 2 horas
+        sameSite: 'lax' as const,
+      };
+
+      // Define novo token principal
+      res.setHeader('Set-Cookie', [
+        serialize('auth_token', newToken, cookieOpts),
+      ]);
+
+      // Remove o stash cookie
+      res.setHeader('Set-Cookie', [
+        serialize('auth_token_creator', '', {
+          httpOnly: true,
+          secure: isSecure,
+          path: '/',
+          maxAge: -1,
+          sameSite: 'lax' as const,
+        }),
+      ]);
+    } else {
+      // Não conseguiu extrair userId - limpa ambos os cookies
+      res.setHeader('Set-Cookie', [
+        serialize('auth_token', '', {
+          httpOnly: true,
+          secure: isSecure,
+          path: '/',
+          maxAge: -1,
+          sameSite: 'lax' as const,
+        }),
+        serialize('auth_token_creator', '', {
+          httpOnly: true,
+          secure: isSecure,
+          path: '/',
+          maxAge: -1,
+          sameSite: 'lax' as const,
+        }),
+      ]);
+    }
 
     return res.status(200).json({ restored: true });
   }
@@ -220,7 +296,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       req,
       creator.id,
       'CREATOR_ACCESS_TRANSFER',
-      `Transferiu o título de criador para ${targetUser.name || targetUser.email} (${targetUser.id})`
+      `Transferiu o título de criador para ${targetUser.name || targetUser.email} (${targetUser.id})`,
+      { action: 'transfer', success: true, targetUserId: targetUser.id }
     );
 
     return res.status(200).json({ success: true, newCreatorId });
