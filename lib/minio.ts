@@ -20,28 +20,14 @@ function requireEnv(name: string): string {
 /**
  * Constrói um cliente MinIO com as credenciais especificadas.
  * Modo 'app' usa MINIO_ACCESS_KEY/MINIO_SECRET_KEY.
- * Modo 'auditor' usa MINIO_AUDIT_ACCESS_KEY/MINIO_AUDIT_SECRET_KEY.
  */
-function buildMinioClient(mode: 'app' | 'auditor'): Minio.Client {
+function buildMinioClient(): Minio.Client {
   const endPoint = process.env.MINIO_ENDPOINT!;
   const port = Number(process.env.MINIO_PORT) || 9000;
   const useSSL = process.env.MINIO_USE_SSL === 'true';
 
-  let accessKey: string;
-  let secretKey: string;
-
-  if (mode === 'auditor') {
-    accessKey = process.env.MINIO_AUDIT_ACCESS_KEY!;
-    secretKey = process.env.MINIO_AUDIT_SECRET_KEY!;
-    if (!accessKey || !secretKey) {
-      throw new Error(
-        'Variáveis de ambiente MINIO_AUDIT_ACCESS_KEY e MINIO_AUDIT_SECRET_KEY são necessárias para o modo auditor.'
-      );
-    }
-  } else {
-    accessKey = requireEnv('MINIO_ACCESS_KEY');
-    secretKey = requireEnv('MINIO_SECRET_KEY');
-  }
+  const accessKey = requireEnv('MINIO_ACCESS_KEY');
+  const secretKey = requireEnv('MINIO_SECRET_KEY');
 
   return new Minio.Client({
     endPoint,
@@ -54,11 +40,11 @@ function buildMinioClient(mode: 'app' | 'auditor'): Minio.Client {
 
 // Cliente para uso interno no servidor/proxy (porta da API MinIO, padrão 9000)
 // Usa credenciais da aplicação por padrão.
-export const minioClient = buildMinioClient('app');
+export const minioClient = buildMinioClient();
 
 // Cliente público para geração de Presigned URLs acessíveis pelos navegadores
 // Usa credenciais da aplicação por padrão.
-export const minioPublicClient = buildMinioClient('app');
+export const minioPublicClient = buildMinioClient();
 
 export const BUCKET_NAME = 'inventory';
 
@@ -68,8 +54,8 @@ export const BUCKET_NAME = 'inventory';
  * Use 'auditor' para credenciais de auditoria (necessário quando a policy da aplicação
  * não possui ListBucket ou em operações que requerem enumeração do bucket).
  */
-export function getMinioClient(mode: 'app' | 'auditor'): Minio.Client {
-  return buildMinioClient(mode);
+export function getMinioClient(): Minio.Client {
+  return buildMinioClient();
 }
 
 /**

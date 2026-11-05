@@ -38,7 +38,7 @@ const signMedia = async (url: string | null | undefined): Promise<string | null>
   const key = getMinioKeyFromUrl(url);
   if (!key) return url;
   try {
-    const minio = getMinioClient('app');
+    const minio = getMinioClient();
     return await minio.presignedGetObject(BUCKET_NAME, key, 3600);
   } catch {
     return url;

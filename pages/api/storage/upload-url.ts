@@ -40,7 +40,7 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
     const objectName = `${Date.now()}-${safeName}`;
     const fileBuffer = fs.readFileSync(file.filepath);
 
-    const minio = getMinioClient('app');
+    const minio = getMinioClient();
     await minio.putObject(bucketName, objectName, fileBuffer, file.size, {
       'Content-Type': file.mimetype || 'application/octet-stream',
     });
