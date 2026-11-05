@@ -1,15 +1,17 @@
 # ADR-005 — Segurança do Acesso do Criador
 
-**Status:** proposto (revisão de código em `fix/rbac-matrix` @ `3355740`, segurança P0 em `chore/security-p0-debt`)
-**Data:** 04/11/2026
-**Deciders:** dono do projeto (MegaNuv)
-**Origem:** análise de segurança após correções P0 (§3.1 do CONTEXT.md); recomendação de endurecimento após remoção de flags `CREATOR_ACCESS_ENABLED`
+| Campo        | Valor                                                                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**   | executado (revisão de código em `fix/rbac-matrix` @ `3355740`, segurança P0 em `chore/security-p0-debt`)                                  |
+| **Data**     | 04/11/2026                                                                                                                                |
+| **Deciders** | Fla175 & MegaNuv                                                                                                                          |
+| **Origem**   | análise de segurança após correções P0 (§3.1 do CONTEXT.md); recomendação de endurecimento após remoção de flags `CREATOR_ACCESS_ENABLED` |
 
 ---
 
 ## 1. Contexto
 
-O recurso de **Acesso do Criador** (`/api/creator-access`) permite que o usuário com `isCreator: true` entre temporariamente em outra conta (`POST`), restaure a sessão (`DELETE`) ou transfira o título de criador (`PATCH`). 
+O recurso de **Acesso do Criador** (`/api/creator-access`) permite que o usuário com `isCreator: true` entre temporariamente em outra conta (`POST`), restaure a sessão (`DELETE`) ou transfira o título de criador (`PATCH`).
 
 Decisões já tomadas nesta versão (`2.25.2`):
 
@@ -31,6 +33,7 @@ As seguintes recomendações são **adotadas** para endurecer a segurança do ac
 **Problema:** Não há limite de tentativas de login/senha no endpoint. Se um atacante obtiver o hash da senha do criador (via vazamento de banco de dados), poderá tentar adivinhar a senha sem restrições.
 
 **Solução:** Implementar rate limiting no handler `pages/api/creator-access`, especificamente nas rotas `POST` e `PATCH` que realizam `bcrypt.compare`. A limitação deve ser:
+
 - Por IP ou por token JWT (mais justo para usuários legítimos compartilhando o mesmo IP).
 - Janela de 15 minutos com limite de 5 tentativas falhas.
 - Após exceder, retornar `429 Too Many Requests` com cabeçalho `Retry-After`.
@@ -52,6 +55,7 @@ As seguintes recomendações são **adotadas** para endurecer a segurança do ac
 **Problema:** O endpoint grava logs (`createLog`) quando o acesso é usado, mas não há como monitorar ou alertar sobre uso suspeito em tempo real. Não há métricas de "quantas vezes o acesso do criador foi usado hoje".
 
 **Solução:** Adicionar métricas de uso após cada operação bem-sucedida:
+
 - Incrementar um contador `creator_access_count` por tipo (enter, restore, transfer).
 - Log estruturado com `event: 'creator_access'`, `action: 'enter'|'restore'|'transfer'`, `creator_id`, `target_user_id`, `success: true/false`.
 - Esses dados podem ser lidos por um endpoint interno de diagnóstico (não exposto publicamente) ou integrados a um sistema de monitoring externo no futuro.
@@ -83,21 +87,21 @@ const rateLimitStore = new Map<string, { count: number; reset: number }>();
 function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
-  
+
   if (!entry) {
     rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
     return { allowed: true, remaining: 4 };
   }
-  
+
   if (now > entry.reset) {
     rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
     return { allowed: true, remaining: 4 };
   }
-  
+
   if (entry.count >= 5) {
     return { allowed: false, remaining: 0 };
   }
-  
+
   rateLimitStore.set(key, { count: entry.count + 1, reset: entry.reset });
   return { allowed: true, remaining: 5 - entry.count };
 }
@@ -125,9 +129,11 @@ Após cada resposta `200` bem-sucedida, adicionar log enriquecido:
 await createLog(
   req,
   creator.id,
-  'CREATOR_ACCESS_ENTER', // ou 'CREATOR_ACCESS_RESTORE' / 'CREATOR_ACCESS_TRANSFER'
-  `Entrou na conta de ${targetUser.name || targetUser.email} (${targetUser.id})${reason ? `. Motivo: ${reason}` : ''}`,
-  { action: 'enter', success: true, targetUserId: targetUser.id } // metadata extra
+  "CREATOR_ACCESS_ENTER", // ou 'CREATOR_ACCESS_RESTORE' / 'CREATOR_ACCESS_TRANSFER'
+  `Entrou na conta de ${targetUser.name || targetUser.email} (${
+    targetUser.id
+  })${reason ? `. Motivo: ${reason}` : ""}`,
+  { action: "enter", success: true, targetUserId: targetUser.id } // metadata extra
 );
 ```
 
@@ -139,22 +145,22 @@ O `createLog` já aceita metadados adicionais (quinto parâmetro), conforme já 
 
 Após a implementação, os seguintes gates devem ser verificados:
 
-| # | Gate | Comando | Esperado |
-|---|------|---------|----------|
-| 1 | Rate limit bloqueia > 5 tentativas em 15 min | Testes de integração manual ou vitest | `429` após 6ª tentativa falha |
-| 2 | `auth_token_creator` tem `max-age=3600` | Ler o source code ou inspecionar headers HTTP | `Max-Age: 3600` |
-| 3 | Logs incluem metadados `action` e `success` | Verificar `createLog` calls nos testes | `action` presente nos logs de teste |
-| 4 | Não há regressão nas rotas existentes | `yarn test` e `yarn build:opt` | Todos os testes passando |
+| #   | Gate                                         | Comando                                       | Esperado                            |
+| --- | -------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+| 1   | Rate limit bloqueia > 5 tentativas em 15 min | Testes de integração manual ou vitest         | `429` após 6ª tentativa falha       |
+| 2   | `auth_token_creator` tem `max-age=3600`      | Ler o source code ou inspecionar headers HTTP | `Max-Age: 3600`                     |
+| 3   | Logs incluem metadados `action` e `success`  | Verificar `createLog` calls nos testes        | `action` presente nos logs de teste |
+| 4   | Não há regressão nas rotas existentes        | `yarn test` e `yarn build:opt`                | Todos os testes passando            |
 
 ### 4.1 Testes de regressão obrigatórios
 
-| Cenário | Expected |
-|---|---|
-| `POST /api/creator-access` com 6 senhas erradas seguidas | `429` após a 5ª falha, `401` na 6ª só se houver reset de janela |
-| `POST /api/creator-access` com senha correta dentro do limite | `200` normalmente, cookies definidos |
-| `POST /api/creator-access` após janela expirar | Contador reinicia, `200` normal |
-| `DELETE /api/creator-access` com stash cookie | `200` + troca de cookies |
-| `PATCH /api/creator-access` com dados válidos | `200` + atualização de role/isCreator |
+| Cenário                                                       | Expected                                                        |
+| ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `POST /api/creator-access` com 6 senhas erradas seguidas      | `429` após a 5ª falha, `401` na 6ª só se houver reset de janela |
+| `POST /api/creator-access` com senha correta dentro do limite | `200` normalmente, cookies definidos                            |
+| `POST /api/creator-access` após janela expirar                | Contador reinicia, `200` normal                                 |
+| `DELETE /api/creator-access` com stash cookie                 | `200` + troca de cookies                                        |
+| `PATCH /api/creator-access` com dados válidos                 | `200` + atualização de role/isCreator                           |
 
 ### 4.2 Cobertura de teste
 

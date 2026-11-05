@@ -1,11 +1,11 @@
 # ADR-004: Modal de visualização de espaço-pai e ícone de expansão no ListSection
 
-| Campo | Valor |
-|---|---|
-| **Status** | aceito |
-| **Data** | 23/10/2026 |
-| **Deciders** | dono do projeto (MegaNuv) + arquiteto de software |
-| **Origem** | requisitos de front-end da Etapa C da ADR-003 — permitir interação com espaços-pai na página index (`ListSection.tsx`) e visualizar suas informações importantes (endereço, foto, responsável, telefone). |
+| Campo        | Valor                                                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**   | executado                                                                                                                                                                                                 |
+| **Data**     | 23/10/2026                                                                                                                                                                                                |
+| **Deciders** | Fla175 & MegaNuv                                                                                                                                                                                          |
+| **Origem**   | requisitos de front-end da Etapa C da ADR-003 — permitir interação com espaços-pai na página index (`ListSection.tsx`) e visualizar suas informações importantes (endereço, foto, responsável, telefone). |
 
 ---
 
@@ -39,12 +39,12 @@ Adicionar ao `ListSection`:
 
 ### Opção A: estender o type `FatherSpace` e usar o array já passado
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Baixa |
-| Cost | Baixa (sem novo endpoint) |
-| Scalability | Média (carrega todos os campos de todos os espaços sempre) |
-| Team familiarity | Alta |
+| Dimension        | Assessment                                                 |
+| ---------------- | ---------------------------------------------------------- |
+| Complexity       | Baixa                                                      |
+| Cost             | Baixa (sem novo endpoint)                                  |
+| Scalability      | Média (carrega todos os campos de todos os espaços sempre) |
+| Team familiarity | Alta                                                       |
 
 **Pros:** sem novo endpoint; dados já estão no `fatherSpaces` passado como prop.
 
@@ -52,11 +52,11 @@ Adicionar ao `ListSection`:
 
 ### Opção B: novo endpoint `GET /api/father-spaces/[id]` (escolhida)
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Média |
-| Cost | Média (novo endpoint + teste de API) |
-| Scalability | Alta (carrega só o espaço necessário) |
+| Dimension        | Assessment                               |
+| ---------------- | ---------------------------------------- |
+| Complexity       | Média                                    |
+| Cost             | Média (novo endpoint + teste de API)     |
+| Scalability      | Alta (carrega só o espaço necessário)    |
 | Team familiarity | Alta (segue padrão dos outros `[id].ts`) |
 
 **Pros:** dados tipados e sob demanda; endpoint consistente com o restante da API; tipo dedicado no frontend.
@@ -65,12 +65,12 @@ Adicionar ao `ListSection`:
 
 ### Opção C: reutilizar `SpaceModal` (edição) disfarçado de visualização
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Baixa |
-| Cost | Baixa (sem novo componente) |
-| Scalability | Baixa (acopla visualização a edição) |
-| Team familiarity | Média |
+| Dimension        | Assessment                           |
+| ---------------- | ------------------------------------ |
+| Complexity       | Baixa                                |
+| Cost             | Baixa (sem novo componente)          |
+| Scalability      | Baixa (acopla visualização a edição) |
+| Team familiarity | Média                                |
 
 **Pros:** reaproveita o formulário existente.
 

@@ -1,9 +1,11 @@
 # ADR-003 — Modularização de componentes long method e adoção do Shadcn UI
 
-**Status:** aceito (decisão do dono em 20/10/2026, após grilling de arquitetura)
-**Data:** 20/10/2026
-**Deciders:** dono do projeto (MegaNuv) + arquiteto de software
-**Origem:** revisão de code smell detectada em `pages/dashboard.tsx` (375 linhas), `pages/settings.tsx` (1.254 linhas) e `components/ListSection.tsx` (2.151 linhas)
+| Campo        | Valor                                                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**   | executado (decisão do dono em 20/10/2026, após grilling de arquitetura)                                                                                  |
+| **Data**     | 20/10/2026                                                                                                                                               |
+| **Deciders** | Fla175 & MegaNuv                                                                                                                                         |
+| **Origem**   | revisão de code smell detectada em `pages/dashboard.tsx` (375 linhas), `pages/settings.tsx` (1.254 linhas) e `components/ListSection.tsx` (2.151 linhas) |
 
 ---
 
@@ -11,11 +13,11 @@
 
 Três arquivos concentram a maior parte da complexidade de UI do sistema e violam o princípio de **Deep Module** (superfície pequena, comportamento encapsulado):
 
-| Arquivo | Linhas | Componente principal | Principais responsabilidades misturadas |
-|---------|--------|----------------------|-----------------------------------------|
-| `pages/dashboard.tsx` | 375 | `DashboardPage` (320 linhas) | fetch de stats, derived state, paginação, 4 cards KPI, grid de categorias, 2 painéis de listagem, 1 modal |
-| `pages/settings.tsx` | 1.254 | `SettingsPage` (1.195 linhas) | 14 `useState`, 5 abas, 7 modais, CRUD de usuários/espacos/categorias, logs, revert, creator access, tema |
-| `components/ListSection.tsx` | 2.151 | `ListSection` (2.010 linhas) | 13 `useState`, 2 renderizadores de árvore recursiva, filtro hierárquico, seleção múltipla, clone em lote, move, undo, 7 modais, context menu |
+| Arquivo                      | Linhas | Componente principal          | Principais responsabilidades misturadas                                                                                                      |
+| ---------------------------- | ------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/dashboard.tsx`        | 375    | `DashboardPage` (320 linhas)  | fetch de stats, derived state, paginação, 4 cards KPI, grid de categorias, 2 painéis de listagem, 1 modal                                    |
+| `pages/settings.tsx`         | 1.254  | `SettingsPage` (1.195 linhas) | 14 `useState`, 5 abas, 7 modais, CRUD de usuários/espacos/categorias, logs, revert, creator access, tema                                     |
+| `components/ListSection.tsx` | 2.151  | `ListSection` (2.010 linhas)  | 13 `useState`, 2 renderizadores de árvore recursiva, filtro hierárquico, seleção múltipla, clone em lote, move, undo, 7 modais, context menu |
 
 **Problemas identificados:**
 
@@ -56,13 +58,13 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 
 ### 2.4 Estratégia de migração de componentes existentes
 
-| Componente atual | Decisão |
-|------------------|---------|
-| `CustomSelect` | Reescrever sobre `Select` do Shadcn (duplica `Select` + `SearchableSelect`) |
-| `FileUpload` / `ImageUpload` | Manter como estão (lógica específica de MinIO/upload policy) |
-| `ConfirmDialog` | Substituir por `Dialog` + `AlertDialog` do Shadcn |
-| `ContextBtn`, `InfoItem` | Manter como componentes utilitários locais (não há equivalente Shadcn) |
-| Modais inline (7 em ListSection, 7 em Settings) | Extrair como componentes próprios; usar `Dialog` do Shadcn como base |
+| Componente atual                                | Decisão                                                                     |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `CustomSelect`                                  | Reescrever sobre `Select` do Shadcn (duplica `Select` + `SearchableSelect`) |
+| `FileUpload` / `ImageUpload`                    | Manter como estão (lógica específica de MinIO/upload policy)                |
+| `ConfirmDialog`                                 | Substituir por `Dialog` + `AlertDialog` do Shadcn                           |
+| `ContextBtn`, `InfoItem`                        | Manter como componentes utilitários locais (não há equivalente Shadcn)      |
+| Modais inline (7 em ListSection, 7 em Settings) | Extrair como componentes próprios; usar `Dialog` do Shadcn como base        |
 
 ### 2.5 Gestão de estado
 
@@ -79,29 +81,32 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 
 ## 3. Alternativas avaliadas
 
-| # | Alternativa | Complexidade | Custo | Veredito |
-|---|-------------|--------------|-------|----------|
-| A | **Modularizar por feature + Shadcn UI + Zustand** (decidido) | Média | Médio | **Aceito** — resolve long method, acessibilidade e prop drilling de uma vez. |
-| B | Só extrair componentes puros, manter estado em `useState` | Baixa | Baixo | Rejeitada — não resolve o estado plano nem o prop drilling. |
-| C | Reescrever tudo com Shadcn + Zustand de imediato | Alta | Alto | Rejeitado — quebra o gateway de qualidade (build, testes) e é um "big bang" arriscado. |
-| D | Manter arquivos gigantes, só adicionar Shadcn para novos componentes | Baixa | Baixo | Rejeitado — não atende o objetivo de remover o code smell de long method. |
+| #   | Alternativa                                                          | Complexidade | Custo | Veredito                                                                               |
+| --- | -------------------------------------------------------------------- | ------------ | ----- | -------------------------------------------------------------------------------------- |
+| A   | **Modularizar por feature + Shadcn UI + Zustand** (decidido)         | Média        | Médio | **Aceito** — resolve long method, acessibilidade e prop drilling de uma vez.           |
+| B   | Só extrair componentes puros, manter estado em `useState`            | Baixa        | Baixo | Rejeitada — não resolve o estado plano nem o prop drilling.                            |
+| C   | Reescrever tudo com Shadcn + Zustand de imediato                     | Alta         | Alto  | Rejeitado — quebra o gateway de qualidade (build, testes) e é um "big bang" arriscado. |
+| D   | Manter arquivos gigantes, só adicionar Shadcn para novos componentes | Baixa        | Baixo | Rejeitado — não atende o objetivo de remover o code smell de long method.              |
 
 ---
 
 ## 4. Trade-off Analysis
 
 **O que fica mais fácil:**
+
 - Testar componentes isoladamente (cada modal, cada aba, cada card é um arquivo separado).
 - Navegar no código (um desenvolvedor entra em `components/settings/UsersTab.tsx` em vez de rolar 1.200 linhas).
 - Substituir componentes feitos à mão por primitives acessíveis do Shadcn (focus trap, ARIA, keyboard).
 - Tipar props com `@types/inventory.ts` — reduz `any` e prop drilling.
 
 **O que fica mais difícil:**
+
 - Curva de aprendizado do Shadcn + Tailwind v4 (configuração manual pode ser necessária).
 - Zustand adiciona uma dependência de estado global que precisa ser documentada.
 - A refatoração inicial é mais lenta que apenas "deixar como está".
 
 **O que precisará ser revisitado:**
+
 - Se o Shadcn não suportar Tailwind v4, haverá retrabalho de configuração.
 - Depois da extração de `ListSection`, avaliar se `useInventorySelection` e `useInventoryFilter` merecem ser hooks globais ou permanecem locais.
 - Monitorar se Zustand realmente reduz prop drilling ou se adiciona complexidade desnecessária em telas pequenas.
@@ -118,11 +123,13 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 ## 6. Action Items
 
 ### Etapa A — Preparação e Shadcn UI
+
 - [ ] Inicializar Shadcn: `npx shadcn@latest init` (ou configurar `components.json` manualmente para Tailwind v4 + Pages Router).
 - [ ] Adicionar componentes base do Shadcn conforme necessário: `select`, `dialog`, `popover`, `command`, `sheet`.
 - [ ] Verificar `yarn lint`, `tsc`, `prisma validate`, `yarn test`, `yarn build:opt` após a instalação.
 
 ### Etapa B — Dashboard (`pages/dashboard.tsx`, ~375 linhas)
+
 - [ ] Extrair `useDashboardStats()` (fetch + mapping de `assetsByCategory`).
 - [ ] Extrair `usePagination()` (genérico, reutilizável).
 - [ ] Extrair `components/dashboard/KPICards.tsx` (patrimônio, total de ativos).
@@ -133,6 +140,7 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 - [ ] Reescrever `DashboardPage` como orquestrador fino (<100 linhas).
 
 ### Etapa C — ListSection (`components/ListSection.tsx`, ~2.151 linhas)
+
 - [ ] Extrair `useInventorySelection(actives)` (seleção única/múltipla, long press).
 - [ ] Extrair `useInventoryFilter(filters, actives, fatherSpaces)` (filtro hierárquico + `expandedNodes`).
 - [ ] Extrair `useMoveAction(actives, fatherSpaces, onRefresh)` (árvore de move + ação).
@@ -145,6 +153,7 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 - [ ] Reescrever `ListSection` como orquestrador fino (<200 linhas).
 
 ### Etapa D — Settings (`pages/settings.tsx`, ~1.254 linhas)
+
 - [x] Extrair `useSettingsPermissions(user)` (`canManageAll`, `canManageUsers`, `canSeeLogs`).
 - [x] Extrair `useSettingsData(activeTab, perms)` (fetch de listas + refresh).
 - [x] Extrair `useRevertHistory()` (polling de 5s + seleção + handlers).
@@ -156,6 +165,7 @@ Nenhum barrel export (`index.ts`) será criado, exceto se exigido por `component
 - [x] Reescrever `SettingsPage` como orquestrador fino (<200 linhas) — **169 L**.
 
 ### Etapa E — Validação e documentação
+
 - [x] Rodar gates completos: `yarn lint`, `npx tsc --noEmit`, `npx prisma validate`, `yarn test`, `yarn build:opt`.
 - [x] Atualizar `SPECS.md` com a nova estrutura de pastas e contratos de componentes.
 - [x] Atualizar `CONTEXT.md` com o foco da nova etapa e dívidas fechadas.
