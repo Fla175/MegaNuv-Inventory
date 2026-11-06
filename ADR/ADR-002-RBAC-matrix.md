@@ -1,10 +1,12 @@
 # ADR-002 — Matriz RBAC canônica e fechamento dos gates
 
-**Status:** aceito (decisão de produto do dono em 20/10/2026; `fixedValue` decidido em 18/10/2026)
-**Data:** 20/10/2026
-**Deciders:** dono do projeto (MegaNuv)
-**Origem:** pendência declarada no §7 da `ADR-001`; auditoria do código em `f2c93e7`
-**Substitui:** a matriz de `SPECS.md` §4.2 (linhas 262-270 em `f2c93e7`)
+| Campo         | Valor                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| **Status**    | executado (decisão de produto do dono em 20/10/2026; `fixedValue` decidido em 18/10/2026) |
+| **Data**      | 20/10/2026                                                                                |
+| **Deciders**  | Fla175 & MegaNuv                                                                          |
+| **Origem**    | pendência declarada no §7 da `ADR-001`; auditoria do código em `f2c93e7`                  |
+| **Substitui** | a matriz de `SPECS.md` §4.2 (linhas 262-270 em `f2c93e7`)                                 |
 
 ---
 
@@ -17,13 +19,13 @@ passa a dizer. Esta é a segunda.
 A auditoria da matriz contra os handlers encontrou cinco divergências. Duas são **falhas de
 privilégio**, não apenas documentação:
 
-| # | Área | O que a matriz/UI dizia | O que o código fazia (em `f2c93e7`) |
-|---|---|---|---|
-| 2.1 | `fixedValue` | ADMIN e MANAGER **não** veem (linhas de `SPECS.md:266-267`) | Desde a Etapa 1 da ADR-001, ADMIN/MANAGER/DIRECTOR veem e editam; só VIEWER não vê |
-| 2.2 | Espaços Pai | CRUD para DIRECTOR/ADMIN/MANAGER (`SPECS.md:265-267`); UI mostra a aba a DIRECTOR/ADMIN (`settings.tsx:115,583`) | `create.ts:17`, `update.ts:18` e `delete.ts:23` exigem `role === "ADMIN"` — DIRECTOR recebia 403 |
-| 2.3 | Usuários | DIRECTOR todos; ADMIN exceto DIRECTOR; MANAGER só VIEWER (`SPECS.md:265-267`) | `POST /api/users` só barrava MANAGER de criar **ADMIN** (`users/index.ts:42`): MANAGER criava **DIRECTOR** e ADMIN criava DIRECTOR. `users/[id].ts:24-27,37-39,55-57` só comparava com ADMIN: MANAGER editava/excluía DIRECTOR, e DIRECTOR não gerenciava ninguém |
-| 2.4 | Logs | DIRECTOR "sim (inclusive edita/deleta)" e MANAGER "sim" (`SPECS.md:265-268`); UI mostra o botão de limpar a DIRECTOR (`settings.tsx:933-934`) | `logs/list.ts:15` bloqueia só VIEWER (leitura OK), mas `logs/clear.ts:16` é ADMIN-only — DIRECTOR via o botão e recebia 403 |
-| 2.5 | Dashboard | A matriz fala em "Leitura total" para todos | `dashboard/stats.ts:13` devolve 403 para VIEWER — decisão de produto mantida; o card de patrimônio total é a exceção |
+| #   | Área         | O que a matriz/UI dizia                                                                                                                       | O que o código fazia (em `f2c93e7`)                                                                                                                                                                                                                               |
+| --- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.1 | `fixedValue` | ADMIN e MANAGER **não** veem (linhas de `SPECS.md:266-267`)                                                                                   | Desde a Etapa 1 da ADR-001, ADMIN/MANAGER/DIRECTOR veem e editam; só VIEWER não vê                                                                                                                                                                                |
+| 2.2 | Espaços Pai  | CRUD para DIRECTOR/ADMIN/MANAGER (`SPECS.md:265-267`); UI mostra a aba a DIRECTOR/ADMIN (`settings.tsx:115,583`)                              | `create.ts:17`, `update.ts:18` e `delete.ts:23` exigem `role === "ADMIN"` — DIRECTOR recebia 403                                                                                                                                                                  |
+| 2.3 | Usuários     | DIRECTOR todos; ADMIN exceto DIRECTOR; MANAGER só VIEWER (`SPECS.md:265-267`)                                                                 | `POST /api/users` só barrava MANAGER de criar **ADMIN** (`users/index.ts:42`): MANAGER criava **DIRECTOR** e ADMIN criava DIRECTOR. `users/[id].ts:24-27,37-39,55-57` só comparava com ADMIN: MANAGER editava/excluía DIRECTOR, e DIRECTOR não gerenciava ninguém |
+| 2.4 | Logs         | DIRECTOR "sim (inclusive edita/deleta)" e MANAGER "sim" (`SPECS.md:265-268`); UI mostra o botão de limpar a DIRECTOR (`settings.tsx:933-934`) | `logs/list.ts:15` bloqueia só VIEWER (leitura OK), mas `logs/clear.ts:16` é ADMIN-only — DIRECTOR via o botão e recebia 403                                                                                                                                       |
+| 2.5 | Dashboard    | A matriz fala em "Leitura total" para todos                                                                                                   | `dashboard/stats.ts:13` devolve 403 para VIEWER — decisão de produto mantida; o card de patrimônio total é a exceção                                                                                                                                              |
 
 O caso 2.3 é o mais grave: um MANAGER podia **criar um DIRECTOR** — papel acima do dele — e
 **editar/excluir** o DIRECTOR existente. Não era escalada teórica: era um `POST`/`PATCH` com o
@@ -37,12 +39,12 @@ não existia um, sem consultar `isCreator`.
 A matriz passa a ser a abaixo. Ela é **normativa**: um handler que divergir dela é bug, e um teste
 que a contradizer está errado.
 
-| Papel | Leitura de inventário | Ativos | Categorias | Espaços Pai | Gerencia usuários | Vê/edita `fixedValue` | Logs | Revert |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `DIRECTOR` | total | sim | sim | sim | todos | sim | ler + apagar | sim |
-| `ADMIN` | total | sim | sim | sim | exceto `DIRECTOR` | sim | ler + apagar | sim |
-| `MANAGER` | total | sim | sim | **não** | só `VIEWER` | sim | ler | sim |
-| `VIEWER` | total (ativos) | **não** | **não** | **não** | não | **não** | não | não |
+| Papel      | Leitura de inventário | Ativos  | Categorias | Espaços Pai | Gerencia usuários | Vê/edita `fixedValue` | Logs         | Revert |
+| ---------- | --------------------- | ------- | ---------- | ----------- | ----------------- | --------------------- | ------------ | ------ |
+| `DIRECTOR` | total                 | sim     | sim        | sim         | todos             | sim                   | ler + apagar | sim    |
+| `ADMIN`    | total                 | sim     | sim        | sim         | exceto `DIRECTOR` | sim                   | ler + apagar | sim    |
+| `MANAGER`  | total                 | sim     | sim        | **não**     | só `VIEWER`       | sim                   | ler          | sim    |
+| `VIEWER`   | total (ativos)        | **não** | **não**    | **não**     | não               | **não**               | não          | não    |
 
 ### 2.1 `fixedValue` (decisão de 18/10/2026, implementada na ADR-001)
 
@@ -116,26 +118,26 @@ comportamento dos handlers. A suíte passou de **260** para **350** testes (5 sk
 
 Cada guarda foi removida de propósito e os testes falharam:
 
-| Mutação | Testes que falharam |
-|---|---|
-| `canManageSpaces` volta a ADMIN-only | 5 |
-| `canAssignRole` aceita DIRECTOR de qualquer um | 7 |
-| `canClearLogs` aceita qualquer papel | 4 |
-| `canActOnUser` deixa ADMIN agir sobre DIRECTOR | 3 |
+| Mutação                                        | Testes que falharam |
+| ---------------------------------------------- | ------------------- |
+| `canManageSpaces` volta a ADMIN-only           | 5                   |
+| `canAssignRole` aceita DIRECTOR de qualquer um | 7                   |
+| `canClearLogs` aceita qualquer papel           | 4                   |
+| `canActOnUser` deixa ADMIN agir sobre DIRECTOR | 3                   |
 
 ---
 
 ## 4. Alternativas avaliadas
 
-| # | Alternativa | Veredito |
-|---|---|---|
-| A | **Só corrigir a documentação** | Rejeitada. Deixaria de pé a escalada MANAGER→DIRECTOR e os 403 de DIRECTOR em espaços/logs. O dono escolheu corrigir o código. |
-| B | **Fazer a documentação refletir o código atual** | Rejeitada. Tornaria "MANAGER cria DIRECTOR" uma regra aceita; é escalada de privilégio, não escolha de produto. |
-| C | **Regra replicada em cada handler** | Rejeitada. É o anti-padrão que a auditoria da ADR-001 já apontou (verificação de JWT em ~22 arquivos). A política fica em `lib/rbac.ts`. |
-| D | **Espaços ADMIN-only** | Rejeitada. A UI já dava a aba ao DIRECTOR; o 403 era o bug. Manager não ganha a estrutura física. |
-| E | **Espaços incluindo MANAGER** | Rejeitada. Ampliaria o poder do MANAGER sobre a hierarquia física sem necessidade de produto. |
-| F | **Logs ADMIN-only** | Rejeitada. Contradiz a UI e a matriz; DIRECTOR é o papel de governança. MANAGER fica com leitura. |
-| G | **MANAGER também apaga logs** | Rejeitada. Exclusão de auditoria é operação destrutiva; leitura basta para o papel. |
+| #   | Alternativa                                      | Veredito                                                                                                                                 |
+| --- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | **Só corrigir a documentação**                   | Rejeitada. Deixaria de pé a escalada MANAGER→DIRECTOR e os 403 de DIRECTOR em espaços/logs. O dono escolheu corrigir o código.           |
+| B   | **Fazer a documentação refletir o código atual** | Rejeitada. Tornaria "MANAGER cria DIRECTOR" uma regra aceita; é escalada de privilégio, não escolha de produto.                          |
+| C   | **Regra replicada em cada handler**              | Rejeitada. É o anti-padrão que a auditoria da ADR-001 já apontou (verificação de JWT em ~22 arquivos). A política fica em `lib/rbac.ts`. |
+| D   | **Espaços ADMIN-only**                           | Rejeitada. A UI já dava a aba ao DIRECTOR; o 403 era o bug. Manager não ganha a estrutura física.                                        |
+| E   | **Espaços incluindo MANAGER**                    | Rejeitada. Ampliaria o poder do MANAGER sobre a hierarquia física sem necessidade de produto.                                            |
+| F   | **Logs ADMIN-only**                              | Rejeitada. Contradiz a UI e a matriz; DIRECTOR é o papel de governança. MANAGER fica com leitura.                                        |
+| G   | **MANAGER também apaga logs**                    | Rejeitada. Exclusão de auditoria é operação destrutiva; leitura basta para o papel.                                                      |
 
 ---
 
@@ -153,6 +155,7 @@ criador semeando o primeiro. VIEWER segue sem qualquer escrita.
 `email`, `role`, `lastLogin`, `createdAt`), sem `password`. A tela recarrega a lista após salvar.
 
 **Dívidas que permanecem (fora do escopo, registradas):**
+
 - `GET /api/users` é legível por VIEWER (campos seguros). É leitura de equipe, não gestão; se o
   produto quiser esconder a lista, é uma decisão separada.
 - Não há denylist de JWT: um token vazado vale até 8 h após logout (`CONTEXT.md` §3.1 #11).

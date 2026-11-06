@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import RevertHistory from "@/components/settings/RevertHistory";
-import QRCodeBatchDownload from "@/components/settings/QRCodeBatchDownload";
 import type { useRevertHistory } from "@/lib/hooks/useRevertHistory";
 import type { SettingsSpace } from "@/components/settings/types";
 
@@ -54,9 +53,6 @@ export default function SettingsHeader({ revert, spacesList = [] }: SettingsHead
     }
   }, [spacesList, hasPhysicalSpaces]);
 
-  // Fallback: se ainda não foi verificado via endpoint, usar o spacesList.length
-  const effectiveHasPhysicalSpaces = hasPhysicalSpaces !== null ? hasPhysicalSpaces : (spacesList.length > 0);
-
   return (
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 lg:mb-10">
       <div className="flex items-center gap-3">
@@ -74,7 +70,6 @@ export default function SettingsHeader({ revert, spacesList = [] }: SettingsHead
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <QRCodeBatchDownload hasPhysicalSpaces={effectiveHasPhysicalSpaces} />
         <RevertHistory
           revertItems={revert.revertItems}
           selectedReverts={revert.selectedReverts}

@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/signup",
   "/api/auth",
   "/api/public",
+  "/api/storage/file",   // Permitir acesso público para proxy de imagens MinIO
   "/api/hello",
   "/initial-setup",
   "/favicon.svg",
