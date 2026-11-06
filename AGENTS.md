@@ -14,13 +14,13 @@
 ## Branch & Versioning Workflow
 
 - **Create a new branch** for every update: `<tipo>/<descurivo>` (e.g., `fix/minio-key`, `feat/active-filters`). Never work directly on `main` or versioned branches.
-- **Version bumps** use `npm version <X.Y.Z> --no-git-tag-version` — the `--no-git-tag-version` flag is **mandatory**. The agent must NOT create tags or commits automatically; only bump `package.json`'s version field. `lib/version.ts` reads the version from `package.json` — no hardcode.
-- After the bump, the agent must report the new version and request the user to create a dedicated branch (e.g., `inventory-vX.Y.Z`), push, open a PR, and merge to `main` — these are human actions.
-- The version currently is `2.27.8` (in `package.json:3`). A bump example:
+- **Version bumps** use `npm version <X.Y.Z>`. The agent must NOT create tags or commits automatically without explicit permission of the user. `lib/version.ts` reads the version from `package.json` — no hardcode.
+- After the bump, the agent must report the new version and ask for permission to create a dedicated branch (e.g., `inventory-vX.Y.Z`), push, open a PR, and merge to `main`.
+- A bump example if the project is at `2.4.11` version:
   ```bash
-  npm version 2.28.0 --no-git-tag-version
-  # → package.json updated from 2.27.8 to 2.28.0
-  # → DO NOT commit or tag; report new version to user
+  npm version 2.5.1
+  # → package.json updated from 2.4.11 to 2.5.1
+  # → DO NOT commit or tag without explicit requirement or permission of the user;
   ```
 
 ## Atomic Commits — Conventional Commits
@@ -49,8 +49,4 @@
 - After atomic commits on a feature branch, open a PR via GitHub CLI or the web UI.
 - The PR must pass all quality gates: `yarn lint` (0 errors), `npx tsc --noEmit` (0 errors), `npx prisma validate` (OK), `yarn build:opt` (standalone build), `yarn test` (Vitest suite).
 - **Merge** to `main` is done via a squash or merge commit as the team decides — the agent does not merge.
-- **Tag and release** are human actions: the user (or release owner) creates an annotated tag `vX.Y.Z` and a GitHub Release via `gh release create vX.Y.Z --notes "..."`. The agent may assist by reporting the new version and changed files but must not create the tag or release autonomously.
-
-## What This Session Did (Medium Paragraph)
-
-> Este agente leu o estado atual do repositóriO (branch `fix/revert-classification`, version `2.27.8`, CONTEXT.md com foco em correções de segurança P0 e pendências de system-versioning), gerou o presente `AGENTS.md` com políticas de commit sob permissão do usuário, fluxo de branch dedicado, versionamento via `npm version --no-git-tag-version`, commits convencionais (Conventional Commits) com tipos `feat`/`fix` e impactos de minor/patch, e workflow de PR/merge/release manual com `gh`. O agente não realizou commits, pushes, tags ou releases automaticamente — todas as ações de versionamento e merge dependem de aprovação e execução humana. O próximo passo é que o usuário revise o fluxo, solicite o bump de versão ou abra PR a partir de uma branch própria.
+- **Tag and release** It needs to create an annotated tag `vX.Y.Z` and a GitHub Release via `gh release create vX.Y.Z --notes "..."`. The agent will do this actions during the execution of commits in explicit user's requirement.

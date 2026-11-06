@@ -2,7 +2,7 @@
 
 | Campo        | Valor                            |
 | ------------ | -------------------------------- |
-| **Status**   | proposed                         |
+| **Status**   | accepted                         |
 | **Data**     | 05/11/2026                       |
 | **Deciders** | Fla175 & MegaNuv                 |
 | **Origem**   | funcionalidade pedida por Fla175 |
