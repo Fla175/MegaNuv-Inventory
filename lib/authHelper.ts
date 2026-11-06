@@ -75,7 +75,7 @@ export function invalidateAllCookies(res: NextApiResponse, options?: {
   ]);
 }
 
-export default {
-  checkStashConsistency,
-  invalidateAllCookies,
+export {
+  checkStashConsistency as checkStash,
+  invalidateAllCookies as invalidateCookies
 };

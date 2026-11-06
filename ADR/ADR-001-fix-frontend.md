@@ -1,10 +1,12 @@
 # ADR-001 — Correção do front-end em quatro etapas
 
-**Status:** aceito (decisão de produto tomada pelo dono em 18/10/2026; evidência verificada por leitura direta)
-**Data:** 18/10/2026
-**Deciders:** dono do projeto (MegaNuv)
-**Origem:** revisão de auditoria do front-end em `inventory-v2.25.2` @ `3355740`
-**Substitui:** a matriz RBAC de `fixedValue` em `SPECS.md:262-270`
+| Campo         | Valor                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| **Status**    | executado (decisão de produto tomada pelo dono em 18/10/2026; evidência verificada por leitura direta) |
+| **Data**      | 18/10/2026                                                                                             |
+| **Deciders**  | Fla175 & MegaNuv                                                                                       |
+| **Origem**    | revisão de auditoria do front-end em `inventory-v2.25.2` @ `3355740`                                   |
+| **Substitui** | a matriz RBAC de `fixedValue` em `SPECS.md:262-270`                                                    |
 
 ---
 
@@ -43,7 +45,7 @@ a um `VIEWER` **escrever** em dados que a regra diz serem somente de leitura par
 A matriz será corrigida em uma **ADR própria, subsequente a esta**. Este documento **não**
 redefine a matriz — ele a corrige no código e **descreve** a mudança, para que a ADR
 documental venha depois com a forma final das regras. Duas ADRs porque são duas coisas: uma decide
-*o que fazer com o código*, a outra decide *o que a especificação passa a dizer*. Misturar
+_o que fazer com o código_, a outra decide _o que a especificação passa a dizer_. Misturar
 as duas esconderia a mudança de contrato dentro de um plano de execução.
 
 ---
@@ -87,17 +89,17 @@ sentido depois que a anterior estanqueou o dano que corrigia.
 
 **Objetivo:** nenhum endpoint de mutação aceita requisição de papel que não deveria aceitá-la.
 
-| # | Endpoint | Defeito | Evidência |
-|---|---|---|---|
-| 0.1 | `pages/api/actives/clone-batch.ts` | **Não verifica sessão no handler e não tem guarda de papel.** Não importa `authMiddleware`; exporta o handler cru (`:6`, sem wrapper na linha final). Um `VIEWER` autenticado pode criar até **50 cópias** de qualquer ativo (`qty` limitado a 50 em `:18`), em qualquer destino | `:6-104` |
-| 0.2 | `pages/api/actives/clone-batch.ts` | A clonagem **copia `fixedValue`** e `notes` do original para a cópia | `:79-80` |
-| 0.3 | `pages/api/actives/update.ts` | Usa `authMiddleware(handler)` (`:128`), que valida **a sessão mas não o papel** — `requiredRoles` não é passado (ver `lib/middlewares/authMiddleware.ts:51-55`). Um `VIEWER` autenticado pode editar qualquer ativo por ID | `:8`, `:128` |
-| 0.4 | `pages/api/actives/update.ts` | `applyToSimilar` propaga a alteração **em lote** para todos os ativos com mesmo `name`/`manufacturer`/`model`/`sku` — um `VIEWER` pode escrever em N registros com um único `PUT` | `:79-106` |
+| #   | Endpoint                           | Defeito                                                                                                                                                                                                                                                                          | Evidência    |
+| --- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 0.1 | `pages/api/actives/clone-batch.ts` | **Não verifica sessão no handler e não tem guarda de papel.** Não importa `authMiddleware`; exporta o handler cru (`:6`, sem wrapper na linha final). Um `VIEWER` autenticado pode criar até **50 cópias** de qualquer ativo (`qty` limitado a 50 em `:18`), em qualquer destino | `:6-104`     |
+| 0.2 | `pages/api/actives/clone-batch.ts` | A clonagem **copia `fixedValue`** e `notes` do original para a cópia                                                                                                                                                                                                             | `:79-80`     |
+| 0.3 | `pages/api/actives/update.ts`      | Usa `authMiddleware(handler)` (`:128`), que valida **a sessão mas não o papel** — `requiredRoles` não é passado (ver `lib/middlewares/authMiddleware.ts:51-55`). Um `VIEWER` autenticado pode editar qualquer ativo por ID                                                       | `:8`, `:128` |
+| 0.4 | `pages/api/actives/update.ts`      | `applyToSimilar` propaga a alteração **em lote** para todos os ativos com mesmo `name`/`manufacturer`/`model`/`sku` — um `VIEWER` pode escrever em N registros com um único `PUT`                                                                                                | `:79-106`    |
 
 **Sobre o risco real.** O `middleware.ts` **cobre** `/api/actives/*` (verificado: o matcher
 `'/((?!_next/static|_next/image|favicon.svg|logo-inventory.svg).*)'` casa com ambas as rotas), e
 o escudo de token em `:58-86` devolve `401` sem cookie. Ou seja: **não é acesso anônimo.** O
-defeito é mais estreito e mais difícil de defender — *qualquer `VIEWER` autenticado* escreve
+defeito é mais estreito e mais difícil de defender — _qualquer `VIEWER` autenticado_ escreve
 onde a regra diz que só deveria ler.
 
 **Por que é a Etapa 0.** As demais etapas corrigem **leitura** (Etapa 1) e **manutenção**
@@ -121,13 +123,13 @@ registro é alterado — **nem os similares alcançados por `applyToSimilar`**.
 **Objetivo:** o campo sensível deixa de sair no payload para quem não pode ver, e deixa de ser
 destruído por quem pode ver mas não recebeu o valor.
 
-| # | Mudança | Arquivo | Evidência |
-|---|---|---|---|
-| 1.1 | `select` explícito no `findMany`; `fixedValue` incluído **apenas** quando o papel não é `VIEWER` | `pages/api/actives/list.ts:14-25` | hoje não há `select`; só há `401` em `:12` |
-| 1.2 | Preservar o valor existente quando `fixedValue` **não** vier no corpo (distinguir "ausente" de `0`) | `pages/api/actives/update.ts:53-61` | hoje grava `|| 0` incondicionalmente |
-| 1.3 | `public-get.ts` aplica o mesmo critério a `signedRoot` e `signedActives` — hoje `:126` espalha `...rootActive` com `fixedValue` e `notes` sem nenhum gate | `pages/api/qrcode/public-get.ts:126`, `:81-95` | `grep fixedValue` no arquivo retorna **vazio** |
-| 1.4 | Somar o valor de **cada ativo da subárvore** no servidor; a interface `SectionActive` passa a declarar `fixedValue` | `pages/api/qrcode/public-get.ts`, `pages/qrcode/view.tsx:187-189` | hoje `sec.fixedValue` é `undefined` → soma `0` sempre |
-| 1.5 | Card de patrimônio total continua restrito — comportamento atual preservado | `pages/api/dashboard/stats.ts:13` | já faz `403` para `VIEWER` |
+| #   | Mudança                                                                                                                                                   | Arquivo                                                           | Evidência                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- | --- | --------------------- |
+| 1.1 | `select` explícito no `findMany`; `fixedValue` incluído **apenas** quando o papel não é `VIEWER`                                                          | `pages/api/actives/list.ts:14-25`                                 | hoje não há `select`; só há `401` em `:12`            |
+| 1.2 | Preservar o valor existente quando `fixedValue` **não** vier no corpo (distinguir "ausente" de `0`)                                                       | `pages/api/actives/update.ts:53-61`                               | hoje grava `                                          |     | 0` incondicionalmente |
+| 1.3 | `public-get.ts` aplica o mesmo critério a `signedRoot` e `signedActives` — hoje `:126` espalha `...rootActive` com `fixedValue` e `notes` sem nenhum gate | `pages/api/qrcode/public-get.ts:126`, `:81-95`                    | `grep fixedValue` no arquivo retorna **vazio**        |
+| 1.4 | Somar o valor de **cada ativo da subárvore** no servidor; a interface `SectionActive` passa a declarar `fixedValue`                                       | `pages/api/qrcode/public-get.ts`, `pages/qrcode/view.tsx:187-189` | hoje `sec.fixedValue` é `undefined` → soma `0` sempre |
+| 1.5 | Card de patrimônio total continua restrito — comportamento atual preservado                                                                               | `pages/api/dashboard/stats.ts:13`                                 | já faz `403` para `VIEWER`                            |
 
 **Precedente que a solução segue:** `lib/apiAuth.ts:55-62` já expõe `isViewer(user)` e
 `isPrivileged(user)` como predicados de papel. A regra cabe em um módulo puro, testável sem
@@ -148,13 +150,13 @@ o risco de perda silenciosa é maior que o risco original.
 
 Cinco defeitos, quatro deles com a mesma raiz: **a mesma regra implementada mais de uma vez.**
 
-| # | Mudança | Arquivo | Evidência |
-|---|---|---|---|
-| 2.1 | Um único `SearchableSelect` em `components/` | hoje duplicado em `ListSection.tsx:77-409` e `actives/activeForm.tsx:144-470` | já divergiram: `:131` trata `type === "default"` como space, `activeForm.tsx:200` não |
-| 2.2 | Reconciliar a semântica de `"default"` **antes** de extrair — os dois seletores aparecem idênticos ao usuário e não se comportam igual | idem | `grep '"default"' activeForm.tsx` → **0 ocorrências** |
-| 2.3 | `parseFileUrls` de `lib/mediaReferences.ts` nos dois lugares; `ListSection.tsx:1781-1789` não faz parse de JSON e produz link `["http://a.pdf"]` | `qrcode/view.tsx:113-123`, `ListSection.tsx:1781-1789` | `SPECS.md:241-243` exige "cópia única" |
-| 2.4 | `fetchData` notifica falha em vez de deixar a lista vazia indistinguível de "sem registros" | `settings.tsx:146-151` | os outros 7 handlers do mesmo arquivo já notificam |
-| 2.5 | Avisar o tamanho da subárvore antes da cascata | `father-spaces/delete.ts:42-53`, `settings.tsx:440-455` | `SPECS.md:239` exige; hoje o `catch` genérico nunca é alcançado porque a cascata apaga os ativos |
+| #   | Mudança                                                                                                                                          | Arquivo                                                                       | Evidência                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 2.1 | Um único `SearchableSelect` em `components/`                                                                                                     | hoje duplicado em `ListSection.tsx:77-409` e `actives/activeForm.tsx:144-470` | já divergiram: `:131` trata `type === "default"` como space, `activeForm.tsx:200` não            |
+| 2.2 | Reconciliar a semântica de `"default"` **antes** de extrair — os dois seletores aparecem idênticos ao usuário e não se comportam igual           | idem                                                                          | `grep '"default"' activeForm.tsx` → **0 ocorrências**                                            |
+| 2.3 | `parseFileUrls` de `lib/mediaReferences.ts` nos dois lugares; `ListSection.tsx:1781-1789` não faz parse de JSON e produz link `["http://a.pdf"]` | `qrcode/view.tsx:113-123`, `ListSection.tsx:1781-1789`                        | `SPECS.md:241-243` exige "cópia única"                                                           |
+| 2.4 | `fetchData` notifica falha em vez de deixar a lista vazia indistinguível de "sem registros"                                                      | `settings.tsx:146-151`                                                        | os outros 7 handlers do mesmo arquivo já notificam                                               |
+| 2.5 | Avisar o tamanho da subárvore antes da cascata                                                                                                   | `father-spaces/delete.ts:42-53`, `settings.tsx:440-455`                       | `SPECS.md:239` exige; hoje o `catch` genérico nunca é alcançado porque a cascata apaga os ativos |
 
 **Ordem dentro da Etapa 2:** 2.2 antes de 2.1 — extrair antes de reconciliar congela a
 divergência no componente compartilhado.
@@ -163,16 +165,16 @@ divergência no componente compartilhado.
 
 ### Etapa 3 — Minor (qualidade e conformidade)
 
-| # | Mudança | Evidência |
-|---|---|---|
-| 3.1 | `role="dialog"` + `aria-modal`; `Esc` nos modais de Entrar e Transferência (hoje `settings.tsx:140-143` só registra `useEscapeKey` para 3 dos 5) | **funcional**, não só a11y |
-| 3.2 | `htmlFor` nos 17 `<label>` sem associação | `activeForm`, `settings`, `ListSection`, `FileUpload`, `imageUpload`, `AddLocationModal` |
-| 3.3 | `FileUpload.tsx:126-128` valida por **OU**; `lib/uploadPolicy.ts:58-73` exige **E** e barra `application/octet-stream` | exatamente o bypass que `SPECS.md:400-402` proíbe |
-| 3.4 | Tipar as 32 ocorrências de `any` com `types/inventory.ts` (104 L, hoje não usado) | `ListSection.tsx:77` é `({...}: any)` |
-| 3.5 | `yarn lint` passa a cobrir `__tests__` | hoje `next lint` varre só `pages\|components\|lib\|src`: **102 erros invisíveis** |
-| 3.6 | Corrigir 5 contagens erradas em `SPECS.md §3.2` e `CONTEXT.md:155` | `ListSection` 1927→**2477**, `settings` 911→**1136**, `activeForm` 659→**1037**, `qrcode/view` 504→**623** |
-| 3.7 | Remover código morto e traduzir comentários PT-BR (≈80 linhas) preservando conteúdo | `getActiveColors`/`getPhysicalSpaceColors` com 0 referências; `ListSection.tsx:949-951` documenta regra de negócio real |
-| 3.8 | Corrigir `ListSection.tsx:1` (`comṕonents/`) | auto-referência corrompida |
+| #   | Mudança                                                                                                                                          | Evidência                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 3.1 | `role="dialog"` + `aria-modal`; `Esc` nos modais de Entrar e Transferência (hoje `settings.tsx:140-143` só registra `useEscapeKey` para 3 dos 5) | **funcional**, não só a11y                                                                                              |
+| 3.2 | `htmlFor` nos 17 `<label>` sem associação                                                                                                        | `activeForm`, `settings`, `ListSection`, `FileUpload`, `imageUpload`, `AddLocationModal`                                |
+| 3.3 | `FileUpload.tsx:126-128` valida por **OU**; `lib/uploadPolicy.ts:58-73` exige **E** e barra `application/octet-stream`                           | exatamente o bypass que `SPECS.md:400-402` proíbe                                                                       |
+| 3.4 | Tipar as 32 ocorrências de `any` com `types/inventory.ts` (104 L, hoje não usado)                                                                | `ListSection.tsx:77` é `({...}: any)`                                                                                   |
+| 3.5 | `yarn lint` passa a cobrir `__tests__`                                                                                                           | hoje `next lint` varre só `pages\|components\|lib\|src`: **102 erros invisíveis**                                       |
+| 3.6 | Corrigir 5 contagens erradas em `SPECS.md §3.2` e `CONTEXT.md:155`                                                                               | `ListSection` 1927→**2477**, `settings` 911→**1136**, `activeForm` 659→**1037**, `qrcode/view` 504→**623**              |
+| 3.7 | Remover código morto e traduzir comentários PT-BR (≈80 linhas) preservando conteúdo                                                              | `getActiveColors`/`getPhysicalSpaceColors` com 0 referências; `ListSection.tsx:949-951` documenta regra de negócio real |
+| 3.8 | Corrigir `ListSection.tsx:1` (`comṕonents/`)                                                                                                     | auto-referência corrompida                                                                                              |
 
 **3.5 exige uma decisão antes de ser executada:** migrar para `eslint .` (como
 `CONTEXT.md:157` já pede) reprovará imediatamente até que os `__tests__` sejam corrigidos ou
@@ -186,11 +188,11 @@ cobre.
 
 ### Etapa 0 — onde vive a autorização de escrita
 
-| # | Alternativa | Complexidade | Custo | Veredito |
-|---|---|---|---|---|
-| A | **`requiredRoles` no `authMiddleware`, mais um `getSessionUser` em `clone-batch`** | Baixa | Baixo | **Adotada** |
-| B | `if (session.role === "VIEWER") return 403` replicado em cada handler | Baixa | Baixo | Rejeitada |
-| C | Confiar no middleware.ts | Nenhum | Nenhum | **Rejeitada** |
+| #   | Alternativa                                                                        | Complexidade | Custo  | Veredito      |
+| --- | ---------------------------------------------------------------------------------- | ------------ | ------ | ------------- |
+| A   | **`requiredRoles` no `authMiddleware`, mais um `getSessionUser` em `clone-batch`** | Baixa        | Baixo  | **Adotada**   |
+| B   | `if (session.role === "VIEWER") return 403` replicado em cada handler              | Baixa        | Baixo  | Rejeitada     |
+| C   | Confiar no middleware.ts                                                           | Nenhum       | Nenhum | **Rejeitada** |
 
 **A vs B.** `authMiddleware` **já tem o parâmetro** `requiredRoles` (`lib/middlewares/authMiddleware.ts:24,51-55`) —
 construído, testado e não usado em lugar nenhum. Adotá-lo é usar o que o projeto já pagou.
@@ -207,23 +209,23 @@ não conhece a matriz RBAC. Um token válido é tudo que ele exige.
 
 ### Etapa 1 — onde vive o gate de leitura
 
-| # | Alternativa | Complexidade | Custo | Veredito |
-|---|---|---|---|---|
-| A | **Servidor omite o campo; update preserva o ausente** | Baixa | Baixo | **Adotada** |
-| B | `403` para quem não pode ver o valor | Média | Alto | Rejeitada |
-| C | Servidor devolve agregado + campo `canViewValue` | Média | Médio | Rejeitada |
-| D | Módulo puro novo em `lib/` para a regra | Baixa | Baixo | **Adotada junto com A** |
-| E | Reforçar só a UI | Baixa | Nenhum | **Rejeitada** |
+| #   | Alternativa                                           | Complexidade | Custo  | Veredito                |
+| --- | ----------------------------------------------------- | ------------ | ------ | ----------------------- |
+| A   | **Servidor omite o campo; update preserva o ausente** | Baixa        | Baixo  | **Adotada**             |
+| B   | `403` para quem não pode ver o valor                  | Média        | Alto   | Rejeitada               |
+| C   | Servidor devolve agregado + campo `canViewValue`      | Média        | Médio  | Rejeitada               |
+| D   | Módulo puro novo em `lib/` para a regra               | Baixa        | Baixo  | **Adotada junto com A** |
+| E   | Reforçar só a UI                                      | Baixa        | Nenhum | **Rejeitada**           |
 
 **A vs B.** `dashboard/stats.ts:13` já usa `403` para `VIEWER`, e esse é o precedente mais
 próximo. Mas `403` aqui derrubaria a **tela inteira** de inventário para o `VIEWER` — que por
-decisão de produto ainda navega, busca e vê ativos. O `VIEWER` não pode ver *o valor*, não pode
-deixar de ver *o inventário*. `403` resolve o problema errado.
+decisão de produto ainda navega, busca e vê ativos. O `VIEWER` não pode ver _o valor_, não pode
+deixar de ver _o inventário_. `403` resolve o problema errado.
 
 **A vs E.** A UI já tem o gate (`ListSection.tsx:1530`), e ele está correto sob a nova
 intenção — só `VIEWER` é ocultado, `MANAGER`/`ADMIN`/`DIRECTOR` veem. Mas `E` deixa o número
 no JSON: basta um `curl` com o cookie de qualquer `VIEWER`. `SPECS.md §5.1` é explícita —
-*"o handler não pode assumir que o middleware rodou"*; o mesmo se aplica ao gate de coluna.
+_"o handler não pode assumir que o middleware rodou"_; o mesmo se aplica ao gate de coluna.
 
 **Por que D.** `SPECS.md §5.1` exige que regra de negócio validada viva em módulo puro em `lib/`,
 para ser testável sem passar por HTTP. `lib/apiAuth.ts:55-62` já é o lugar canônico dos
@@ -237,11 +239,11 @@ por uma **perda de dado**.
 
 ### Forma do documento
 
-| # | Alternativa | Veredito |
-|---|---|---|
-| A | 3 ADRs numeradas (004/005/006) | Rejeitada |
-| B | 1 ADR para o que tem decisão + plano em `.planning/` | Rejeitada |
-| C | **1 ADR, numeração reiniciada em `ADR/`** | **Adotada** |
+| #   | Alternativa                                          | Veredito    |
+| --- | ---------------------------------------------------- | ----------- |
+| A   | 3 ADRs numeradas (004/005/006)                       | Rejeitada   |
+| B   | 1 ADR para o que tem decisão + plano em `.planning/` | Rejeitada   |
+| C   | **1 ADR, numeração reiniciada em `ADR/`**            | **Adotada** |
 
 A numeração anterior (`ADR-001` em `ESTAGIO-1-CREATOR-ACCESS.md`, `ADR-002`/`ADR-003`
 citadas no `CHANGELOG.md`) contava decisões isoladas. Estas correções formam **um** plano
@@ -255,6 +257,7 @@ independentes, o que não é o caso.
 ## 5. Consequências
 
 **Ficam mais fáceis:**
+
 - A autorização de escrita passa a ter **um** lugar por endpoint em vez de nenhum ou de uma
   linha replicada, e `requiredRoles` — já construído e nunca usado — ganha o uso para o qual
   foi escrito.
@@ -267,6 +270,7 @@ independentes, o que não é o caso.
 - Falha de rede em `settings.tsx` deixa de parecer "nenhum registro".
 
 **Ficam mais difíceis:**
+
 - A Etapa 0 toca endpoints que **funcionam hoje**. `clone-batch` e `update` são usados no
   fluxo normal de inventário; bloquear `VIEWER` é o comportamento pretendido, mas exige
   confirmar que nenhum fluxo legítimo dependia de `VIEWER` clonar ou editar. `clone-batch` hoje
@@ -282,6 +286,7 @@ independentes, o que não é o caso.
   possivelmente a atualização do texto do `AGENTS.md §4`.
 
 **Vão precisar de revisão:**
+
 - A **ADR documental subsequente** (matriz RBAC revisada). Este documento descreve a mudança
   de contrato mas não a substitui.
 - `SPECS.md:266-267` e `SPECS.md:381-390` citam a regra antiga de `fixedValue` em mais de um
@@ -355,8 +360,7 @@ independentes, o que não é o caso.
       no estado (mapeamento explícito). **3.7:** `getActiveColors`/`getPhysicalSpaceColors`
       removidos (0 referências) e comentários PT-BR traduzidos nos arquivos da etapa, preservando a
       regra de negócio do undo. **3.6:** contagens atualizadas para os valores correntes
-      (`ListSection` 2.150, `settings` 1.235, `activeForm` 775, `qrcode/view` 614, `FileUpload`
-      307) — os números desta ADR foram superados pela própria Etapa 2. Gates: `eslint .`/tsc/
+      (`ListSection` 2.150, `settings` 1.235, `activeForm` 775, `qrcode/view` 614, `FileUpload` 307) — os números desta ADR foram superados pela própria Etapa 2. Gates: `eslint .`/tsc/
       prisma limpos, **260 testes**, build standalone 90M.
 - [ ] **ADR-002** — revisar a matriz RBAC de `SPECS.md:262-270` conforme a decisão de produto,
       incluindo a regra de escrita (`clone-batch`, `update`) que a matriz atual não expressa

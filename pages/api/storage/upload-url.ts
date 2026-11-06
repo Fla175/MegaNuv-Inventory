@@ -3,7 +3,7 @@ import { NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
 import db from '@/lib/prisma';
-import { minioClient, BUCKET_NAME } from '@/lib/minio';
+import { getMinioClient, BUCKET_NAME } from '@/lib/minio';
 import { validateUpload } from '@/lib/uploadPolicy';
 import { authMiddleware, AuthenticatedNextApiRequest } from '@/lib/middlewares/authMiddleware';
 
@@ -40,7 +40,8 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
     const objectName = `${Date.now()}-${safeName}`;
     const fileBuffer = fs.readFileSync(file.filepath);
 
-    await minioClient.putObject(bucketName, objectName, fileBuffer, file.size, {
+    const minio = getMinioClient();
+    await minio.putObject(bucketName, objectName, fileBuffer, file.size, {
       'Content-Type': file.mimetype || 'application/octet-stream',
     });
 

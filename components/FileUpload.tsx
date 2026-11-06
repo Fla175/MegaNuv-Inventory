@@ -1,6 +1,16 @@
 // components/FileUpload.tsx
 import { useState, useRef, useId } from 'react';
-import { UploadCloud, X, Loader2, FileText, Link as LinkIcon, Plus, Image as ImageIcon, File as FileIcon } from 'lucide-react';
+import {
+  UploadCloud,
+  X,
+  Loader2,
+  FileText,
+  Link as LinkIcon,
+  Plus,
+  Image as ImageIcon,
+  File as FileIcon,
+
+} from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
 import { validateUpload } from '@/lib/uploadPolicy';
 
@@ -9,13 +19,17 @@ interface FileUploadProps {
   onChange: (urls: string[]) => void;
   label?: string;
   maxFiles?: number;
+  /** Optional: show alias input for new attachments */
+  showAliasInput?: boolean;
 }
 
-// Helper: derive the display data and visual style from the URL
+/**
+ * Derive the display data and visual style from the URL
+ */
 const getFileDetails = (url: string) => {
   const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
   const displayName = decodeURIComponent(rawFilename);
-  
+
   const extMatch = displayName.match(/\.([a-zA-Z0-9]+)$/);
   const extension = extMatch ? extMatch[1].toLowerCase() : 'link';
 
@@ -30,7 +44,7 @@ const getFileDetails = (url: string) => {
   } else if (['doc', 'docx'].includes(extension)) {
     Icon = FileIcon;
     colorClass = 'text-blue-500';
-    bgClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50';
+    bgClass = 'bg-blue-50 dark:bg-zinc-900/20 border-blue-200 dark:border-blue-800/50';
   } else if (['png', 'jpg', 'jpeg'].includes(extension)) {
     Icon = ImageIcon;
     colorClass = 'text-emerald-500';
@@ -40,22 +54,27 @@ const getFileDetails = (url: string) => {
   return { displayName, extension, Icon, colorClass, bgClass };
 };
 
+/**
+ * Derive the file extension from a URL path
+ */
 const getFileExtension = (urlOrPath: string): string => {
   if (!urlOrPath) return '';
 
   const cleanPath = urlOrPath.split('?')[0];
   const extension = cleanPath.split('.').pop()?.toLowerCase() || '';
   return extension && extension !== cleanPath.toLowerCase() ? `.${extension}` : '';
-};
+}
 
-export default function FileUpload({ 
-  value = [], 
-  onChange, 
+export default function FileUpload({
+  value = [],
+  onChange,
   label = "Documentos",
-  maxFiles = 5 
+  maxFiles = 5,
+  showAliasInput = false,
 }: FileUploadProps) {
   const [loading, setLoading] = useState(false);
   const [linkInput, setLinkInput] = useState('');
+  const [aliasInputs, setAliasInputs] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = UseToast();
 
@@ -69,6 +88,13 @@ export default function FileUpload({
     }
     onChange([...currentFiles, linkInput.trim()]);
     setLinkInput('');
+    // Clear alias input for the new file
+    setAliasInputs((prev) => {
+      const newPrev = { ...prev };
+      const newKey = String(currentFiles.length);
+      delete newPrev[newKey];
+      return newPrev;
+    });
   };
 
   const handleRemoveFile = async (indexToRemove: number) => {
@@ -96,7 +122,6 @@ export default function FileUpload({
       const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
       onChange(newFiles);
       toast.showSuccess('Arquivo removido com sucesso.');
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao tentar remover o arquivo.';
       toast.showError(errorMessage);
@@ -114,16 +139,12 @@ export default function FileUpload({
     const availableSlots = maxFiles - currentFiles.length;
     if (selectedFiles.length > availableSlots) {
       toast.showWarning(`Você só pode enviar mais ${availableSlots} arquivo(s). Os extras foram ignorados.`);
-      selectedFiles = selectedFiles.slice(0, availableSlots); // Trim the list so it does not exceed the limit
+      selectedFiles = selectedFiles.slice(0, availableSlots);
     }
 
     const validFiles: File[] = [];
 
-    // 3. Per-file validation — the same rule as the server
-    // (`lib/uploadPolicy.ts`): both type **and** extension must be allowed
-    // (`SPECS.md` §5.3). The previous local copy used **or** and accepted
-    // `application/octet-stream` with an allowed extension — exactly the
-    // bypass the SPEC forbids.
+    // 3. Per-file validation
     for (const file of selectedFiles) {
       const rejection = validateUpload({
         mimetype: file.type,
@@ -158,24 +179,36 @@ export default function FileUpload({
         const formData = new FormData();
         formData.append('file', file);
 
+        // Get alias for this file, if provided
+        const aliasKey = String(currentFiles.length + validFiles.indexOf(file));
+        const alias = aliasInputs[aliasKey] || '';
+
         const res = await fetch('/api/storage/upload-url', {
           method: 'POST',
           body: formData,
         });
-        
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Erro no upload de ${file.name}`);
-        
-        return data.publicUrl as string;
+
+        // Return both the URL and the alias
+        return { publicUrl: data.publicUrl as string, alias };
       });
 
-      // Run uploads concurrently and collect results with Promise.allSettled
-      // (so a single failing file does not fail the whole batch)
+      // Run uploads concurrently and collect results
       const results = await Promise.allSettled(uploadPromises);
 
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
-          newUploadedUrls.push(result.value);
+          const { publicUrl, alias } = result.value;
+          newUploadedUrls.push(publicUrl);
+          // Store alias associated with this URL index
+          setAliasInputs((prev) => {
+            const newPrev = { ...prev };
+            newPrev[String(currentFiles.length + index)] = alias || '';
+            return newPrev;
+          });
+          toast.showSuccess(`${newUploadedUrls.length} arquivo(s) enviado(s) com sucesso.`);
         } else {
           toast.showError(`Erro ao enviar "${validFiles[index].name}": ${result.reason.message}`);
         }
@@ -188,13 +221,11 @@ export default function FileUpload({
           toast.showSuccess(`${newUploadedUrls.length} arquivo(s) enviado(s) com sucesso.`);
         }
       }
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro crítico ao enviar arquivos.';
       toast.showError(errorMessage);
     } finally {
       setLoading(false);
-      // Reset the input so the same file can be selected again
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -216,7 +247,8 @@ export default function FileUpload({
           {currentFiles.map((url, index) => {
             const fileExtension = getFileExtension(url);
             const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
-            
+            const alias = aliasInputs[String(index)] || '';
+
             return (
               <div key={index} className={`flex items-center justify-between border rounded-xl p-2 transition-colors ${bgClass}`}>
                 <div className="flex items-center gap-3 overflow-hidden flex-1">
@@ -229,10 +261,10 @@ export default function FileUpload({
                       href={url} 
                       target="_blank" 
                       rel="noreferrer" 
-                      className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate hover:underline"
+                      className="text-xs font-bold text-gray-700 dark:text-zinc-500 truncate hover:underline"
                       title={displayName}
                     >
-                      {displayName}
+                      {alias || displayName}
                     </a>
                     {extension !== 'link' && (
                       <span className={`text-[10px] font-black uppercase tracking-wider ${colorClass}`}>
@@ -254,6 +286,39 @@ export default function FileUpload({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {currentFiles.length > 0 && (
+        <div className="flex flex-col gap-2 mt-3">
+          {currentFiles.map((_url, index) => (
+            <div key={index} className="flex items-center gap-2">
+              {showAliasInput && (
+                <input
+                  type="text"
+                  value={aliasInputs[String(index)] || ''}
+                  onChange={(e) => 
+                    setAliasInputs((prev) => ({
+                      ...prev,
+                      [String(index)]: e.target.value.trim(),
+                    }))
+                  }
+                  className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-white/10 rounded-xl pl-3 py-2 text-xs font-bold focus:border-indigo-500 outline-none"
+                  placeholder="Nome do documento"
+                  title="Digite um nome para este anexo"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemoveFile(index)}
+                disabled={loading}
+                className={`p-1.5 rounded-lg text-gray-400 shrink-0`}
+                title="Remover arquivo"
+              >
+                <X size={14}/>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -298,7 +363,7 @@ export default function FileUpload({
             {loading ? (
               <><Loader2 className="animate-spin text-indigo-600" size={16}/> <span className="text-[10px] font-bold text-indigo-600">Enviando arquivos...</span></>
             ) : (
-              <><UploadCloud className="text-gray-400" size={16}/> <span className="text-[10px] pl-2 font-bold text-gray-400 uppercase">Enviar documento(s)</span></>
+              <><UploadCloud className="text-gray-400" size={16}/> <span className="text-[10x] pl-2 font-bold text-gray-400 uppercase">Enviar documento(s)</span></>
             )}
           </div>
         </>

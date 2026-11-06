@@ -124,6 +124,9 @@ export interface Active {
 
   createdAt: string | Date;
   updatedAt: string | Date;
+
+  // NEW: attachments with aliases
+  attachments?: Attachment[];
 }
 
 // --- HELPER TYPES (for forms and APIs) ---
@@ -183,4 +186,25 @@ export interface InventoryItem {
   quantity?: number;
   /** Marks a `movingItem` that represents the multi-selection, not an asset. */
   isBatch?: boolean;
+}
+
+/** LINHA DE `Active` com as duas colunas que guardam mídia. */
+export interface ActiveMediaRow {
+  fileUrl?: string | null;
+  imageUrl?: string | null;
+}
+
+/** Attachment with alias for document links. */
+export interface Attachment {
+  id: string;
+  alias: string;
+  fileUrl: string;
+  activeId: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+/** LINHA DE `FatherSpace` — só `imageUrl` guarda mídia. */
+export interface FatherSpaceMediaRow {
+  imageUrl?: string | null;
 }

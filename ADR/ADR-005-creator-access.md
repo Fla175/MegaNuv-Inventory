@@ -1,0 +1,221 @@
+# ADR-005 — Segurança do Acesso do Criador
+
+| Campo        | Valor                                                                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**   | executado (revisão de código em `fix/rbac-matrix` @ `3355740`, segurança P0 em `chore/security-p0-debt`)                                  |
+| **Data**     | 04/11/2026                                                                                                                                |
+| **Deciders** | Fla175 & MegaNuv                                                                                                                          |
+| **Origem**   | análise de segurança após correções P0 (§3.1 do CONTEXT.md); recomendação de endurecimento após remoção de flags `CREATOR_ACCESS_ENABLED` |
+
+---
+
+## 1. Contexto
+
+O recurso de **Acesso do Criador** (`/api/creator-access`) permite que o usuário com `isCreator: true` entre temporariamente em outra conta (`POST`), restaure a sessão (`DELETE`) ou transfira o título de criador (`PATCH`).
+
+Decisões já tomadas nesta versão (`2.25.2`):
+
+- **Flags removidas**: `CREATOR_ACCESS_ENABLED` e `CREATOR_ACCESS_REQUIRE_PASSWORD` foram eliminadas do código (CHANGELOG §2.3 item 9). O acesso do criador é **sempre ativo** — não há kill switch.
+- **Senha obrigatória**: `POST /api/creator-access` e `PATCH /api/creator-access` exigem validação de senha via `bcrypt.compare(password, creator.password)`.
+- **Autenticação**: todas as três rotas exigem token JWT válido (via cookie `auth_token` ou header `Authorization: Bearer`).
+- **Guards**: `403` para não-criadores, `409` se já houver stash, `400` se tentar auto-impersonation, `404` se alvo inexistente.
+
+O código atual já implementa o núcleo descrito nas recomendações de segurança P0. No entanto, a análise de código identificou pontos que poderiam ser endurecidos ainda mais para reduzir a superfície de ataque e melhorar a auditoria.
+
+---
+
+## 2. Decisão
+
+As seguintes recomendações são **adotadas** para endurecer a segurança do acesso do criador, sem alterar o contrato de "sempre ativo + senha obrigatória":
+
+### 2.1 Rate limiting (recomendação #1)
+
+**Problema:** Não há limite de tentativas de login/senha no endpoint. Se um atacante obtiver o hash da senha do criador (via vazamento de banco de dados), poderá tentar adivinhar a senha sem restrições.
+
+**Solução:** Implementar rate limiting no handler `pages/api/creator-access`, especificamente nas rotas `POST` e `PATCH` que realizam `bcrypt.compare`. A limitação deve ser:
+
+- Por IP ou por token JWT (mais justo para usuários legítimos compartilhando o mesmo IP).
+- Janela de 15 minutos com limite de 5 tentativas falhas.
+- Após exceder, retornar `429 Too Many Requests` com cabeçalho `Retry-After`.
+
+**Local:** `pages/api/creator-access.ts` — adicionar middleware de rate limiting ou wrapper.
+
+### 2.2 Duração reduzida do stash cookie (recomendação #2)
+
+**Problema:** O cookie `auth_token_creator` persiste por **8 horas** (configurado em `maxAge: 8 * 60 * 60`). Se um atacante ganhar acesso temporário ao dispositivo do usuário, pode restaurar a impersonação indefinidamente dentro desse período.
+
+**Solução:** Reduzir a duração do `auth_token_creator` de 8h para **1h** (`maxAge: 60 * 60`). O cookie `auth_token` (2h) permanece inalterado.
+
+**Justificativa:** 1 hora ainda é suficiente para o caso de uso principal (mudança de contexto de trabalho de curta duração), mas reduz a janela de ataque se o dispositivo for comprometido.
+
+**Local:** `pages/api/creator-access.ts:107-113` — alterar `maxAge: 8 * 60 * 60` para `maxAge: 60 * 60`.
+
+### 2.3 Auditoria e monitoramento (recomendação #3)
+
+**Problema:** O endpoint grava logs (`createLog`) quando o acesso é usado, mas não há como monitorar ou alertar sobre uso suspeito em tempo real. Não há métricas de "quantas vezes o acesso do criador foi usado hoje".
+
+**Solução:** Adicionar métricas de uso após cada operação bem-sucedida:
+
+- Incrementar um contador `creator_access_count` por tipo (enter, restore, transfer).
+- Log estruturado com `event: 'creator_access'`, `action: 'enter'|'restore'|'transfer'`, `creator_id`, `target_user_id`, `success: true/false`.
+- Esses dados podem ser lidos por um endpoint interno de diagnóstico (não exposto publicamente) ou integrados a um sistema de monitoring externo no futuro.
+
+**Local:** `pages/api/creator-access.ts` — após cada `res.status(200)` well-sucedido, chamar `createLog` com metadados adicionais (já existe, apenas precisa incluir o tipo de ação e o resultado).
+
+### 2.4 Rate limiting em rotas DELETE e PATCH (recomendação #4, opcional)
+
+**Problema:** As rotas `DELETE` (restore) e `PATCH` (transfer) também não têm proteção contra uso repetido.
+
+**Solução:** Aplicar a mesma política de rate limiting destas rotas também, embora o risco seja menor pois ambas exigem o cookie `auth_token_creator` existente (restauração) ou token de sessão atual (transferência).
+
+**Decisão:** **Adiar para uma versão futura.** O foco atual é `POST` (entrada de conta), que é o ponto mais crítico. As rotas `DELETE` e `PATCH` já têm guards múltiplos (stash check, token validation) que reduzem o vetor de ataque.
+
+---
+
+## 3. Implementação
+
+As três primeiras recomendações (#1, #2, #3) são **obrigatórias** para a próxima revisão de segurança. A #4 pode ser considerada futuramente.
+
+### 3.1 Rate limiting (arquivo: `pages/api/creator-access.ts`)
+
+Adicionar no topo do arquivo, após as importações:
+
+```typescript
+// Rate limiting simples por IP + token
+const rateLimitStore = new Map<string, { count: number; reset: number }>();
+
+function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+
+  if (!entry) {
+    rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
+    return { allowed: true, remaining: 4 };
+  }
+
+  if (now > entry.reset) {
+    rateLimitStore.set(key, { count: 1, reset: now + 15 * 60 * 1000 });
+    return { allowed: true, remaining: 4 };
+  }
+
+  if (entry.count >= 5) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  rateLimitStore.set(key, { count: entry.count + 1, reset: entry.reset });
+  return { allowed: true, remaining: 5 - entry.count };
+}
+```
+
+A cada requisição `POST`/`PATCH` bem-sucedida (antes de enviar cookies), verificar o rate limit e retornar `429` se excedido.
+
+### 3.2 Reduzir duração do stash cookie (arquivo: `pages/api/creator-access.ts`)
+
+Alterar linhas 107-113:
+
+```typescript
+// Antes:
+maxAge: 8 * 60 * 60, // 8 horas
+
+// Depois:
+maxAge: 60 * 60, // 1 hora
+```
+
+### 3.3 Métricas de uso (arquivo: `pages/api/creator-access.ts`)
+
+Após cada resposta `200` bem-sucedida, adicionar log enriquecido:
+
+```typescript
+await createLog(
+  req,
+  creator.id,
+  "CREATOR_ACCESS_ENTER", // ou 'CREATOR_ACCESS_RESTORE' / 'CREATOR_ACCESS_TRANSFER'
+  `Entrou na conta de ${targetUser.name || targetUser.email} (${
+    targetUser.id
+  })${reason ? `. Motivo: ${reason}` : ""}`,
+  { action: "enter", success: true, targetUserId: targetUser.id } // metadata extra
+);
+```
+
+O `createLog` já aceita metadados adicionais (quinto parâmetro), conforme já usado nas linhas 92-97 atuais.
+
+---
+
+## 4. Verificação / Gates
+
+Após a implementação, os seguintes gates devem ser verificados:
+
+| #   | Gate                                         | Comando                                       | Esperado                            |
+| --- | -------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+| 1   | Rate limit bloqueia > 5 tentativas em 15 min | Testes de integração manual ou vitest         | `429` após 6ª tentativa falha       |
+| 2   | `auth_token_creator` tem `max-age=3600`      | Ler o source code ou inspecionar headers HTTP | `Max-Age: 3600`                     |
+| 3   | Logs incluem metadados `action` e `success`  | Verificar `createLog` calls nos testes        | `action` presente nos logs de teste |
+| 4   | Não há regressão nas rotas existentes        | `yarn test` e `yarn build:opt`                | Todos os testes passando            |
+
+### 4.1 Testes de regressão obrigatórios
+
+| Cenário                                                       | Expected                                                        |
+| ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `POST /api/creator-access` com 6 senhas erradas seguidas      | `429` após a 5ª falha, `401` na 6ª só se houver reset de janela |
+| `POST /api/creator-access` com senha correta dentro do limite | `200` normalmente, cookies definidos                            |
+| `POST /api/creator-access` após janela expirar                | Contador reinicia, `200` normal                                 |
+| `DELETE /api/creator-access` com stash cookie                 | `200` + troca de cookies                                        |
+| `PATCH /api/creator-access` com dados válidos                 | `200` + atualização de role/isCreator                           |
+
+### 4.2 Cobertura de teste
+
+Os testes existentes em `__tests__/api/creator-access.test.ts` já cobrem 25 casos (RBAC, senha, guards). Após as mudanças:
+
+- **Novos testes**: rate limiting (mínimo 5 tentativas falhas → 429)
+- **Atualizações**: testes de stash cookie agora esperam `max-age=3600` nos headers
+- **Cobertura mínima**: 80% das novas linhas de código
+
+---
+
+## 5. Consequências
+
+### 5.1 Melhora de segurança
+
+- **Superfície de ataque reduzida:** rate limiting impede brute-force após vazamento de hash.
+- **Janela de ataque reduzida:** stash cookie de 1h em vez de 8h limita danos se dispositivo for comprometido.
+- **Visibilidade de uso:** métricas permitem detectar uso inusual de acesso do criador.
+
+### 5.2 Custos observáveis
+
+- **Complexidade moderada:** rate limiting requer mapa em memória (aceitável para o tamanho do app; em produção alta tráfego seria migrado para Redis).
+- **Mudança de comportamento:** usuários que dependem de sessões de criador longas (>1h) precisarão reentrar a senha com mais frequência. Isso é intencional e comunicado como endurecimento de segurança.
+- **Log slightly larger:** metadados adicionais nos logs de criação, mas volume negligível.
+
+### 5.3 Riscos
+
+- **Rate limit falso positivo:** se múltiplos usuários compartilham o mesmo IP (ex.: escritório corporativo), poderão ser bloqueados uns aos outros. Mitigação: usar token JWT como parte da chave de rate limit, não apenas IP.
+- **Confusão do usuário:** redução de 8h para 1h pode parecer "logout forçado". Documentação e UX devem comunicar que a senha será necessária com mais frequência.
+
+### 5.4 Dívidas abertas (fora do escopo desta ADR)
+
+- Rate limiting com armazenamento distribuído (Redis) para ambientes com múltiplas instâncias.
+- Integração com sistema de monitoring extern (Prometheus, Datadog) para os contadores de acesso.
+- Testes de carga para validar que rate limit não afeta fluxos legítimos em picos de uso.
+
+---
+
+## 6. Itens de ação
+
+- [ ] **Taxa de limite:** implementar `checkRateLimit` no handler `POST`/`PATCH` de `/api/creator-access`, com chave baseada em token JWT + IP.
+- [ ] **Duração do stash:** alterar `maxAge: 8 * 60 * 60` para `maxAge: 60 * 60` nas linhas de resposta `Set-Cookie`.
+- [ ] **Metadados de log:** enriquecer o `createLog` call bem-sucedido com objeto `{ action, success, targetUserId }` (ou equivalente por tipo de operação).
+- [ ] **Testes de regressão:** adicionar 3 novos casos de teste no `__tests__/api/creator-access.test.ts`: (a) rate limit 5 tentativas, (b) stash cookie max-age=3600, (c) log inclui action field.
+- [ ] **Verificar gates:** `yarn lint`, `npx tsc --noEmit`, `npx prisma validate`, `yarn build:opt` — todos verdes.
+- [ ] **Registrar em CHANGELOG.md:** entrada em `## [Unreleased]` sob `## ADR-005 Operations`.
+- [ ] **Atualizar versionamento:** versionar a nova mudança feita, com `npm version 2.28.x` para a versão final. (múltiplos patches devido commits atômicos)
+
+---
+
+## 7. Referências
+
+- `CONTEXT.md` §3.1 — segurança P0, itens 11-12 (logout não revoga token, segredos no histórico).
+- `SPECS.md` §4.3 — recurso de Acesso do Criador (incondicional e sempre autenticado por senha).
+- `ADR-002` — matriz RBAC canônica; `isCreator` como exceção singleton.
+- `CHANGELOG.md` — remoção de flags `CREATOR_ACCESS_ENABLED`/`CREATOR_ACCESS_REQUIRE_PASSWORD`.
+- `pages/api/creator-access.ts` — implementação atual das 3 rotas.
+- `__tests__/api/creator-access.test.ts` — 25 testes de cobertura atuais.

@@ -1,7 +1,7 @@
 // pages/api/qrcode/public-get.ts
 import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { minioPublicClient, BUCKET_NAME } from '@/lib/minio';
+import { getMinioClient, BUCKET_NAME } from '@/lib/minio';
 import { getMinioKeyFromUrl } from '@/lib/mediaUrl';
 import { parseFileUrls } from '@/lib/mediaReferences';
 import { canViewValue } from '@/lib/apiAuth';
@@ -38,7 +38,8 @@ const signMedia = async (url: string | null | undefined): Promise<string | null>
   const key = getMinioKeyFromUrl(url);
   if (!key) return url;
   try {
-    return await minioPublicClient.presignedGetObject(BUCKET_NAME, key, 3600);
+    const minio = getMinioClient();
+    return await minio.presignedGetObject(BUCKET_NAME, key, 3600);
   } catch {
     return url;
   }
