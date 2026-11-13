@@ -126,6 +126,9 @@ export interface Active {
 
   createdAt: string | Date;
   updatedAt: string | Date;
+
+  // NEW: attachments with aliases
+  attachments?: Attachment[];
 }
 
 // --- HELPER TYPES (for forms and APIs) ---

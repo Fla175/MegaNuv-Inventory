@@ -104,12 +104,24 @@ model Active {
   fatherSpace     FatherSpace @relation(fields: [fatherSpaceId], references: [id])
   parent          Active?     @relation("ActiveHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children        Active[]    @relation("ActiveHierarchy")
+  attachments     Attachment[] @relation("ActiveAttachments")
   Movement        Movement[]
 
   @@index([fatherSpaceId])
   @@index([parentId])
   @@index([createdById])
   @@index([categoryId])
+}
+
+model Attachment {
+  id          String    @id @default(uuid())
+  alias       String    // Friendly name shown to user
+  fileUrl     String    @db.Text  // MinIO URL (same format as Active.fileUrl)
+  activeId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  active      Active    @relation("ActiveAttachments", fields: [activeId], references: [id], onDelete: Cascade)
 }
 
 enum UserRole {

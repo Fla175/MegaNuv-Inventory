@@ -31,7 +31,7 @@ const getFileExtension = (urlOrPath: string): string => {
   const cleanPath = urlOrPath.split('?')[0];
   const extension = cleanPath.split('.').pop()?.toLowerCase() || '';
   return extension && extension !== cleanPath.toLowerCase() ? `.${extension}` : '';
-};
+}
 
 export default function FileUpload({
   value = [],
@@ -240,7 +240,7 @@ export default function FileUpload({
                       className="text-xs font-bold text-gray-700 dark:text-zinc-500 truncate hover:underline"
                       title={displayName}
                     >
-                      {displayName}
+                      {alias || displayName}
                     </a>
                     {extension !== "link" && (
                       <span
@@ -283,6 +283,39 @@ export default function FileUpload({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {currentFiles.length > 0 && (
+        <div className="flex flex-col gap-2 mt-3">
+          {currentFiles.map((_url, index) => (
+            <div key={index} className="flex items-center gap-2">
+              {showAliasInput && (
+                <input
+                  type="text"
+                  value={aliasInputs[String(index)] || ''}
+                  onChange={(e) => 
+                    setAliasInputs((prev) => ({
+                      ...prev,
+                      [String(index)]: e.target.value.trim(),
+                    }))
+                  }
+                  className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-white/10 rounded-xl pl-3 py-2 text-xs font-bold focus:border-indigo-500 outline-none"
+                  placeholder="Nome do documento"
+                  title="Digite um nome para este anexo"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => handleRemoveFile(index)}
+                disabled={loading}
+                className={`p-1.5 rounded-lg text-gray-400 shrink-0`}
+                title="Remover arquivo"
+              >
+                <X size={14}/>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

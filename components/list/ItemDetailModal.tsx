@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import QRCode from "react-qr-code";
+import { useState, useEffect } from "react";
 import { toLocalMediaUrl } from "@/lib/mediaUrl";
 import { getItemColors } from "@/lib/constants/colors";
 import { parseFileUrls, parseFileAliases } from "@/lib/mediaReferences";
@@ -41,6 +42,8 @@ interface ItemDetailModalProps {
   onClone: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
   onPrint: (item: InventoryItem) => void;
+  /** Optional pre-fetched attachments for the active */
+  attachments?: Attachment[];
 }
 
 export default function ItemDetailModal({
@@ -243,6 +246,52 @@ export default function ItemDetailModal({
                   Nenhum anexo cadastrado.
                 </p>
               )}
+
+              {/* Also display existing fileUrl documents (backward compatible) */}
+              {filesArray.length > 0 && attachments.length === 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                  {filesArray.map((url: string, index: number) => {
+                    const { extension, Icon, colorClass, bgClass } =
+                      getFileDetails(url);
+                    return (
+                      <a
+                        key={index + "legacy"}
+                        href={toLocalMediaUrl(url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex items-center gap-3 border rounded-xl p-3 transition-all hover:scale-[1.01] active:scale-[0.99] ${bgClass}`}
+                      >
+                        <div
+                          className={`p-2 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}
+                        >
+                          <Icon size={18} />
+                        </div>
+                        <div className="flex flex-col flex-1 overflow-hidden">
+                          {attachments.map((attachment: Attachment) => {
+                            const displayName = attachment.alias;
+                            return (
+                              <span
+                                key={displayName}
+                                className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate"
+                                title={displayName}
+                              >
+                                {displayName}
+                              </span>
+                            );
+                          })}
+                          {extension !== "link" && (
+                            <span
+                              className={`text-[9px] font-black uppercase tracking-wider ${colorClass}`}
+                            >
+                              .{extension}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           </div>
 
