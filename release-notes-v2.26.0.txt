@@ -1,0 +1,81 @@
+Release v2.26.0 — Simplificação do alias de anexo (ADR-012)
+
+# MegaNuv Inventory v2.26.0
+
+## O que mudou
+
+### Simplificação do alias de anexo (ADR-012)
+Substituímos a tabela separada `Attachment` por um campo `fileAlias` direto na tabela `Active`, paralelo ao `fileUrl` (formato CSV/JSON). Isso elimina:
+
+- Tabela separada `Attachment` e seu relacionamento Prisma
+- 3 rotas de API dedicadas (`POST/PATCH/DELETE /api/attachments/*`)
+- Dependência de `id` retornado pela API para renomear anexos
+- Múltiplas chamadas sequenciais (salvar ativo → criar anexo → atualizar id → renomear)
+
+### Arquivos alterados
+
+**Schema e migrations:**
+- `prisma/schema.prisma`: removido modelo `Attachment`, adicionado `fileAlias @db.Text` a `Active`
+- `prisma/migrations/20261113000000_add_file_alias_to_active/migration.sql`: adiciona coluna `fileAlias`
+- `prisma/migrations/20261113000000_delete_attachment_table/migration.sql`: remove tabela `Attachment`
+
+**API:**
+- `pages/api/actives/create.ts`: grava `fileAlias` na criação do ativo
+- `pages/api/actives/update.ts`: grava `fileAlias` na atualização do ativo
+- Deletados: `pages/api/attachments/[attachmentId].ts` e `pages/api/actives/[activeId]/attachments.ts`
+
+**Tipos:**
+- `types/inventory.ts`: removida interface `Attachment`, adicionado `fileAlias` a `Active` e `InventoryItem`
+
+**UI:**
+- `components/FileUpload.tsx`: `onChange` envia `{url, alias}[]`; prop `onRename` com botão SquarePen
+- `components/actives/activeForm.tsx`: estado `fileAlias`, `handleRenameSave`, renderização do `RenameAttachmentDialog`
+- `components/list/ItemDetailModal.tsx`: exibe `fileAlias` paralelo a `fileUrl`; removido `useEffect` de busca de attachments
+- `components/list/RenameAttachmentDialog.tsx`: modal dedicado para editar alias
+
+**Biblioteca:**
+- `lib/mediaReferences.ts`: função pura `parseFileAliases` (mesmo padrão de `parseFileUrls`)
+- `lib/apiAuth.ts`: predicado puro `canManageAttachments` (DIRECTOR/ADMIN/MANAGER)
+
+**ADRs (todos accepted):**
+- `ADR-008`: RBAC de anexos com predido puro
+- `ADR-009`: Ciclo completo do alias no upload
+- `ADR-010`: Dedup de getFileDetails
+- `ADR-011`: Adapter puro buildAttachmentViews (substituído por fileAlias direto)
+- `ADR-012`: Simplificação com fileAlias direto no Active
+
+**Novos arquivos:**
+- `GLOSSARY.md`: vocabulário de domínio
+- `__tests__/lib/fileDetails.test.ts`: 10 testes unitários
+- `__tests__/lib/apiAuth.test.ts`: 6 testes canManageAttachments
+
+## Backward compatibility
+
+- `Active.fileUrl` permanece inalterado (formato JSON array ou CSV)
+- `fileAlias` é nullable; registros existentes têm `null`
+- Nenhum dado perdido: a tabela `Attachment` foi removida (não havia dados em produção)
+
+## Ação necessária antes do deploy
+
+Executar a migration no banco de produção:
+
+```bash
+npx prisma migrate deploy
+```
+
+Ou aplicar manualmente:
+
+```sql
+ALTER TABLE `Active` ADD COLUMN `fileAlias` TEXT NULL;
+```
+
+## Verificação
+
+- `yarn lint`: 0 erros
+- `npx tsc --noEmit`: 0 erros
+- `npx prisma validate`: schema válido
+- `yarn vitest`: 398 testes passando (5 skipped)
+
+## Versionamento
+
+Bump de versão minor (2.25.2 → 2.26.0) conforme convenção de commits feat.
