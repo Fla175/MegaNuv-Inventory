@@ -99,6 +99,12 @@ export default async function handler(
         data.fileUrl.length > 0 ? data.fileUrl.join(",") : null;
     }
 
+    let normalizedFileAlias = data.fileAlias;
+    if (Array.isArray(data.fileAlias)) {
+      normalizedFileAlias =
+        data.fileAlias.length > 0 ? data.fileAlias.join(",") : null;
+    }
+
     for (let i = 0; i < quantity; i++) {
       let finalId = "";
       let isUnique = false;
@@ -125,6 +131,7 @@ export default async function handler(
           notes: data.notes || null,
           imageUrl: data.imageUrl || null,
           fileUrl: normalizedFileUrl || null,
+          fileAlias: normalizedFileAlias || null,
           fatherSpaceId: data.fatherSpaceId,
           parentId: data.parentId || null,
           isPhysicalSpace: isPhysicalSpace,

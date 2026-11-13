@@ -13,12 +13,13 @@ import {
 } from "lucide-react";
 import ImageUpload from "@/components/imageUpload";
 import FileUpload from "@/components/FileUpload";
+import RenameAttachmentDialog from "@/components/list/RenameAttachmentDialog";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { useEscapeKey } from "@/lib/hooks/useEscapeKey";
 import { UseToast } from "@/lib/context/ToastContext";
 import CustomSelect from "../customSelect";
 import type { Category, FatherSpace, InventoryItem } from "@/types/inventory";
-import { parseFileUrls } from "@/lib/mediaReferences";
+import { parseFileUrls, parseFileAliases } from "@/lib/mediaReferences";
 import type { SelectOptionType } from "@/lib/searchableSelect";
 
 interface ActiveFormProps {
@@ -55,6 +56,14 @@ export default function ActiveForm({
   ];
   useEscapeKey(onClose);
 
+  /** Controle do modal de renomear alias. */
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameAttachment, setRenameAttachment] = useState<{
+    url: string;
+    alias: string;
+    index: number;
+  } | null>(null);
+
   const [formData, setFormData] = useState({
     id: undefined as string | undefined,
     isPhysicalSpace: false,
@@ -70,6 +79,7 @@ export default function ActiveForm({
     notes: "",
     imageUrl: null as string | null,
     fileUrl: [] as string[],
+    fileAlias: [] as string[],
     locationId: "",
     locationType: "" as "space" | "active" | "",
   });
@@ -141,6 +151,7 @@ export default function ActiveForm({
         locationType: locType,
         serialNumbers: serialArray,
         fileUrl: fileUrlArray,
+        fileAlias: initialData.fileAlias ? parseFileAliases(initialData.fileAlias) : [],
       }));
     }
   }, [initialData, mode]);
@@ -172,6 +183,18 @@ export default function ActiveForm({
       updatedSerials[index] = value;
       return { ...prev, serialNumbers: updatedSerials };
     });
+  };
+
+  const handleRenameSave = (newAlias: string) => {
+    if (!renameAttachment) return;
+    setFormData((prev) => {
+      const newAliases = [...prev.fileAlias];
+      newAliases[renameAttachment.index] = newAlias;
+      return { ...prev, fileAlias: newAliases };
+    });
+    setRenameModalOpen(false);
+    setRenameAttachment(null);
+    toast.showSuccess("Alias atualizado com sucesso.");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -225,10 +248,18 @@ export default function ActiveForm({
         throw new Error(`${apiError}${apiDetails}`);
       }
 
+      const activeId = isEdit ? formData.id! : (data as { id?: string }).id;
+
+      if (!activeId) {
+        toast.showError("Não foi possível identificar o ID do ativo salvo.");
+        onClose();
+        return;
+      }
+
       toast.showSuccess(
         mode === "edit"
-          ? "Item updated successfully."
-          : "Item created successfully."
+          ? "Item atualizado com sucesso."
+          : "Item criado com sucesso."
       );
       onClose();
     } catch (error: unknown) {
@@ -651,10 +682,25 @@ export default function ActiveForm({
             />
             <FileUpload
               value={formData.fileUrl}
-              onChange={(url) =>
-                setFormData((prev) => ({ ...prev, fileUrl: url }))
-              }
+              onChange={(items) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  fileUrl: items.map((i) => i.url),
+                  fileAlias: items.map((i) => i.alias ?? ""),
+                }));
+              }}
+              onRename={(item) => {
+                const index = formData.fileUrl.indexOf(item.url);
+                if (index < 0) return;
+                setRenameAttachment({
+                  url: item.url,
+                  alias: item.alias,
+                  index,
+                });
+                setRenameModalOpen(true);
+              }}
               label="Enviar Documento"
+              showAliasInput
             />
           </div>
 
@@ -769,6 +815,22 @@ export default function ActiveForm({
             </form>
           </div>
         </div>
+      )}
+      {/* MODAL RENAME ANEXO */}
+      {renameModalOpen && renameAttachment && (
+        <RenameAttachmentDialog
+          isOpen={renameModalOpen}
+          onClose={() => {
+            setRenameModalOpen(false);
+            setRenameAttachment(null);
+          }}
+          attachment={{
+            id: renameAttachment.url,
+            alias: renameAttachment.alias,
+            fileUrl: renameAttachment.url,
+          }}
+          onSave={handleRenameSave}
+        />
       )}
     </div>
   );

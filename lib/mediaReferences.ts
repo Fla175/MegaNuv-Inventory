@@ -50,6 +50,20 @@ export function parseFileUrls(fileUrl: string | null | undefined): string[] {
   return Array.from(new Set(urls));
 }
 
+/**
+ * Lê `Active.fileAlias` nos mesmos dois formatos legados de `fileUrl`
+ * (JSON array ou CSV) e devolve a lista de aliases, paralela às URLs.
+ *
+ * **Nunca lança.** Mesmo comportamento de `parseFileUrls` para entradas
+ * corrompidas: devolve `[]`.
+ */
+export function parseFileAliases(fileAlias: string | null | undefined): string[] {
+  if (!fileAlias) return [];
+
+  const aliases = readAsJsonArray(fileAlias) ?? readAsCsv(fileAlias);
+  return Array.from(new Set(aliases));
+}
+
 /** `null` quando não é JSON array — o chamador cai para o CSV. */
 function readAsJsonArray(fileUrl: string): string[] | null {
   try {
