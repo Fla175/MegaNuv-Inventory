@@ -2,11 +2,22 @@ Release v2.26.0 — Simplificação do alias de anexo (ADR-012)
 
 # MegaNuv Inventory v2.26.0
 
+## Contexto de versão
+
+Esta release é um **ajuste de direção** em relação à versão previamente cadastrada **v2.27.11**. A v2.27.11 havia implementado o modelo `Attachment` como tabela separada para aliases de documentos (ADR-006/ADR-007), mas a implementação apresentou problemas de persistência (o `id` do anexo não era retornado de forma confiável, o estado local perdia a referência ao banco, e o fluxo exigia múltiplas chamadas sequenciais).
+
+A v2.26.0 **downgradeia** essa abordagem e simplifica: em vez de uma tabela separada, adiciona um único campo `fileAlias` diretamente na tabela `Active`, paralelo ao `fileUrl` existente.
+
 ## O que mudou
 
-### Simplificação do alias de anexo (ADR-012)
-Substituímos a tabela separada `Attachment` por um campo `fileAlias` direto na tabela `Active`, paralelo ao `fileUrl` (formato CSV/JSON). Isso elimina:
+### Criação da nova funcionalidade: alias de anexo direto no ativo (ADR-012)
 
+A funcionalidade de alias de anexo agora permite que cada documento anexado a um ativo tenha um nome amigável (`alias`) armazenado diretamente no registro do ativo, sem necessidade de tabela auxiliar.
+
+**Observação sobre a deleção da tabela `Attachment`:**
+A melhor solução encontrada durante a implementação foi adicionar um novo campo (`fileAlias`) diretamente na tabela `Active`, em vez de manter a tabela separada `Attachment`. Isso traz mais simplicidade e praticidade: o alias vive na mesma linha do `fileUrl`, é gravado no mesmo `PUT`/`POST` que salva o ativo, e não depende de `id` retornado por chamada separada à API. A tabela `Attachment` foi deletada do schema (não havia dados em produção).
+
+O que isso elimina:
 - Tabela separada `Attachment` e seu relacionamento Prisma
 - 3 rotas de API dedicadas (`POST/PATCH/DELETE /api/attachments/*`)
 - Dependência de `id` retornado pela API para renomear anexos
