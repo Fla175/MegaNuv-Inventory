@@ -4,55 +4,23 @@ import {
   UploadCloud,
   X,
   Loader2,
-  FileText,
   Link as LinkIcon,
   Plus,
-  Image as ImageIcon,
-  File as FileIcon,
-
+  SquarePen,
 } from 'lucide-react';
 import { UseToast } from '@/lib/context/ToastContext';
 import { validateUpload } from '@/lib/uploadPolicy';
+import { getFileDetails } from '@/components/list/FileDetails';
 
 interface FileUploadProps {
   value: string[];
-  onChange: (urls: string[]) => void;
+  onChange: (items: { url: string; alias?: string }[]) => void;
+  onRename?: (item: { url: string; alias: string }) => void;
   label?: string;
   maxFiles?: number;
   /** Optional: show alias input for new attachments */
   showAliasInput?: boolean;
 }
-
-/**
- * Derive the display data and visual style from the URL
- */
-const getFileDetails = (url: string) => {
-  const rawFilename = url.split('/').pop()?.split('?')[0] || 'link-anexado';
-  const displayName = decodeURIComponent(rawFilename);
-
-  const extMatch = displayName.match(/\.([a-zA-Z0-9]+)$/);
-  const extension = extMatch ? extMatch[1].toLowerCase() : 'link';
-
-  let Icon = LinkIcon;
-  let colorClass = 'text-gray-500';
-  let bgClass = 'bg-gray-50 dark:bg-zinc-800/50 border-gray-200 dark:border-zinc-700';
-
-  if (extension === 'pdf') {
-    Icon = FileText;
-    colorClass = 'text-red-500';
-    bgClass = 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50';
-  } else if (['doc', 'docx'].includes(extension)) {
-    Icon = FileIcon;
-    colorClass = 'text-blue-500';
-    bgClass = 'bg-blue-50 dark:bg-zinc-900/20 border-blue-200 dark:border-blue-800/50';
-  } else if (['png', 'jpg', 'jpeg'].includes(extension)) {
-    Icon = ImageIcon;
-    colorClass = 'text-emerald-500';
-    bgClass = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50';
-  }
-
-  return { displayName, extension, Icon, colorClass, bgClass };
-};
 
 /**
  * Derive the file extension from a URL path
@@ -63,11 +31,12 @@ const getFileExtension = (urlOrPath: string): string => {
   const cleanPath = urlOrPath.split('?')[0];
   const extension = cleanPath.split('.').pop()?.toLowerCase() || '';
   return extension && extension !== cleanPath.toLowerCase() ? `.${extension}` : '';
-}
+};
 
 export default function FileUpload({
   value = [],
   onChange,
+  onRename,
   label = "Documentos",
   maxFiles = 5,
   showAliasInput = false,
@@ -80,15 +49,17 @@ export default function FileUpload({
 
   const currentFiles = Array.isArray(value) ? value : [];
 
+  const toItems = (urls: string[]) => urls.map((url) => ({ url }));
+
   const handleAddLink = () => {
     if (!linkInput.trim()) return;
     if (currentFiles.length >= maxFiles) {
       toast.showWarning(`Você só pode anexar até ${maxFiles} arquivos.`);
       return;
     }
-    onChange([...currentFiles, linkInput.trim()]);
-    setLinkInput('');
-    // Clear alias input for the new file
+    const alias = showAliasInput ? aliasInputs[String(currentFiles.length)] || "" : "";
+    onChange([...toItems(currentFiles), { url: linkInput.trim(), alias }]);
+    setLinkInput("");
     setAliasInputs((prev) => {
       const newPrev = { ...prev };
       const newKey = String(currentFiles.length);
@@ -103,7 +74,6 @@ export default function FileUpload({
     try {
       setLoading(true);
 
-      // Call the existing API using the DELETE method
       const res = await fetch('/api/storage/delete-url', {
         method: 'DELETE',
         headers: {
@@ -118,9 +88,8 @@ export default function FileUpload({
         throw new Error(data.error || 'Erro ao remover o arquivo do servidor.');
       }
 
-      // If MinIO deletion succeeded, update local state
       const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
-      onChange(newFiles);
+      onChange(toItems(newFiles));
       toast.showSuccess('Arquivo removido com sucesso.');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro ao tentar remover o arquivo.';
@@ -131,20 +100,19 @@ export default function FileUpload({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 1. Capture multiple files
     let selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
 
-    // 2. Enforce the file count limit
     const availableSlots = maxFiles - currentFiles.length;
     if (selectedFiles.length > availableSlots) {
-      toast.showWarning(`Você só pode enviar mais ${availableSlots} arquivo(s). Os extras foram ignorados.`);
+      toast.showWarning(
+        `Você só pode enviar mais ${availableSlots} arquivo(s). Os extras foram ignorados.`
+      );
       selectedFiles = selectedFiles.slice(0, availableSlots);
     }
 
     const validFiles: File[] = [];
 
-    // 3. Per-file validation
     for (const file of selectedFiles) {
       const rejection = validateUpload({
         mimetype: file.type,
@@ -154,9 +122,9 @@ export default function FileUpload({
 
       if (rejection) {
         const reason =
-          rejection.field === 'size'
-            ? 'tamanho acima de 10MB.'
-            : 'tipo não permitido.';
+          rejection.field === "size"
+            ? "tamanho acima de 10MB."
+            : "tipo não permitido.";
         toast.showWarning(`Arquivo "${file.name}" recusado: ${reason}`);
         continue;
       }
@@ -165,68 +133,69 @@ export default function FileUpload({
     }
 
     if (validFiles.length === 0) {
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    // 4. Batch upload
     try {
       setLoading(true);
-      const newUploadedUrls: string[] = [];
+      const newUploadedItems: { url: string; alias?: string }[] = [];
 
-      // Map files to concurrent upload promises
       const uploadPromises = validFiles.map(async (file) => {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", file);
 
-        // Get alias for this file, if provided
         const aliasKey = String(currentFiles.length + validFiles.indexOf(file));
-        const alias = aliasInputs[aliasKey] || '';
+        const alias = aliasInputs[aliasKey] || "";
 
-        const res = await fetch('/api/storage/upload-url', {
-          method: 'POST',
+        const res = await fetch("/api/storage/upload-url", {
+          method: "POST",
           body: formData,
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Erro no upload de ${file.name}`);
+        if (!res.ok)
+          throw new Error(data.error || `Erro no upload de ${file.name}`);
 
-        // Return both the URL and the alias
         return { publicUrl: data.publicUrl as string, alias };
       });
 
-      // Run uploads concurrently and collect results
       const results = await Promise.allSettled(uploadPromises);
 
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
+        if (result.status === "fulfilled") {
           const { publicUrl, alias } = result.value;
-          newUploadedUrls.push(publicUrl);
-          // Store alias associated with this URL index
+          newUploadedItems.push({ url: publicUrl, alias });
           setAliasInputs((prev) => {
             const newPrev = { ...prev };
-            newPrev[String(currentFiles.length + index)] = alias || '';
+            newPrev[String(currentFiles.length + index)] = alias || "";
             return newPrev;
           });
-          toast.showSuccess(`${newUploadedUrls.length} arquivo(s) enviado(s) com sucesso.`);
+          toast.showSuccess(
+            `${newUploadedItems.length} arquivo(s) enviado(s) com sucesso.`
+          );
         } else {
-          toast.showError(`Erro ao enviar "${validFiles[index].name}": ${result.reason.message}`);
+          toast.showError(
+            `Erro ao enviar "${validFiles[index].name}": ${result.reason.message}`
+          );
         }
       });
 
-      // Store the URLs that succeeded
-      if (newUploadedUrls.length > 0) {
-        onChange([...currentFiles, ...newUploadedUrls]);
-        if (newUploadedUrls.length === validFiles.length) {
-          toast.showSuccess(`${newUploadedUrls.length} arquivo(s) enviado(s) com sucesso.`);
+      if (newUploadedItems.length > 0) {
+        onChange([...toItems(currentFiles), ...newUploadedItems]);
+        if (newUploadedItems.length === validFiles.length) {
+          toast.showSuccess(
+            `${newUploadedItems.length} arquivo(s) enviado(s) com sucesso.`
+          );
         }
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro crítico ao enviar arquivos.';
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro crítico ao enviar arquivos.";
       toast.showError(errorMessage);
     } finally {
       setLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -241,84 +210,79 @@ export default function FileUpload({
       >
         {label} ({currentFiles.length}/{maxFiles})
       </label>
-      
+
       {currentFiles.length > 0 && (
         <div className="flex flex-col gap-2 mb-3">
           {currentFiles.map((url, index) => {
             const fileExtension = getFileExtension(url);
-            const { displayName, extension, Icon, colorClass, bgClass } = getFileDetails(url);
-            const alias = aliasInputs[String(index)] || '';
+            const { extension, Icon, colorClass, bgClass } =
+              getFileDetails(url);
+            const alias = aliasInputs[String(index)] || "";
+            const displayName = alias || getFileDetails(url).displayName;
 
             return (
-              <div key={index} className={`flex items-center justify-between border rounded-xl p-2 transition-colors ${bgClass}`}>
+              <div
+                key={index}
+                className={`flex items-center justify-between border rounded-xl p-2 transition-colors ${bgClass}`}
+              >
                 <div className="flex items-center gap-3 overflow-hidden flex-1">
-                  <div className={`p-1.5 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}>
+                  <div
+                    className={`p-1.5 bg-white dark:bg-zinc-950 rounded-lg shadow-sm ${colorClass}`}
+                  >
                     <Icon size={16} />
                   </div>
-                  
+
                   <div className="flex flex-col flex-1 overflow-hidden">
-                    <a 
-                      href={url} 
-                      target="_blank" 
-                      rel="noreferrer" 
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
                       className="text-xs font-bold text-gray-700 dark:text-zinc-500 truncate hover:underline"
                       title={displayName}
                     >
-                      {alias || displayName}
+                      {displayName}
                     </a>
-                    {extension !== 'link' && (
-                      <span className={`text-[10px] font-black uppercase tracking-wider ${colorClass}`}>
+                    {extension !== "link" && (
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider ${colorClass}`}
+                      >
                         .{extension}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <button 
-                  type="button" 
-                  onClick={() => handleRemoveFile(index)}
-                  disabled={loading}
-                  className={`p-1.5 ml-2 rounded-lg text-gray-400 ${ ['.doc', '.docx'].includes(fileExtension) ? "hover:bg-blue-100 hover:text-blue-500" : ['.png', '.jpg', '.jpeg'].includes(fileExtension) ? "hover:bg-emerald-100 hover:text-emerald-500" : "hover:bg-red-100 hover:text-red-500" } transition-colors shrink-0`}
-                  title="Remover arquivo"
-                >
-                  <X size={14}/>
-                </button>
+                <div className="flex items-center gap-1">
+                  {onRename && (
+                    <button
+                      type="button"
+                      onClick={() => onRename({ url, alias })}
+                      disabled={loading}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0"
+                      title="Renomear documento"
+                    >
+                      <SquarePen size={14} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(index)}
+                    disabled={loading}
+                    className={`p-1.5 ml-2 rounded-lg text-gray-400 ${
+                      [".doc", ".docx"].includes(fileExtension)
+                        ? "hover:bg-blue-100 hover:text-blue-500"
+                        : [".png", ".jpg", ".jpeg"].includes(fileExtension)
+                        ? "hover:bg-emerald-100 hover:text-emerald-500"
+                        : "hover:bg-red-100 hover:text-red-500"
+                    } transition-colors shrink-0`}
+                    title="Remover arquivo"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {currentFiles.length > 0 && (
-        <div className="flex flex-col gap-2 mt-3">
-          {currentFiles.map((_url, index) => (
-            <div key={index} className="flex items-center gap-2">
-              {showAliasInput && (
-                <input
-                  type="text"
-                  value={aliasInputs[String(index)] || ''}
-                  onChange={(e) => 
-                    setAliasInputs((prev) => ({
-                      ...prev,
-                      [String(index)]: e.target.value.trim(),
-                    }))
-                  }
-                  className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-white/10 rounded-xl pl-3 py-2 text-xs font-bold focus:border-indigo-500 outline-none"
-                  placeholder="Nome do documento"
-                  title="Digite um nome para este anexo"
-                />
-              )}
-              <button
-                type="button"
-                onClick={() => handleRemoveFile(index)}
-                disabled={loading}
-                className={`p-1.5 rounded-lg text-gray-400 shrink-0`}
-                title="Remover arquivo"
-              >
-                <X size={14}/>
-              </button>
-            </div>
-          ))}
         </div>
       )}
 
@@ -326,17 +290,22 @@ export default function FileUpload({
         <>
           <div className="flex gap-2 mb-2">
             <div className="relative flex-1">
-                <LinkIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                <input 
-                    type="text" 
-                    placeholder="Cole um link..." 
-                    className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-bold focus:border-indigo-500 outline-none"
-                    value={linkInput}
-                    onChange={(e) => setLinkInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLink())}
-                />
+              <LinkIcon
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Cole um link..."
+                className="w-full bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs font-bold focus:border-indigo-500 outline-none"
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && (e.preventDefault(), handleAddLink())
+                }
+              />
             </div>
-            <button 
+            <button
               type="button"
               onClick={handleAddLink}
               disabled={!linkInput.trim()}
@@ -346,24 +315,34 @@ export default function FileUpload({
             </button>
           </div>
 
-          <div 
+          <div
             onClick={() => !loading && fileInputRef.current?.click()}
             className="relative w-full h-16 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900 hover:border-indigo-400 transition-all cursor-pointer overflow-hidden flex items-center justify-center gap-2"
           >
-            <input 
+            <input
               id={fileInputId}
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileSelect} 
-              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" 
-              className="hidden" 
-              multiple 
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              className="hidden"
+              multiple
             />
-            
+
             {loading ? (
-              <><Loader2 className="animate-spin text-indigo-600" size={16}/> <span className="text-[10px] font-bold text-indigo-600">Enviando arquivos...</span></>
+              <>
+                <Loader2 className="animate-spin text-indigo-600" size={16} />{" "}
+                <span className="text-[10px] font-bold text-indigo-600">
+                  Enviando arquivos...
+                </span>
+              </>
             ) : (
-              <><UploadCloud className="text-gray-400" size={16}/> <span className="text-[10x] pl-2 font-bold text-gray-400 uppercase">Enviar documento(s)</span></>
+              <>
+                <UploadCloud className="text-gray-400" size={16} />{" "}
+                <span className="text-[10x] text-[10px] pl-2 font-bold uppercase">
+                  Enviar documento(s)
+                </span>
+              </>
             )}
           </div>
         </>

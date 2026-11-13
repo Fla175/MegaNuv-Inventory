@@ -121,12 +121,11 @@ export interface Active {
 
   imageUrl?: string | null;
   fileUrl?: string | null;
+  /** Alias amigável opcional, paralelo ao fileUrl (segue mesmo formato CSV/JSON) */
+  fileAlias?: string | null;
 
   createdAt: string | Date;
   updatedAt: string | Date;
-
-  // NEW: attachments with aliases
-  attachments?: Attachment[];
 }
 
 // --- HELPER TYPES (for forms and APIs) ---
@@ -174,6 +173,8 @@ export interface InventoryItem {
   createdById?: string | null;
   imageUrl?: string | null;
   fileUrl?: string | null;
+  /** Alias amigável opcional, paralelo ao fileUrl (segue mesmo formato CSV/JSON) */
+  fileAlias?: string | null;
 
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -192,16 +193,6 @@ export interface InventoryItem {
 export interface ActiveMediaRow {
   fileUrl?: string | null;
   imageUrl?: string | null;
-}
-
-/** Attachment with alias for document links. */
-export interface Attachment {
-  id: string;
-  alias: string;
-  fileUrl: string;
-  activeId: string;
-  createdAt: string | Date;
-  updatedAt: string | Date;
 }
 
 /** LINHA DE `FatherSpace` — só `imageUrl` guarda mídia. */

@@ -76,3 +76,16 @@ export function canViewValue(user: Pick<AuthTokenPayload, 'role'> | null | undef
     user?.role === 'DIRECTOR' || user?.role === 'ADMIN' || user?.role === 'MANAGER'
   );
 }
+
+/**
+ * Verdadeiro para papéis autorizados a gerenciar anexos (criar, renomear e excluir) —
+ * decisão de ADR-007 §E: MANAGER, ADMIN e DIRECTOR podem gerenciar anexos; **apenas
+ * VIEWER** não pode (só visualiza). Predicado puro, ao lado de `canViewValue`, para
+ * os endpoints de anexo aplicarem o mesmo critério: a regra de acesso vive no
+ * servidor, não na UI.
+ */
+export function canManageAttachments(user: Pick<AuthTokenPayload, 'role'> | null | undefined): boolean {
+  return (
+    user?.role === 'DIRECTOR' || user?.role === 'ADMIN' || user?.role === 'MANAGER'
+  );
+}

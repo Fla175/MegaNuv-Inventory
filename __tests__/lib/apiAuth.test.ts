@@ -10,7 +10,7 @@ vi.mock('@/lib/auth', () => ({
   AuthTokenPayload: {},
 }));
 
-const { getSessionToken, getSessionUser, isViewer, isPrivileged } = await import('@/lib/apiAuth');
+const { getSessionToken, getSessionUser, isViewer, isPrivileged, canViewValue, canManageAttachments } = await import('@/lib/apiAuth');
 
 describe('getSessionToken', () => {
   it('lê o cookie auth_token', () => {
@@ -93,6 +93,40 @@ describe('isViewer / isPrivileged', () => {
     expect(isPrivileged({ role: 'ADMIN' })).toBe(true);
     expect(isPrivileged({ role: 'MANAGER' })).toBe(false);
     expect(isPrivileged({ role: 'VIEWER' })).toBe(false);
+  });
+});
+
+describe('canManageAttachments (ADR-007)', () => {
+  it('permite DIRECTOR, ADMIN e MANAGER gerenciarem anexos', () => {
+    expect(canManageAttachments({ role: 'DIRECTOR' })).toBe(true);
+    expect(canManageAttachments({ role: 'ADMIN' })).toBe(true);
+    expect(canManageAttachments({ role: 'MANAGER' })).toBe(true);
+  });
+
+  it('nega VIEWER a gerência de anexos', () => {
+    expect(canManageAttachments({ role: 'VIEWER' })).toBe(false);
+  });
+
+  it('nega quando não há usuário', () => {
+    expect(canManageAttachments(null)).toBe(false);
+    expect(canManageAttachments(undefined)).toBe(false);
+  });
+});
+
+describe('canViewValue (regressão)', () => {
+  it('permite DIRECTOR, ADMIN e MANAGER verem o valor', () => {
+    expect(canViewValue({ role: 'DIRECTOR' })).toBe(true);
+    expect(canViewValue({ role: 'ADMIN' })).toBe(true);
+    expect(canViewValue({ role: 'MANAGER' })).toBe(true);
+  });
+
+  it('nega VIEWER a ver o valor', () => {
+    expect(canViewValue({ role: 'VIEWER' })).toBe(false);
+  });
+
+  it('nega quando não há usuário', () => {
+    expect(canViewValue(null)).toBe(false);
+    expect(canViewValue(undefined)).toBe(false);
   });
 });
 describe('regressão: token presente porém inválido não autentica (SPECS.md §5.1)', () => {

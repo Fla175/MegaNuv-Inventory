@@ -26,6 +26,7 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
       notes,
       imageUrl,
       fileUrl,
+      fileAlias,
       applyToSimilar,
     } = req.body;
 
@@ -48,6 +49,10 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
     const formattedFileUrl = Array.isArray(fileUrl)
       ? fileUrl.filter(Boolean).join(",")
       : fileUrl || null;
+
+    const formattedFileAlias = Array.isArray(fileAlias)
+      ? fileAlias.filter(Boolean).join(",")
+      : fileAlias || null;
 
     // Etapa 1 da ADR-001 (1.2): "ausente" ≠ "zerado". O parse incondicional
     // anterior (`parseFloat(fixedValue) || 0`) gravava `0` sempre que o campo
@@ -78,6 +83,7 @@ const handler = async (req: AuthenticatedNextApiRequest, res: NextApiResponse) =
       notes: notes || null,
       imageUrl: imageUrl || null,
       fileUrl: formattedFileUrl,
+      fileAlias: formattedFileAlias,
     };
 
     const updatedActive = await prisma.active.update({
