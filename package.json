@@ -1,6 +1,6 @@
 {
   "name": "inventory-meganuv",
-  "version": "2.27.11",
+  "version": "2.26.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
